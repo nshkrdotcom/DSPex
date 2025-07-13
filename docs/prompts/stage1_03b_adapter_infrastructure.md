@@ -28,7 +28,7 @@ During the Prompt 3 update for 3-layer testing integration, several critical inf
 
 **Comprehensive Type Mapping with 3-Layer Test Support:**
 ```elixir
-defmodule AshDSPy.Adapters.TypeConverter do
+defmodule DSPex.Adapters.TypeConverter do
   @moduledoc """
   Type conversion between Elixir and adapter-specific formats.
   Enhanced with test layer awareness and ML-specific types.
@@ -225,7 +225,7 @@ end
 
 **Comprehensive Error Handling with Test Layer Support:**
 ```elixir
-defmodule AshDSPy.Adapters.ErrorHandler do
+defmodule DSPex.Adapters.ErrorHandler do
   @moduledoc """
   Standardized error handling for adapter operations with test layer awareness.
   """
@@ -245,7 +245,7 @@ defmodule AshDSPy.Adapters.ErrorHandler do
   Wrap error with context and test layer awareness.
   """
   def wrap_error(error, context \\ %{}) do
-    test_layer = AshDSPy.Testing.TestMode.effective_test_mode()
+    test_layer = DSPex.Testing.TestMode.effective_test_mode()
     
     case error do
       {:error, :timeout} ->
@@ -389,19 +389,19 @@ end
 
 **Factory with Test Layer Integration:**
 ```elixir
-defmodule AshDSPy.Adapters.Factory do
+defmodule DSPex.Adapters.Factory do
   @moduledoc """
   Factory for creating and managing adapter instances with test layer awareness.
   """
   
-  alias AshDSPy.Adapters.{Registry, ErrorHandler, TypeConverter}
+  alias DSPex.Adapters.{Registry, ErrorHandler, TypeConverter}
   
   @doc """
   Create adapter with test layer specific configuration.
   """
   def create_adapter(adapter_type \\ nil, opts \\ []) do
     test_layer = Keyword.get(opts, :test_layer) || 
-                 AshDSPy.Testing.TestMode.effective_test_mode()
+                 DSPex.Testing.TestMode.effective_test_mode()
     
     resolved_adapter_type = adapter_type || 
                            Registry.get_adapter_for_test_layer(test_layer)
@@ -425,7 +425,7 @@ defmodule AshDSPy.Adapters.Factory do
     timeout = Keyword.get(opts, :timeout, get_default_timeout())
     max_retries = Keyword.get(opts, :max_retries, get_default_retries())
     test_layer = Keyword.get(opts, :test_layer) ||
-                 AshDSPy.Testing.TestMode.effective_test_mode()
+                 DSPex.Testing.TestMode.effective_test_mode()
     
     context = %{
       adapter: adapter,
@@ -441,7 +441,7 @@ defmodule AshDSPy.Adapters.Factory do
   """
   def execute_with_signature_validation(adapter, signature_module, inputs, opts \\ []) do
     test_layer = Keyword.get(opts, :test_layer) ||
-                 AshDSPy.Testing.TestMode.effective_test_mode()
+                 DSPex.Testing.TestMode.effective_test_mode()
     
     with {:ok, validated_inputs} <- validate_inputs_for_signature(signature_module, inputs, test_layer),
          {:ok, adapter_inputs} <- convert_inputs_for_adapter(adapter, signature_module, validated_inputs, test_layer) do
@@ -487,21 +487,21 @@ defmodule AshDSPy.Adapters.Factory do
     test_layer = Keyword.get(opts, :test_layer)
     
     case adapter_module do
-      AshDSPy.Adapters.PythonPort ->
+      DSPex.Adapters.PythonPort ->
         if test_layer == :layer_3 do
           check_python_bridge_available()
         else
           {:ok, :test_mode_bypass}
         end
       
-      AshDSPy.Adapters.BridgeMock ->
+      DSPex.Adapters.BridgeMock ->
         if test_layer == :layer_2 do
           check_bridge_mock_available()
         else
           {:ok, :test_mode_bypass}
         end
       
-      AshDSPy.Adapters.Mock ->
+      DSPex.Adapters.Mock ->
         ensure_mock_started(opts)
       
       _ ->
@@ -544,14 +544,14 @@ defmodule AshDSPy.Adapters.Factory do
   defp convert_inputs_for_adapter(adapter, signature_module, inputs, test_layer) do
     # Convert inputs based on adapter requirements
     case adapter do
-      AshDSPy.Adapters.PythonPort ->
+      DSPex.Adapters.PythonPort ->
         TypeConverter.convert_signature_to_format(signature_module, :python, test_layer: test_layer)
         {:ok, inputs}  # Python adapter handles conversion internally
       
-      AshDSPy.Adapters.BridgeMock ->
+      DSPex.Adapters.BridgeMock ->
         {:ok, inputs}  # Protocol testing uses same format
       
-      AshDSPy.Adapters.Mock ->
+      DSPex.Adapters.Mock ->
         {:ok, inputs}  # Mock accepts any format
       
       _ ->
@@ -560,29 +560,29 @@ defmodule AshDSPy.Adapters.Factory do
   end
   
   defp check_python_bridge_available do
-    case Process.whereis(AshDSPy.PythonBridge.Bridge) do
+    case Process.whereis(DSPex.PythonBridge.Bridge) do
       nil -> {:error, "Python bridge not running"}
       _pid -> {:ok, :available}
     end
   end
   
   defp check_bridge_mock_available do
-    case AshDSPy.Testing.BridgeMockServer.running?() do
+    case DSPex.Testing.BridgeMockServer.running?() do
       true -> {:ok, :available}
       false -> {:error, "Bridge mock server not running"}
     end
   end
   
   defp ensure_mock_started(opts) do
-    case Process.whereis(AshDSPy.Adapters.Mock) do
-      nil -> AshDSPy.Adapters.Mock.start_link(opts)
+    case Process.whereis(DSPex.Adapters.Mock) do
+      nil -> DSPex.Adapters.Mock.start_link(opts)
       _pid -> {:ok, :already_started}
     end
   end
   
   # Test layer specific defaults
   defp get_default_timeout do
-    case AshDSPy.Testing.TestMode.effective_test_mode() do
+    case DSPex.Testing.TestMode.effective_test_mode() do
       :layer_1 -> 1_000   # Fast for mock tests
       :layer_2 -> 5_000   # Medium for protocol tests
       :layer_3 -> 30_000  # Longer for integration tests
@@ -591,7 +591,7 @@ defmodule AshDSPy.Adapters.Factory do
   end
   
   defp get_default_retries do
-    case AshDSPy.Testing.TestMode.effective_test_mode() do
+    case DSPex.Testing.TestMode.effective_test_mode() do
       :layer_1 -> 0  # No retries for mock (should be deterministic)
       :layer_2 -> 2  # Some retries for protocol tests
       :layer_3 -> 3  # More retries for integration tests
@@ -605,7 +605,7 @@ end
 
 **Cross-Adapter Behavior Compliance Testing:**
 ```elixir
-defmodule AshDSPy.Adapters.BehaviorComplianceTest do
+defmodule DSPex.Adapters.BehaviorComplianceTest do
   @moduledoc """
   Comprehensive behavior compliance testing for all adapters across test layers.
   """
@@ -613,33 +613,33 @@ defmodule AshDSPy.Adapters.BehaviorComplianceTest do
   use ExUnit.Case
   
   defmodule TestSignature do
-    use AshDSPy.Signature
+    use DSPex.Signature
     
     signature question: :string -> answer: :string, confidence: :float
   end
   
   defmodule ComplexTestSignature do
-    use AshDSPy.Signature
+    use DSPex.Signature
     
     signature input: :string, context: {:list, :string} -> 
              result: :string, reasoning: {:list, :string}, confidence: :probability
   end
   
   @adapters_by_layer %{
-    layer_1: AshDSPy.Adapters.Mock,
-    layer_2: AshDSPy.Adapters.BridgeMock,
-    layer_3: AshDSPy.Adapters.PythonPort
+    layer_1: DSPex.Adapters.Mock,
+    layer_2: DSPex.Adapters.BridgeMock,
+    layer_3: DSPex.Adapters.PythonPort
   }
   
   @test_layers [:layer_1, :layer_2, :layer_3]
   
   setup do
     # Reset test environment
-    AshDSPy.Testing.TestMode.set_test_mode(:mock_adapter)
+    DSPex.Testing.TestMode.set_test_mode(:mock_adapter)
     
     # Start required services
-    {:ok, _} = AshDSPy.Adapters.Mock.start_link()
-    AshDSPy.Adapters.Mock.reset()
+    {:ok, _} = DSPex.Adapters.Mock.start_link()
+    DSPex.Adapters.Mock.reset()
     
     :ok
   end
@@ -656,7 +656,7 @@ defmodule AshDSPy.Adapters.BehaviorComplianceTest do
           :layer_3 -> :full_integration
         end
         
-        AshDSPy.Testing.TestMode.set_test_mode(test_mode)
+        DSPex.Testing.TestMode.set_test_mode(test_mode)
         
         {:ok, adapter: adapter, test_layer: unquote(layer)}
       end
@@ -767,20 +767,20 @@ defmodule AshDSPy.Adapters.BehaviorComplianceTest do
   describe "Factory pattern compliance" do
     test "creates correct adapters for test layers" do
       for {layer, expected_adapter} <- @adapters_by_layer do
-        {:ok, adapter} = AshDSPy.Adapters.Factory.create_adapter(nil, test_layer: layer)
+        {:ok, adapter} = DSPex.Adapters.Factory.create_adapter(nil, test_layer: layer)
         assert adapter == expected_adapter
       end
     end
     
     test "validates adapter requirements" do
-      {:ok, _adapter} = AshDSPy.Adapters.Factory.create_adapter(:mock, test_layer: :layer_1)
+      {:ok, _adapter} = DSPex.Adapters.Factory.create_adapter(:mock, test_layer: :layer_1)
     end
     
     test "handles execution with retry logic" do
-      adapter = AshDSPy.Adapters.Mock
+      adapter = DSPex.Adapters.Mock
       
       # This should succeed
-      {:ok, result} = AshDSPy.Adapters.Factory.execute_with_adapter(
+      {:ok, result} = DSPex.Adapters.Factory.execute_with_adapter(
         adapter, 
         :health_check, 
         [],
@@ -793,25 +793,25 @@ defmodule AshDSPy.Adapters.BehaviorComplianceTest do
   
   describe "Type conversion compliance" do
     test "converts basic types correctly" do
-      assert AshDSPy.Adapters.TypeConverter.convert_type(:string, :python) == "str"
-      assert AshDSPy.Adapters.TypeConverter.convert_type(:integer, :python) == "int"
-      assert AshDSPy.Adapters.TypeConverter.convert_type({:list, :string}, :python) == "List[str]"
+      assert DSPex.Adapters.TypeConverter.convert_type(:string, :python) == "str"
+      assert DSPex.Adapters.TypeConverter.convert_type(:integer, :python) == "int"
+      assert DSPex.Adapters.TypeConverter.convert_type({:list, :string}, :python) == "List[str]"
     end
     
     test "validates inputs with test layer awareness" do
-      {:ok, "hello"} = AshDSPy.Adapters.TypeConverter.validate_input("hello", :string, test_layer: :layer_1)
-      {:ok, 42} = AshDSPy.Adapters.TypeConverter.validate_input(42, :integer, test_layer: :layer_2)
-      {:ok, [1, 2, 3]} = AshDSPy.Adapters.TypeConverter.validate_input([1, 2, 3], {:list, :integer}, test_layer: :layer_3)
+      {:ok, "hello"} = DSPex.Adapters.TypeConverter.validate_input("hello", :string, test_layer: :layer_1)
+      {:ok, 42} = DSPex.Adapters.TypeConverter.validate_input(42, :integer, test_layer: :layer_2)
+      {:ok, [1, 2, 3]} = DSPex.Adapters.TypeConverter.validate_input([1, 2, 3], {:list, :integer}, test_layer: :layer_3)
     end
     
     test "rejects invalid inputs appropriately" do
-      {:error, _} = AshDSPy.Adapters.TypeConverter.validate_input(42, :string, test_layer: :layer_3)
-      {:error, _} = AshDSPy.Adapters.TypeConverter.validate_input("hello", :integer, test_layer: :layer_3)
-      {:error, _} = AshDSPy.Adapters.TypeConverter.validate_input([1, "two"], {:list, :integer}, test_layer: :layer_3)
+      {:error, _} = DSPex.Adapters.TypeConverter.validate_input(42, :string, test_layer: :layer_3)
+      {:error, _} = DSPex.Adapters.TypeConverter.validate_input("hello", :integer, test_layer: :layer_3)
+      {:error, _} = DSPex.Adapters.TypeConverter.validate_input([1, "two"], {:list, :integer}, test_layer: :layer_3)
     end
     
     test "converts signatures to different formats" do
-      signature_def = AshDSPy.Adapters.TypeConverter.convert_signature_to_format(TestSignature, :python)
+      signature_def = DSPex.Adapters.TypeConverter.convert_signature_to_format(TestSignature, :python)
       
       assert Map.has_key?(signature_def, :inputs)
       assert Map.has_key?(signature_def, :outputs)
@@ -822,7 +822,7 @@ defmodule AshDSPy.Adapters.BehaviorComplianceTest do
   
   describe "Error handling compliance" do
     test "wraps errors with proper context" do
-      error = AshDSPy.Adapters.ErrorHandler.wrap_error({:error, :timeout}, %{context: :test})
+      error = DSPex.Adapters.ErrorHandler.wrap_error({:error, :timeout}, %{context: :test})
       
       assert error.type == :timeout
       assert error.recoverable == true
@@ -832,19 +832,19 @@ defmodule AshDSPy.Adapters.BehaviorComplianceTest do
     
     test "provides test layer specific retry delays" do
       # Set different test modes and verify retry delays
-      AshDSPy.Testing.TestMode.set_test_mode(:mock_adapter)
-      error1 = AshDSPy.Adapters.ErrorHandler.wrap_error({:error, :timeout})
+      DSPex.Testing.TestMode.set_test_mode(:mock_adapter)
+      error1 = DSPex.Adapters.ErrorHandler.wrap_error({:error, :timeout})
       
-      AshDSPy.Testing.TestMode.set_test_mode(:full_integration)
-      error2 = AshDSPy.Adapters.ErrorHandler.wrap_error({:error, :timeout})
+      DSPex.Testing.TestMode.set_test_mode(:full_integration)
+      error2 = DSPex.Adapters.ErrorHandler.wrap_error({:error, :timeout})
       
       # Layer 1 should have shorter delays than Layer 3
       assert error1.retry_after < error2.retry_after
     end
     
     test "formats errors with test context" do
-      error = AshDSPy.Adapters.ErrorHandler.wrap_error({:error, "test error"})
-      formatted = AshDSPy.Adapters.ErrorHandler.format_error(error)
+      error = DSPex.Adapters.ErrorHandler.wrap_error({:error, "test error"})
+      formatted = DSPex.Adapters.ErrorHandler.format_error(error)
       
       assert is_binary(formatted)
       assert formatted =~ "test error"
@@ -859,13 +859,13 @@ Based on the analysis showing these components are critical infrastructure (not 
 
 ### FILE STRUCTURE TO CREATE:
 ```
-lib/ash_dspy/adapters/
+lib/dspex/adapters/
 ├── type_converter.ex     # Enhanced type conversion with test layer support
 ├── error_handler.ex      # Standardized error handling with retry logic
 ├── factory.ex            # Adapter lifecycle management and execution
 └── supervisor.ex         # Adapter supervision (if needed)
 
-test/ash_dspy/adapters/
+test/dspex/adapters/
 ├── behavior_compliance_test.exs  # Cross-adapter behavior testing
 ├── type_converter_test.exs       # Type conversion comprehensive tests
 ├── error_handler_test.exs        # Error handling pattern tests

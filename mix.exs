@@ -1,9 +1,9 @@
-defmodule AshDSPex.MixProject do
+defmodule DSPex.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :ash_dspex,
+      app: :dspex,
       version: "0.1.0",
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
@@ -25,7 +25,7 @@ defmodule AshDSPex.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {AshDSPex.Application, []}
+      mod: {DSPex.Application, []}
     ]
   end
 

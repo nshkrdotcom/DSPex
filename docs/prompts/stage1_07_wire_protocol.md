@@ -37,7 +37,7 @@ From STAGE_1_FOUNDATION_IMPLEMENTATION.md and Python bridge implementation:
 From STAGE_1_FOUNDATION_IMPLEMENTATION.md:
 
 ```elixir
-defmodule AshDSPy.PythonBridge.Protocol do
+defmodule DSPex.PythonBridge.Protocol do
   @moduledoc """
   Wire protocol for Python bridge communication.
   """
@@ -72,13 +72,13 @@ end
 
 **Enhanced Protocol with Versioning and Validation:**
 ```elixir
-defmodule AshDSPy.Protocol.WireProtocol do
+defmodule DSPex.Protocol.WireProtocol do
   @moduledoc """
   Comprehensive wire protocol for communication with external systems.
   Supports versioning, compression, validation, and multiple message types.
   """
   
-  alias AshDSPy.Protocol.{MessageFraming, Validation, Compression}
+  alias DSPex.Protocol.{MessageFraming, Validation, Compression}
   
   @protocol_version "1.0"
   @supported_versions ["1.0"]
@@ -299,7 +299,7 @@ end
 
 **Binary Message Framing with Length Prefix:**
 ```elixir
-defmodule AshDSPy.Protocol.MessageFraming do
+defmodule DSPex.Protocol.MessageFraming do
   @moduledoc """
   Message framing for reliable binary communication.
   Supports length-prefixed messages with optional compression indicators.
@@ -316,7 +316,7 @@ defmodule AshDSPy.Protocol.MessageFraming do
     
     data_length = byte_size(data)
     
-    if data_length > AshDSPy.Protocol.WireProtocol.max_message_size() do
+    if data_length > DSPex.Protocol.WireProtocol.max_message_size() do
       {:error, "Message too large: #{data_length} bytes"}
     else
       header = <<
@@ -371,7 +371,7 @@ defmodule AshDSPy.Protocol.MessageFraming do
   end
   
   def max_payload_size do
-    AshDSPy.Protocol.WireProtocol.max_message_size() - @total_header_size
+    DSPex.Protocol.WireProtocol.max_message_size() - @total_header_size
   end
 end
 ```
@@ -380,13 +380,13 @@ end
 
 **Comprehensive Message Validation:**
 ```elixir
-defmodule AshDSPy.Protocol.Validation do
+defmodule DSPex.Protocol.Validation do
   @moduledoc """
   Validation system for wire protocol messages.
   Ensures message integrity, format compliance, and security.
   """
   
-  alias AshDSPy.Protocol.WireProtocol
+  alias DSPex.Protocol.WireProtocol
   
   def validate_message(%WireProtocol{} = message) do
     validations = [
@@ -562,7 +562,7 @@ end
 
 **Optional Message Compression:**
 ```elixir
-defmodule AshDSPy.Protocol.Compression do
+defmodule DSPex.Protocol.Compression do
   @moduledoc """
   Optional compression support for large messages.
   Uses gzip compression with configurable thresholds.
@@ -658,13 +658,13 @@ end
 
 **Multi-Provider JSON Schema Generation:**
 ```elixir
-defmodule AshDSPy.Protocol.JsonSchema do
+defmodule DSPex.Protocol.JsonSchema do
   @moduledoc """
   Comprehensive JSON schema generation for multiple providers and use cases.
   Supports OpenAI, Anthropic, Google, and custom schema formats.
   """
   
-  alias AshDSPy.Types.{Registry, Serializer}
+  alias DSPex.Types.{Registry, Serializer}
   
   @providers [:openai, :anthropic, :google, :custom]
   @schema_version "2020-12"
@@ -1064,13 +1064,13 @@ end
 
 **Wire Protocol and JSON Schema Testing:**
 ```elixir
-defmodule AshDSPy.Protocol.WireProtocolTest do
+defmodule DSPex.Protocol.WireProtocolTest do
   use ExUnit.Case
   
-  alias AshDSPy.Protocol.{WireProtocol, MessageFraming, Validation, Compression, JsonSchema}
+  alias DSPex.Protocol.{WireProtocol, MessageFraming, Validation, Compression, JsonSchema}
   
   defmodule TestSignature do
-    use AshDSPy.Signature
+    use DSPex.Signature
     
     signature question: :string, context: {:list, :string} -> 
              answer: :string, confidence: :probability, reasoning: :reasoning_chain
@@ -1311,7 +1311,7 @@ defmodule AshDSPy.Protocol.WireProtocolTest do
     
     test "applies constraints to schema fields" do
       defmodule ConstrainedSignature do
-        use AshDSPy.Signature
+        use DSPex.Signature
         
         signature name: {:string, min_length: 2, max_length: 50} -> 
                  score: {:integer, min: 0, max: 100}
@@ -1330,7 +1330,7 @@ defmodule AshDSPy.Protocol.WireProtocolTest do
     
     test "handles complex nested types" do
       defmodule NestedSignature do
-        use AshDSPy.Signature
+        use DSPex.Signature
         
         signature items: {:list, :string}, config: {:dict, :string, :integer} -> 
                  results: {:list, :map}
@@ -1418,7 +1418,7 @@ Based on the complete context above, implement the comprehensive wire protocol a
 
 ### FILE STRUCTURE TO CREATE:
 ```
-lib/ash_dspy/protocol/
+lib/dspex/protocol/
 ├── wire_protocol.ex         # Main protocol implementation
 ├── message_framing.ex       # Binary message framing
 ├── validation.ex            # Message validation and sanitization
@@ -1427,7 +1427,7 @@ lib/ash_dspy/protocol/
 ├── versioning.ex           # Protocol versioning support
 └── supervisor.ex           # Protocol system supervision
 
-test/ash_dspy/protocol/
+test/dspex/protocol/
 ├── wire_protocol_test.exs   # Protocol encoding/decoding tests
 ├── message_framing_test.exs # Framing and binary handling tests  
 ├── validation_test.exs      # Validation and security tests
@@ -1438,31 +1438,31 @@ test/ash_dspy/protocol/
 
 ### SPECIFIC IMPLEMENTATION REQUIREMENTS:
 
-1. **Wire Protocol (`lib/ash_dspy/protocol/wire_protocol.ex`)**:
+1. **Wire Protocol (`lib/dspex/protocol/wire_protocol.ex`)**:
    - Complete message encoding/decoding with versioning
    - Checksum validation for message integrity
    - Support for different message types (request/response/notification)
    - Comprehensive error handling and recovery
 
-2. **Message Framing (`lib/ash_dspy/protocol/message_framing.ex`)**:
+2. **Message Framing (`lib/dspex/protocol/message_framing.ex`)**:
    - Binary framing with length prefixes
    - Compression flag handling
    - Protocol version in frame headers
    - Streaming support for large messages
 
-3. **Validation System (`lib/ash_dspy/protocol/validation.ex`)**:
+3. **Validation System (`lib/dspex/protocol/validation.ex`)**:
    - Message structure validation
    - Payload sanitization for security
    - Command argument validation
    - Size limits and safety checks
 
-4. **Compression Support (`lib/ash_dspy/protocol/compression.ex`)**:
+4. **Compression Support (`lib/dspex/protocol/compression.ex`)**:
    - Optional gzip compression for large messages
    - Intelligent compression decisions
    - Compression statistics and analysis
    - Fallback for incompressible data
 
-5. **JSON Schema Generation (`lib/ash_dspy/protocol/json_schema.ex`)**:
+5. **JSON Schema Generation (`lib/dspex/protocol/json_schema.ex`)**:
    - Multi-provider schema support (OpenAI, Anthropic, Google)
    - Constraint application to schemas
    - Example generation and validation

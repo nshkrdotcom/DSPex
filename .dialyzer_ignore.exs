@@ -1,5 +1,5 @@
 [
   # Ignore warnings that are acceptable for now
   # Type specifications that are supertypes of success typing but are still correct
-  {"lib/ash_dspex/signature/type_parser.ex", :contract_supertype},
+  {"lib/dspex/signature/type_parser.ex", :contract_supertype},
 ]

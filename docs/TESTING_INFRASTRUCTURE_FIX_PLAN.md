@@ -22,20 +22,20 @@ Analysis reveals **31 instances of Process.sleep()** across the codebase, repres
 
 ### Production Code Violations (CRITICAL)
 ```elixir
-# lib/ash_dspex/python_bridge/bridge.ex:393
+# lib/dspex/python_bridge/bridge.ex:393
 Process.sleep(100)  # ❌ Production code guessing timing
 
-# lib/ash_dspex/python_bridge/supervisor.ex:299
+# lib/dspex/python_bridge/supervisor.ex:299
 Process.sleep(1_000)  # ❌ 1-second production delay
 
-# lib/ash_dspex/python_bridge/supervisor.ex:330  
+# lib/dspex/python_bridge/supervisor.ex:330  
 Process.sleep(100)   # ❌ More production timing assumptions
 ```
 
 ### Test Code Violations by Category
 
 #### 1. Integration Test Sleeps (10 instances)
-**File**: `test/ash_dspex/python_bridge/integration_test.exs`
+**File**: `test/dspex/python_bridge/integration_test.exs`
 ```elixir
 Process.sleep(500)   # Line 21  - Bridge startup wait
 Process.sleep(200)   # Line 95  - Response wait  
@@ -50,7 +50,7 @@ Process.sleep(1000)  # Line 342 - Bridge startup wait
 ```
 
 #### 2. Monitor Test Sleeps (8 instances)
-**File**: `test/ash_dspex/python_bridge/monitor_test.exs`
+**File**: `test/dspex/python_bridge/monitor_test.exs`
 ```elixir
 Process.sleep(100)  # Line 93  - Health check wait
 Process.sleep(100)  # Line 113 - Status verification wait
@@ -63,7 +63,7 @@ Process.sleep(100)  # Line 219 - Final status check
 ```
 
 #### 3. Supervisor Test Sleeps (7 instances)  
-**File**: `test/ash_dspex/python_bridge/supervisor_test.exs`
+**File**: `test/dspex/python_bridge/supervisor_test.exs`
 ```elixir
 Process.sleep(100)  # Line 129 - Child restart wait
 Process.sleep(100)  # Line 172 - Supervisor stop wait
@@ -75,14 +75,14 @@ Process.sleep(200)  # Line 351 - Configuration reload wait
 ```
 
 #### 4. Bridge Test Sleeps (2 instances)
-**File**: `test/ash_dspex/python_bridge/bridge_test.exs`
+**File**: `test/dspex/python_bridge/bridge_test.exs`
 ```elixir
 Process.sleep(100)  # Line 80  - Initialization wait
 Process.sleep(100)  # Line 185 - "Let it initialize"
 ```
 
 #### 5. Gemini Integration Sleep (1 instance)
-**File**: `test/ash_dspex/gemini_integration_test.exs`
+**File**: `test/dspex/gemini_integration_test.exs`
 ```elixir
 Process.sleep(1000) # Line 16 - Integration test wait
 ```
@@ -98,7 +98,7 @@ Based on UNIFIED_TESTING_GUIDE.md patterns, create comprehensive helpers:
 
 ```elixir
 # test/support/supervision_test_helpers.ex
-defmodule AshDSPex.SupervisionTestHelpers do
+defmodule DSPex.SupervisionTestHelpers do
   @moduledoc """
   Test helpers for supervision tree isolation and process lifecycle management.
   Eliminates all Process.sleep() usage with event-driven coordination.
@@ -173,7 +173,7 @@ end
 #### B. Bridge Communication Helpers
 ```elixir
 # test/support/bridge_test_helpers.ex  
-defmodule AshDSPex.BridgeTestHelpers do
+defmodule DSPex.BridgeTestHelpers do
   @moduledoc """
   Test helpers for Python bridge communication.
   Provides event-driven coordination for bridge operations.
@@ -223,7 +223,7 @@ end
 #### C. Monitor Test Helpers  
 ```elixir
 # test/support/monitor_test_helpers.ex
-defmodule AshDSPex.MonitorTestHelpers do
+defmodule DSPex.MonitorTestHelpers do
   @moduledoc """
   Test helpers for monitor behavior verification.
   Eliminates timing assumptions with event-driven health checks.
@@ -268,7 +268,7 @@ end
 #### Foundation Module Implementation
 ```elixir  
 # test/support/unified_test_foundation.ex
-defmodule AshDSPex.UnifiedTestFoundation do
+defmodule DSPex.UnifiedTestFoundation do
   @moduledoc """
   Unified test foundation implementing isolation patterns from UNIFIED_TESTING_GUIDE.md
   """
@@ -276,9 +276,9 @@ defmodule AshDSPex.UnifiedTestFoundation do
   defmacro __using__(isolation_type) do
     quote do
       use ExUnit.Case, async: isolation_allows_async?(unquote(isolation_type))
-      import AshDSPex.SupervisionTestHelpers
-      import AshDSPex.BridgeTestHelpers  
-      import AshDSPex.MonitorTestHelpers
+      import DSPex.SupervisionTestHelpers
+      import DSPex.BridgeTestHelpers  
+      import DSPex.MonitorTestHelpers
       
       setup context do
         unquote(__MODULE__).setup_isolation(unquote(isolation_type), context)
@@ -296,7 +296,7 @@ defmodule AshDSPex.UnifiedTestFoundation do
     supervisor_name = :"test_supervisor_#{unique_id}"
     
     # Start isolated supervisor with unique names
-    {:ok, supervisor_pid} = AshDSPex.PythonBridge.Supervisor.start_link(
+    {:ok, supervisor_pid} = DSPex.PythonBridge.Supervisor.start_link(
       name: supervisor_name,
       bridge_name: :"bridge_#{unique_id}",
       monitor_name: :"monitor_#{unique_id}"
@@ -417,10 +417,10 @@ Replace all 10 sleep instances in `integration_test.exs`:
 ```elixir
 # BEFORE - Typical sleep pattern
 test "bridge handles complex queries" do
-  {:ok, supervisor_pid} = start_supervised({AshDSPex.PythonBridge.Supervisor, [name: :test_supervisor]})
+  {:ok, supervisor_pid} = start_supervised({DSPex.PythonBridge.Supervisor, [name: :test_supervisor]})
   Process.sleep(1000)  # ❌ "Give Python bridge time to start"
   
-  result = AshDSPex.PythonBridge.call(:test_supervisor, :query, query_params)
+  result = DSPex.PythonBridge.call(:test_supervisor, :query, query_params)
   assert {:ok, _} = result
 end
 

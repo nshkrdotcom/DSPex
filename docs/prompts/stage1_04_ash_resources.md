@@ -8,7 +8,7 @@ Implement foundational Ash resources that model DSPy signatures and programs as 
 
 ### ASH DOMAIN MODELING ARCHITECTURE
 
-From ashDocs/documentation/tutorials/get-started.md and ASH_DSPY_INTEGRATION_ARCHITECTURE.md:
+From ashDocs/documentation/tutorials/get-started.md and DSPEX_INTEGRATION_ARCHITECTURE.md:
 
 **Core Domain Philosophy:**
 - Ash resources serve as domain models for ML operations
@@ -20,7 +20,7 @@ From ashDocs/documentation/tutorials/get-started.md and ASH_DSPY_INTEGRATION_ARC
 **Domain Architecture:**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   AshDSPy.ML.Domain                        │
+│                   DSPex.ML.Domain                        │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐│
@@ -39,7 +39,7 @@ From ashDocs/documentation/tutorials/get-started.md and ASH_DSPY_INTEGRATION_ARC
 From STAGE_1_FOUNDATION_IMPLEMENTATION.md:
 
 ```elixir
-defmodule AshDSPy.ML.Domain do
+defmodule DSPex.ML.Domain do
   @moduledoc """
   ML domain for DSPy resources.
   """
@@ -47,9 +47,9 @@ defmodule AshDSPy.ML.Domain do
   use Ash.Domain
   
   resources do
-    resource AshDSPy.ML.Signature
-    resource AshDSPy.ML.Program
-    resource AshDSPy.ML.Execution
+    resource DSPex.ML.Signature
+    resource DSPex.ML.Program
+    resource DSPex.ML.Execution
   end
 end
 ```
@@ -109,13 +109,13 @@ end
 From STAGE_1_FOUNDATION_IMPLEMENTATION.md with extensions:
 
 ```elixir
-defmodule AshDSPy.ML.Signature do
+defmodule DSPex.ML.Signature do
   @moduledoc """
   Ash resource for managing DSPy signatures.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer
   
   attributes do
@@ -204,7 +204,7 @@ defmodule AshDSPy.ML.Signature do
   end
   
   relationships do
-    has_many :programs, AshDSPy.ML.Program
+    has_many :programs, DSPex.ML.Program
   end
   
   validations do
@@ -228,13 +228,13 @@ end
 From STAGE_1_FOUNDATION_IMPLEMENTATION.md with comprehensive extensions:
 
 ```elixir
-defmodule AshDSPy.ML.Program do
+defmodule DSPex.ML.Program do
   @moduledoc """
   Ash resource for managing DSPy programs.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer
   
   attributes do
@@ -259,8 +259,8 @@ defmodule AshDSPy.ML.Program do
   end
   
   relationships do
-    belongs_to :signature, AshDSPy.ML.Signature, public?: true
-    has_many :executions, AshDSPy.ML.Execution
+    belongs_to :signature, DSPex.ML.Signature, public?: true
+    has_many :executions, DSPex.ML.Execution
   end
   
   actions do
@@ -274,7 +274,7 @@ defmodule AshDSPy.ML.Program do
         signature_module = Ash.Changeset.get_argument(changeset, :signature_module)
         
         # Validate signature module
-        case AshDSPy.ML.Signature.validate_module(%{signature_module: signature_module}) do
+        case DSPex.ML.Signature.validate_module(%{signature_module: signature_module}) do
           {:ok, true} ->
             # Find or create signature record
             case find_or_create_signature(signature_module) do
@@ -389,12 +389,12 @@ defmodule AshDSPy.ML.Program do
   defp find_or_create_signature(signature_module) do
     module_string = to_string(signature_module)
     
-    case AshDSPy.ML.Signature
+    case DSPex.ML.Signature
          |> Ash.Query.filter(module == ^module_string)
          |> Ash.read_one() do
       {:ok, nil} ->
         # Create new signature
-        AshDSPy.ML.Signature.from_module(%{
+        DSPex.ML.Signature.from_module(%{
           signature_module: signature_module,
           name: module_string
         })
@@ -406,7 +406,7 @@ defmodule AshDSPy.ML.Program do
   end
   
   defp initialize_program_with_adapter(program) do
-    adapter = AshDSPy.Adapters.Registry.get_adapter(program.adapter_type)
+    adapter = DSPex.Adapters.Registry.get_adapter(program.adapter_type)
     signature_module = String.to_existing_atom(program.signature.module)
     
     config = %{
@@ -422,14 +422,14 @@ defmodule AshDSPy.ML.Program do
   end
   
   defp execute_program_with_tracking(program, inputs, execution_options) do
-    adapter = AshDSPy.Adapters.Registry.get_adapter(program.adapter_type)
+    adapter = DSPex.Adapters.Registry.get_adapter(program.adapter_type)
     
     # Validate inputs against signature
     signature_module = String.to_existing_atom(program.signature.module)
     case signature_module.validate_inputs(inputs) do
       {:ok, validated_inputs} ->
         # Execute with adapter
-        case AshDSPy.Adapters.Factory.execute_with_adapter(
+        case DSPex.Adapters.Factory.execute_with_adapter(
                adapter, 
                :execute_program, 
                [program.dspy_program_id, validated_inputs],
@@ -461,7 +461,7 @@ defmodule AshDSPy.ML.Program do
   end
   
   defp create_execution_record(program, inputs, outputs) do
-    AshDSPy.ML.Execution.create(%{
+    DSPex.ML.Execution.create(%{
       program_id: program.id,
       inputs: inputs,
       outputs: outputs,
@@ -476,13 +476,13 @@ end
 
 **Complete Execution Resource:**
 ```elixir
-defmodule AshDSPy.ML.Execution do
+defmodule DSPex.ML.Execution do
   @moduledoc """
   Ash resource for tracking program executions.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer
   
   attributes do
@@ -502,7 +502,7 @@ defmodule AshDSPy.ML.Execution do
   end
   
   relationships do
-    belongs_to :program, AshDSPy.ML.Program, public?: true
+    belongs_to :program, DSPex.ML.Program, public?: true
   end
   
   actions do
@@ -576,7 +576,7 @@ From ashDocs/documentation/topics/actions/manual-actions.md:
 
 **Manual Action Patterns for ML Operations:**
 ```elixir
-defmodule AshDSPy.ML.Actions.ProgramExecution do
+defmodule DSPex.ML.Actions.ProgramExecution do
   @moduledoc """
   Manual action for executing ML programs with full lifecycle management.
   """
@@ -589,7 +589,7 @@ defmodule AshDSPy.ML.Actions.ProgramExecution do
     options = Ash.Changeset.get_argument(changeset, :execution_options) || %{}
     
     # Load program
-    case AshDSPy.ML.Program.get!(program_id) do
+    case DSPex.ML.Program.get!(program_id) do
       program when program.status == :ready ->
         execute_with_tracking(program, inputs, options)
       
@@ -605,7 +605,7 @@ defmodule AshDSPy.ML.Actions.ProgramExecution do
     start_time = System.monotonic_time(:millisecond)
     
     # Create execution record
-    {:ok, execution} = AshDSPy.ML.Execution.create_execution(%{
+    {:ok, execution} = DSPex.ML.Execution.create_execution(%{
       program_id: program.id,
       inputs: inputs,
       metadata: %{
@@ -615,14 +615,14 @@ defmodule AshDSPy.ML.Actions.ProgramExecution do
     })
     
     # Mark as running
-    {:ok, execution} = AshDSPy.ML.Execution.mark_running(execution)
+    {:ok, execution} = DSPex.ML.Execution.mark_running(execution)
     
     try do
       # Execute program
-      case AshDSPy.ML.Program.execute(program, %{inputs: inputs, execution_options: options}) do
+      case DSPex.ML.Program.execute(program, %{inputs: inputs, execution_options: options}) do
         {:ok, outputs} ->
           duration = System.monotonic_time(:millisecond) - start_time
-          {:ok, execution} = AshDSPy.ML.Execution.mark_completed(execution, %{
+          {:ok, execution} = DSPex.ML.Execution.mark_completed(execution, %{
             outputs: outputs,
             duration_ms: duration
           })
@@ -636,7 +636,7 @@ defmodule AshDSPy.ML.Actions.ProgramExecution do
         
         {:error, reason} ->
           duration = System.monotonic_time(:millisecond) - start_time
-          {:ok, _execution} = AshDSPy.ML.Execution.mark_failed(execution, %{
+          {:ok, _execution} = DSPex.ML.Execution.mark_failed(execution, %{
             error_message: to_string(reason),
             duration_ms: duration
           })
@@ -646,7 +646,7 @@ defmodule AshDSPy.ML.Actions.ProgramExecution do
     rescue
       error ->
         duration = System.monotonic_time(:millisecond) - start_time
-        {:ok, _execution} = AshDSPy.ML.Execution.mark_failed(execution, %{
+        {:ok, _execution} = DSPex.ML.Execution.mark_failed(execution, %{
           error_message: "Execution exception: #{inspect(error)}",
           duration_ms: duration
         })
@@ -662,20 +662,20 @@ end
 **PostgreSQL Configuration:**
 ```elixir
 # config/config.exs
-config :ash_dspy, AshDSPy.Repo,
+config :dspex, DSPex.Repo,
   username: "postgres",
   password: "postgres",
   hostname: "localhost",
-  database: "ash_dspy_dev",
+  database: "dspex_dev",
   pool_size: 10
 
-config :ash_dspy, ecto_repos: [AshDSPy.Repo]
+config :dspex, ecto_repos: [DSPex.Repo]
 ```
 
 **Repo Module:**
 ```elixir
-defmodule AshDSPy.Repo do
-  use AshPostgres.Repo, otp_app: :ash_dspy
+defmodule DSPex.Repo do
+  use AshPostgres.Repo, otp_app: :dspex
   
   def installed_extensions do
     ["uuid-ossp", "citext"]
@@ -686,7 +686,7 @@ end
 **Migration Files:**
 ```elixir
 # priv/repo/migrations/20240101000001_create_signatures.exs
-defmodule AshDSPy.Repo.Migrations.CreateSignatures do
+defmodule DSPex.Repo.Migrations.CreateSignatures do
   use Ecto.Migration
 
   def up do
@@ -718,13 +718,13 @@ end
 
 **Resource Testing:**
 ```elixir
-defmodule AshDSPy.ML.SignatureTest do
+defmodule DSPex.ML.SignatureTest do
   use ExUnit.Case
   
-  alias AshDSPy.ML.Signature
+  alias DSPex.ML.Signature
   
   defmodule TestSignature do
-    use AshDSPy.Signature
+    use DSPex.Signature
     
     signature question: :string -> answer: :string, confidence: :float
   end
@@ -742,7 +742,7 @@ defmodule AshDSPy.ML.SignatureTest do
     })
     
     assert signature.name == "Test QA Signature"
-    assert signature.module == "AshDSPy.ML.SignatureTest.TestSignature"
+    assert signature.module == "DSPex.ML.SignatureTest.TestSignature"
     assert length(signature.inputs) == 1
     assert length(signature.outputs) == 2
     assert signature.status == :draft
@@ -778,24 +778,24 @@ defmodule AshDSPy.ML.SignatureTest do
   end
 end
 
-defmodule AshDSPy.ML.ProgramTest do
+defmodule DSPex.ML.ProgramTest do
   use ExUnit.Case
   
-  alias AshDSPy.ML.{Program, Signature}
+  alias DSPex.ML.{Program, Signature}
   
   defmodule TestSignature do
-    use AshDSPy.Signature
+    use DSPex.Signature
     
     signature question: :string -> answer: :string
   end
   
   setup do
     # Ensure mock adapter is available
-    {:ok, _} = AshDSPy.Adapters.Mock.start_link()
-    AshDSPy.Adapters.Mock.reset()
+    {:ok, _} = DSPex.Adapters.Mock.start_link()
+    DSPex.Adapters.Mock.reset()
     
     # Set adapter to mock for testing
-    Application.put_env(:ash_dspy, :adapter, :mock)
+    Application.put_env(:dspex, :adapter, :mock)
     
     :ok
   end
@@ -810,7 +810,7 @@ defmodule AshDSPy.ML.ProgramTest do
     assert program.name == "Test Program"
     assert program.adapter_type == :mock
     assert program.status == :draft
-    assert program.signature.module == "AshDSPy.ML.ProgramTest.TestSignature"
+    assert program.signature.module == "DSPex.ML.ProgramTest.TestSignature"
   end
   
   test "initializes program with adapter" do
@@ -884,27 +884,27 @@ From ashDocs/documentation/topics/resources/code-interfaces.md:
 
 **Enhanced Code Interfaces:**
 ```elixir
-defmodule AshDSPy.ML do
+defmodule DSPex.ML do
   @moduledoc """
   High-level interface for ML operations.
   """
   
   # Signature operations
   defdelegate create_signature_from_module(signature_module, opts \\ %{}), 
-    to: AshDSPy.ML.Signature, as: :from_module
+    to: DSPex.ML.Signature, as: :from_module
   
   defdelegate activate_signature(signature), 
-    to: AshDSPy.ML.Signature, as: :activate
+    to: DSPex.ML.Signature, as: :activate
   
   # Program operations
   defdelegate create_program(signature_module, opts \\ %{}), 
-    to: AshDSPy.ML.Program, as: :create_with_signature
+    to: DSPex.ML.Program, as: :create_with_signature
   
   defdelegate initialize_program(program), 
-    to: AshDSPy.ML.Program, as: :initialize
+    to: DSPex.ML.Program, as: :initialize
   
   defdelegate execute_program(program, inputs, opts \\ %{}), 
-    to: AshDSPy.ML.Program, as: :execute
+    to: DSPex.ML.Program, as: :execute
   
   # Convenience functions
   def quick_execute(signature_module, inputs, opts \\ %{}) do
@@ -921,13 +921,13 @@ defmodule AshDSPy.ML do
   end
   
   def list_active_signatures do
-    AshDSPy.ML.Signature
+    DSPex.ML.Signature
     |> Ash.Query.filter(status == :active)
     |> Ash.read!()
   end
   
   def get_program_statistics(program_id) do
-    case AshDSPy.ML.Execution.by_program(%{program_id: program_id}) do
+    case DSPex.ML.Execution.by_program(%{program_id: program_id}) do
       {:ok, executions} ->
         total_executions = length(executions)
         successful = Enum.count(executions, &(&1.status == :completed))
@@ -961,7 +961,7 @@ Based on the complete context above, implement the foundational Ash resources sy
 
 ### FILE STRUCTURE TO CREATE:
 ```
-lib/ash_dspy/ml/
+lib/dspex/ml/
 ├── domain.ex                # Main domain definition
 ├── signature.ex             # Signature resource
 ├── program.ex               # Program resource  
@@ -976,7 +976,7 @@ priv/repo/migrations/
 ├── 002_create_programs.exs      # Program table
 └── 003_create_executions.exs    # Execution table
 
-test/ash_dspy/ml/
+test/dspex/ml/
 ├── domain_test.exs          # Domain functionality tests
 ├── signature_test.exs       # Signature resource tests
 ├── program_test.exs         # Program resource tests
@@ -986,31 +986,31 @@ test/ash_dspy/ml/
 
 ### SPECIFIC IMPLEMENTATION REQUIREMENTS:
 
-1. **Domain Setup (`lib/ash_dspy/ml/domain.ex`)**:
+1. **Domain Setup (`lib/dspex/ml/domain.ex`)**:
    - Complete domain definition with all resources
    - Proper resource registration and configuration
    - Domain-level policies and authorization setup
    - Integration with application configuration
 
-2. **Signature Resource (`lib/ash_dspy/ml/signature.ex`)**:
+2. **Signature Resource (`lib/dspex/ml/signature.ex`)**:
    - Complete resource definition with all attributes
    - Actions for lifecycle management (create, activate, deprecate)
    - Signature module validation and integration
    - Proper relationships and constraints
 
-3. **Program Resource (`lib/ash_dspy/ml/program.ex`)**:
+3. **Program Resource (`lib/dspex/ml/program.ex`)**:
    - Comprehensive program lifecycle management
    - Integration with adapter pattern for execution
    - Execution tracking and statistics
    - Error handling and status management
 
-4. **Execution Resource (`lib/ash_dspy/ml/execution.ex`)**:
+4. **Execution Resource (`lib/dspex/ml/execution.ex`)**:
    - Complete execution tracking with timing
    - Status management and error recording
    - Relationships with programs and metadata
    - Query actions for analytics and reporting
 
-5. **Manual Actions (`lib/ash_dspy/ml/actions/`)**:
+5. **Manual Actions (`lib/dspex/ml/actions/`)**:
    - Complex execution logic with full lifecycle
    - Error handling and recovery patterns
    - Performance tracking and monitoring

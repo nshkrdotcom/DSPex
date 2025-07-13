@@ -1,9 +1,9 @@
-defmodule AshDSPexTest do
+defmodule DSPexTest do
   use ExUnit.Case
-  doctest AshDSPex
+  doctest DSPex
 
   test "version returns a string" do
-    version = AshDSPex.version()
+    version = DSPex.version()
     assert is_binary(version)
     assert version =~ ~r/\d+\.\d+\.\d+/
   end

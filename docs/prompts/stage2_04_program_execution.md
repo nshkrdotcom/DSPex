@@ -187,16 +187,16 @@ end
 **Core Execution Engine with Advanced Orchestration:**
 
 ```elixir
-defmodule AshDSPy.Program.ExecutionEngine do
+defmodule DSPex.Program.ExecutionEngine do
   @moduledoc """
   Comprehensive program execution engine with advanced orchestration capabilities.
   """
   
   use GenServer
   
-  alias AshDSPy.Module.Registry
-  alias AshDSPy.Program.{DependencyGraph, ResourceManager, ExecutionContext}
-  alias AshDSPy.Telemetry.Tracker
+  alias DSPex.Module.Registry
+  alias DSPex.Program.{DependencyGraph, ResourceManager, ExecutionContext}
+  alias DSPex.Telemetry.Tracker
   
   defstruct [
     :program_id,
@@ -265,7 +265,7 @@ defmodule AshDSPy.Program.ExecutionEngine do
     execution_id = generate_execution_id()
     
     # Start telemetry span
-    :telemetry.span([:ash_dspy, :program, :execution],
+    :telemetry.span([:dspex, :program, :execution],
       %{
         program_id: state.program_id,
         execution_id: execution_id,
@@ -340,7 +340,7 @@ defmodule AshDSPy.Program.ExecutionEngine do
         new_history = add_to_execution_history(state.execution_history, execution_record)
         
         # Emit telemetry
-        :telemetry.execute([:ash_dspy, :program, :completed],
+        :telemetry.execute([:dspex, :program, :completed],
           %{duration: duration},
           %{
             program_id: state.program_id,
@@ -482,7 +482,7 @@ defmodule AshDSPy.Program.ExecutionEngine do
       {:ok, resource_allocation} ->
         try do
           # Execute module with telemetry
-          :telemetry.span([:ash_dspy, :module, :execution],
+          :telemetry.span([:dspex, :module, :execution],
             %{
               module: module_spec.name,
               program: state.program_id
@@ -624,7 +624,7 @@ defmodule AshDSPy.Program.ExecutionEngine do
   # Utility functions
   
   defp via_name(program_id) do
-    {:via, Registry, {AshDSPy.Program.Registry, program_id}}
+    {:via, Registry, {DSPex.Program.Registry, program_id}}
   end
   
   defp generate_execution_id do
@@ -763,7 +763,7 @@ end
 **Advanced Dependency Analysis and Optimization:**
 
 ```elixir
-defmodule AshDSPy.Program.DependencyGraph do
+defmodule DSPex.Program.DependencyGraph do
   @moduledoc """
   Advanced dependency graph analysis and optimization for program execution.
   """
@@ -1010,7 +1010,7 @@ end
 **Advanced Resource Allocation and Monitoring:**
 
 ```elixir
-defmodule AshDSPy.Program.ResourceManager do
+defmodule DSPex.Program.ResourceManager do
   @moduledoc """
   Advanced resource management for program execution optimization.
   """
@@ -1344,7 +1344,7 @@ end
 
 ### PRIMARY DELIVERABLES
 
-1. **Execution Engine** - Complete `AshDSPy.Program.ExecutionEngine` with orchestration
+1. **Execution Engine** - Complete `DSPex.Program.ExecutionEngine` with orchestration
 2. **Dependency Graph Manager** - Advanced dependency analysis and optimization
 3. **Resource Manager** - Intelligent resource allocation and monitoring
 4. **Execution Context** - Comprehensive execution state and monitoring

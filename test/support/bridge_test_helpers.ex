@@ -1,4 +1,4 @@
-defmodule AshDSPex.BridgeTestHelpers do
+defmodule DSPex.BridgeTestHelpers do
   @moduledoc """
   Test helpers for Python bridge communication.
   Provides event-driven coordination for bridge operations.
@@ -8,7 +8,7 @@ defmodule AshDSPex.BridgeTestHelpers do
   """
 
   require Logger
-  import AshDSPex.SupervisionTestHelpers, only: [wait_for: 2]
+  import DSPex.SupervisionTestHelpers, only: [wait_for: 2]
 
   @doc """
   Performs a bridge call with retry logic and proper timeout handling.

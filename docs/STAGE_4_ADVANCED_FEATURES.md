@@ -13,14 +13,14 @@ Stage 4 implements advanced features that make the DSPy-Ash integration enterpri
 ### 1.1 Model Registry Resource
 
 ```elixir
-# lib/ash_dspy/ml/model.ex
-defmodule AshDSPy.ML.Model do
+# lib/dspex/ml/model.ex
+defmodule DSPex.ML.Model do
   @moduledoc """
   Resource for managing different language models and their configurations.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer,
     extensions: [AshStateMachine]
   
@@ -57,8 +57,8 @@ defmodule AshDSPy.ML.Model do
   end
   
   relationships do
-    has_many :program_models, AshDSPy.ML.ProgramModel
-    has_many :executions, AshDSPy.ML.Execution
+    has_many :program_models, DSPex.ML.ProgramModel
+    has_many :executions, DSPex.ML.Execution
   end
   
   state_machine do
@@ -84,7 +84,7 @@ defmodule AshDSPy.ML.Model do
         
         if test_on_creation do
           # Enqueue health check
-          AshDSPy.Workers.ModelHealthCheckWorker.new(%{
+          DSPex.Workers.ModelHealthCheckWorker.new(%{
             model_id: Ash.Changeset.get_attribute(changeset, :id)
           })
           |> Oban.insert()
@@ -101,7 +101,7 @@ defmodule AshDSPy.ML.Model do
     end
     
     action :health_check, :map do
-      run AshDSPy.ML.Actions.ModelHealthCheck
+      run DSPex.ML.Actions.ModelHealthCheck
     end
     
     action :estimate_cost, :map do
@@ -156,14 +156,14 @@ end
 ### 1.2 Multi-Model Program Support
 
 ```elixir
-# lib/ash_dspy/ml/program_model.ex
-defmodule AshDSPy.ML.ProgramModel do
+# lib/dspex/ml/program_model.ex
+defmodule DSPex.ML.ProgramModel do
   @moduledoc """
   Join resource for programs and models with routing rules.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer
   
   attributes do
@@ -186,8 +186,8 @@ defmodule AshDSPy.ML.ProgramModel do
   end
   
   relationships do
-    belongs_to :program, AshDSPy.ML.Program
-    belongs_to :model, AshDSPy.ML.Model
+    belongs_to :program, DSPex.ML.Program
+    belongs_to :model, DSPex.ML.Model
   end
   
   actions do
@@ -223,13 +223,13 @@ end
 ### 1.3 Model Router
 
 ```elixir
-# lib/ash_dspy/ml/model_router.ex
-defmodule AshDSPy.ML.ModelRouter do
+# lib/dspex/ml/model_router.ex
+defmodule DSPex.ML.ModelRouter do
   @moduledoc """
   Routes program executions to appropriate models based on strategies.
   """
   
-  alias AshDSPy.ML.{Program, Model, ProgramModel}
+  alias DSPex.ML.{Program, Model, ProgramModel}
   
   @doc """
   Select the best model for a program execution based on routing strategy.
@@ -388,7 +388,7 @@ defmodule AshDSPy.ML.ModelRouter do
   end
   
   defp schedule_health_check(model) do
-    AshDSPy.Workers.ModelHealthCheckWorker.new(%{model_id: model.id})
+    DSPex.Workers.ModelHealthCheckWorker.new(%{model_id: model.id})
     |> Oban.insert()
   end
 end
@@ -397,13 +397,13 @@ end
 ### 1.4 Enhanced Execution with Model Routing
 
 ```elixir
-# lib/ash_dspy/data_layer/query_handler.ex (enhanced execute)
-defmodule AshDSPy.DataLayer.QueryHandler do
+# lib/dspex/data_layer/query_handler.ex (enhanced execute)
+defmodule DSPex.DataLayer.QueryHandler do
   # ... existing code ...
   
   defp execute_via_adapter(program, inputs) do
     # Use model router to select best model
-    case AshDSPy.ML.ModelRouter.select_model(program, inputs) do
+    case DSPex.ML.ModelRouter.select_model(program, inputs) do
       {:ok, program_model} ->
         adapter = get_adapter_for_model(program_model.model)
         
@@ -440,7 +440,7 @@ defmodule AshDSPy.DataLayer.QueryHandler do
   
   defp try_fallback_model(program, inputs, failed_model, original_error) do
     # Find fallback models excluding the failed one
-    fallback_models = AshDSPy.ML.ProgramModel.list!(
+    fallback_models = DSPex.ML.ProgramModel.list!(
       filter: [
         program_id: program.id,
         routing_strategy: :fallback
@@ -465,10 +465,10 @@ defmodule AshDSPy.DataLayer.QueryHandler do
   
   defp get_adapter_for_model(model) do
     case model.provider do
-      :openai -> AshDSPy.Adapters.OpenAI
-      :anthropic -> AshDSPy.Adapters.Anthropic
-      :cohere -> AshDSPy.Adapters.Cohere
-      _ -> Application.get_env(:ash_dspy, :adapter, AshDSPy.Adapters.PythonPort)
+      :openai -> DSPex.Adapters.OpenAI
+      :anthropic -> DSPex.Adapters.Anthropic
+      :cohere -> DSPex.Adapters.Cohere
+      _ -> Application.get_env(:dspex, :adapter, DSPex.Adapters.PythonPort)
     end
   end
   
@@ -500,7 +500,7 @@ defmodule AshDSPy.DataLayer.QueryHandler do
         }
     end
     
-    AshDSPy.ML.ProgramModel.record_execution(program_model, updates)
+    DSPex.ML.ProgramModel.record_execution(program_model, updates)
     
     # Update Model aggregate metrics
     update_model_aggregate_metrics(program_model.model, duration, status)
@@ -523,7 +523,7 @@ defmodule AshDSPy.DataLayer.QueryHandler do
       current -> (current * 0.9) + (duration * 0.1)  # Exponential moving average
     end
     
-    AshDSPy.ML.Model.update!(model, %{average_latency_ms: new_latency})
+    DSPex.ML.Model.update!(model, %{average_latency_ms: new_latency})
   end
 end
 ```
@@ -533,14 +533,14 @@ end
 ### 2.1 Deployment Pipeline Resource
 
 ```elixir
-# lib/ash_dspy/ml/deployment_pipeline.ex
-defmodule AshDSPy.ML.DeploymentPipeline do
+# lib/dspex/ml/deployment_pipeline.ex
+defmodule DSPex.ML.DeploymentPipeline do
   @moduledoc """
   Resource for managing deployment pipelines and automation.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer,
     extensions: [AshStateMachine, AshOban]
   
@@ -569,8 +569,8 @@ defmodule AshDSPy.ML.DeploymentPipeline do
   end
   
   relationships do
-    belongs_to :program, AshDSPy.ML.Program
-    has_many :deployments, AshDSPy.ML.Deployment
+    belongs_to :program, DSPex.ML.Program
+    has_many :deployments, DSPex.ML.Deployment
   end
   
   state_machine do
@@ -610,7 +610,7 @@ defmodule AshDSPy.ML.DeploymentPipeline do
       
       change fn changeset, _context ->
         # Start monitoring this pipeline
-        AshDSPy.Workers.PipelineMonitorWorker.new(%{
+        DSPex.Workers.PipelineMonitorWorker.new(%{
           pipeline_id: changeset.data.id
         })
         |> Oban.insert()
@@ -626,7 +626,7 @@ defmodule AshDSPy.ML.DeploymentPipeline do
         pipeline = context.resource
         check_context = input.arguments.context
         
-        AshDSPy.ML.Actions.CheckTriggerConditions.run(pipeline, check_context)
+        DSPex.ML.Actions.CheckTriggerConditions.run(pipeline, check_context)
       end
     end
     
@@ -634,7 +634,7 @@ defmodule AshDSPy.ML.DeploymentPipeline do
       argument :reason, :string, default: "Manual trigger"
       argument :config_overrides, :map, default: %{}
       
-      run AshDSPy.ML.Actions.TriggerDeployment
+      run DSPex.ML.Actions.TriggerDeployment
     end
   end
   
@@ -650,14 +650,14 @@ end
 ### 2.2 Deployment Resource
 
 ```elixir
-# lib/ash_dspy/ml/deployment.ex
-defmodule AshDSPy.ML.Deployment do
+# lib/dspex/ml/deployment.ex
+defmodule DSPex.ML.Deployment do
   @moduledoc """
   Resource for tracking individual deployments.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer,
     extensions: [AshStateMachine]
   
@@ -690,8 +690,8 @@ defmodule AshDSPy.ML.Deployment do
   end
   
   relationships do
-    belongs_to :pipeline, AshDSPy.ML.DeploymentPipeline
-    belongs_to :program, AshDSPy.ML.Program
+    belongs_to :pipeline, DSPex.ML.DeploymentPipeline
+    belongs_to :program, DSPex.ML.Program
   end
   
   state_machine do
@@ -722,7 +722,7 @@ defmodule AshDSPy.ML.Deployment do
       
       # Enqueue deployment job
       change fn changeset, _context ->
-        AshDSPy.Workers.DeploymentWorker.new(%{
+        DSPex.Workers.DeploymentWorker.new(%{
           deployment_id: Ash.Changeset.get_attribute(changeset, :id)
         })
         |> Oban.insert()
@@ -746,15 +746,15 @@ defmodule AshDSPy.ML.Deployment do
     end
     
     action :validate_deployment, :map do
-      run AshDSPy.ML.Actions.ValidateDeployment
+      run DSPex.ML.Actions.ValidateDeployment
     end
     
     action :execute_deployment, :map do
-      run AshDSPy.ML.Actions.ExecuteDeployment
+      run DSPex.ML.Actions.ExecuteDeployment
     end
     
     action :rollback_deployment, :map do
-      run AshDSPy.ML.Actions.RollbackDeployment
+      run DSPex.ML.Actions.RollbackDeployment
     end
   end
   
@@ -790,15 +790,15 @@ end
 ### 2.3 Deployment Worker
 
 ```elixir
-# lib/ash_dspy/workers/deployment_worker.ex
-defmodule AshDSPy.Workers.DeploymentWorker do
+# lib/dspex/workers/deployment_worker.ex
+defmodule DSPex.Workers.DeploymentWorker do
   @moduledoc """
   Oban worker for executing deployment pipelines.
   """
   
   use Oban.Worker, queue: :deployment, max_attempts: 3
   
-  alias AshDSPy.ML.{Deployment, DeploymentPipeline, Program}
+  alias DSPex.ML.{Deployment, DeploymentPipeline, Program}
   
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"deployment_id" => deployment_id}}) do
@@ -1007,7 +1007,7 @@ defmodule AshDSPy.Workers.DeploymentWorker do
   defp get_recent_executions(program, count) do
     since = DateTime.add(DateTime.utc_now(), -24, :hour)
     
-    AshDSPy.ML.Execution.list!(
+    DSPex.ML.Execution.list!(
       filter: [
         program_id: program.id,
         started_at: [greater_than: since],
@@ -1056,7 +1056,7 @@ defmodule AshDSPy.Workers.DeploymentWorker do
   
   defp schedule_health_checks(deployment) do
     # Schedule periodic health checks for the deployment
-    AshDSPy.Workers.DeploymentHealthCheckWorker.new(%{
+    DSPex.Workers.DeploymentHealthCheckWorker.new(%{
       deployment_id: deployment.id
     }, schedule_in: 60)  # First check in 1 minute
     |> Oban.insert()
@@ -1074,19 +1074,19 @@ end
 ### 3.1 Optimizer Registry
 
 ```elixir
-# lib/ash_dspy/optimizers/registry.ex
-defmodule AshDSPy.Optimizers.Registry do
+# lib/dspex/optimizers/registry.ex
+defmodule DSPex.Optimizers.Registry do
   @moduledoc """
   Registry of available optimization algorithms.
   """
   
   @optimizers %{
-    "BootstrapFewShot" => AshDSPy.Optimizers.BootstrapFewShot,
-    "MIPRO" => AshDSPy.Optimizers.MIPRO,
-    "COPRO" => AshDSPy.Optimizers.COPRO,
-    "AdvancedBootstrap" => AshDSPy.Optimizers.AdvancedBootstrap,
-    "MultiObjective" => AshDSPy.Optimizers.MultiObjective,
-    "BayesianOptimizer" => AshDSPy.Optimizers.BayesianOptimizer
+    "BootstrapFewShot" => DSPex.Optimizers.BootstrapFewShot,
+    "MIPRO" => DSPex.Optimizers.MIPRO,
+    "COPRO" => DSPex.Optimizers.COPRO,
+    "AdvancedBootstrap" => DSPex.Optimizers.AdvancedBootstrap,
+    "MultiObjective" => DSPex.Optimizers.MultiObjective,
+    "BayesianOptimizer" => DSPex.Optimizers.BayesianOptimizer
   }
   
   def get_optimizer(name) do
@@ -1112,13 +1112,13 @@ end
 ### 3.2 Advanced Bootstrap Optimizer
 
 ```elixir
-# lib/ash_dspy/optimizers/advanced_bootstrap.ex
-defmodule AshDSPy.Optimizers.AdvancedBootstrap do
+# lib/dspex/optimizers/advanced_bootstrap.ex
+defmodule DSPex.Optimizers.AdvancedBootstrap do
   @moduledoc """
   Advanced bootstrap optimizer with adaptive sampling and quality filtering.
   """
   
-  @behaviour AshDSPy.Optimizers.Optimizer
+  @behaviour DSPex.Optimizers.Optimizer
   
   def info do
     %{
@@ -1307,13 +1307,13 @@ end
 ### 3.3 Multi-Objective Optimizer
 
 ```elixir
-# lib/ash_dspy/optimizers/multi_objective.ex
-defmodule AshDSPy.Optimizers.MultiObjective do
+# lib/dspex/optimizers/multi_objective.ex
+defmodule DSPex.Optimizers.MultiObjective do
   @moduledoc """
   Multi-objective optimizer that balances accuracy, latency, and cost.
   """
   
-  @behaviour AshDSPy.Optimizers.Optimizer
+  @behaviour DSPex.Optimizers.Optimizer
   
   def info do
     %{
@@ -1525,14 +1525,14 @@ end
 ### 4.1 Experiment Resource
 
 ```elixir
-# lib/ash_dspy/ml/experiment.ex
-defmodule AshDSPy.ML.Experiment do
+# lib/dspex/ml/experiment.ex
+defmodule DSPex.ML.Experiment do
   @moduledoc """
   Resource for managing ML experiments and comparisons.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer,
     extensions: [AshStateMachine]
   
@@ -1565,9 +1565,9 @@ defmodule AshDSPy.ML.Experiment do
   end
   
   relationships do
-    has_many :experiment_runs, AshDSPy.ML.ExperimentRun
-    belongs_to :baseline_program, AshDSPy.ML.Program
-    belongs_to :dataset, AshDSPy.ML.Dataset
+    has_many :experiment_runs, DSPex.ML.ExperimentRun
+    belongs_to :baseline_program, DSPex.ML.Program
+    belongs_to :dataset, DSPex.ML.Dataset
   end
   
   state_machine do
@@ -1605,7 +1605,7 @@ defmodule AshDSPy.ML.Experiment do
       
       change fn changeset, _context ->
         # Enqueue experiment execution
-        AshDSPy.Workers.ExperimentWorker.new(%{
+        DSPex.Workers.ExperimentWorker.new(%{
           experiment_id: changeset.data.id
         })
         |> Oban.insert()
@@ -1615,7 +1615,7 @@ defmodule AshDSPy.ML.Experiment do
     end
     
     action :analyze_results, :map do
-      run AshDSPy.ML.Actions.AnalyzeExperimentResults
+      run DSPex.ML.Actions.AnalyzeExperimentResults
     end
     
     action :compare_variants, :map do
@@ -1625,7 +1625,7 @@ defmodule AshDSPy.ML.Experiment do
         experiment = context.resource
         metric = input.arguments.metric
         
-        AshDSPy.ML.Analysis.CompareVariants.run(experiment, metric)
+        DSPex.ML.Analysis.CompareVariants.run(experiment, metric)
       end
     end
   end
@@ -1671,15 +1671,15 @@ end
 ### 4.2 Experiment Worker
 
 ```elixir
-# lib/ash_dspy/workers/experiment_worker.ex
-defmodule AshDSPy.Workers.ExperimentWorker do
+# lib/dspex/workers/experiment_worker.ex
+defmodule DSPex.Workers.ExperimentWorker do
   @moduledoc """
   Worker for executing ML experiments.
   """
   
   use Oban.Worker, queue: :experiments, max_attempts: 2
   
-  alias AshDSPy.ML.{Experiment, Program, Dataset, ExperimentRun}
+  alias DSPex.ML.{Experiment, Program, Dataset, ExperimentRun}
   
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"experiment_id" => experiment_id}}) do

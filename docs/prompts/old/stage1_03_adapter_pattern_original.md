@@ -38,7 +38,7 @@ From DSPY_ADAPTER_LAYER_ARCHITECTURE.md and STAGE_1_FOUNDATION_IMPLEMENTATION.md
 From STAGE_1_FOUNDATION_IMPLEMENTATION.md:
 
 ```elixir
-defmodule AshDSPy.Adapters.Adapter do
+defmodule DSPex.Adapters.Adapter do
   @moduledoc """
   Behavior for DSPy adapters.
   """
@@ -67,14 +67,14 @@ end
 From STAGE_1_FOUNDATION_IMPLEMENTATION.md with extensions:
 
 ```elixir
-defmodule AshDSPy.Adapters.PythonPort do
+defmodule DSPex.Adapters.PythonPort do
   @moduledoc """
   Python port adapter for DSPy integration.
   """
   
-  @behaviour AshDSPy.Adapters.Adapter
+  @behaviour DSPex.Adapters.Adapter
   
-  alias AshDSPy.PythonBridge.Bridge
+  alias DSPex.PythonBridge.Bridge
   
   @impl true
   def create_program(config) do
@@ -133,21 +133,21 @@ end
 From application configuration patterns:
 
 ```elixir
-defmodule AshDSPy.Adapters.Registry do
+defmodule DSPex.Adapters.Registry do
   @moduledoc """
   Registry for managing available adapters and selection.
   """
   
-  @default_adapter AshDSPy.Adapters.PythonPort
+  @default_adapter DSPex.Adapters.PythonPort
   
   @adapters %{
-    python_port: AshDSPy.Adapters.PythonPort,
-    native: AshDSPy.Adapters.Native,
-    mock: AshDSPy.Adapters.Mock
+    python_port: DSPex.Adapters.PythonPort,
+    native: DSPex.Adapters.Native,
+    mock: DSPex.Adapters.Mock
   }
   
   def get_adapter(adapter_name \\ nil) do
-    case adapter_name || Application.get_env(:ash_dspy, :adapter) do
+    case adapter_name || Application.get_env(:dspex, :adapter) do
       nil -> @default_adapter
       atom when is_atom(atom) -> Map.get(@adapters, atom, @default_adapter)
       module when is_atom(module) -> module
@@ -181,7 +181,7 @@ end
 
 **Extended Behavior Definition:**
 ```elixir
-defmodule AshDSPy.Adapters.ExtendedAdapter do
+defmodule DSPex.Adapters.ExtendedAdapter do
   @moduledoc """
   Extended adapter behavior with additional operations.
   """
@@ -228,7 +228,7 @@ end
 
 **Comprehensive Type Mapping:**
 ```elixir
-defmodule AshDSPy.Adapters.TypeConverter do
+defmodule DSPex.Adapters.TypeConverter do
   @moduledoc """
   Type conversion between Elixir and adapter-specific formats.
   """
@@ -338,7 +338,7 @@ end
 
 **Comprehensive Error Handling:**
 ```elixir
-defmodule AshDSPy.Adapters.ErrorHandler do
+defmodule DSPex.Adapters.ErrorHandler do
   @moduledoc """
   Standardized error handling for adapter operations.
   """
@@ -421,12 +421,12 @@ end
 
 **Complete Mock Implementation:**
 ```elixir
-defmodule AshDSPy.Adapters.Mock do
+defmodule DSPex.Adapters.Mock do
   @moduledoc """
   Mock adapter for testing and development.
   """
   
-  @behaviour AshDSPy.Adapters.Adapter
+  @behaviour DSPex.Adapters.Adapter
   
   use GenServer
   
@@ -533,12 +533,12 @@ end
 
 **Factory Pattern Implementation:**
 ```elixir
-defmodule AshDSPy.Adapters.Factory do
+defmodule DSPex.Adapters.Factory do
   @moduledoc """
   Factory for creating and managing adapter instances.
   """
   
-  alias AshDSPy.Adapters.{Registry, ErrorHandler}
+  alias DSPex.Adapters.{Registry, ErrorHandler}
   
   def create_adapter(adapter_type, opts \\ []) do
     with {:ok, adapter_module} <- Registry.validate_adapter(adapter_type),
@@ -574,10 +574,10 @@ defmodule AshDSPy.Adapters.Factory do
   
   defp check_adapter_requirements(adapter_module, opts) do
     case adapter_module do
-      AshDSPy.Adapters.PythonPort ->
+      DSPex.Adapters.PythonPort ->
         check_python_bridge_available()
       
-      AshDSPy.Adapters.Mock ->
+      DSPex.Adapters.Mock ->
         ensure_mock_started(opts)
       
       _ ->
@@ -586,15 +586,15 @@ defmodule AshDSPy.Adapters.Factory do
   end
   
   defp check_python_bridge_available do
-    case Process.whereis(AshDSPy.PythonBridge.Bridge) do
+    case Process.whereis(DSPex.PythonBridge.Bridge) do
       nil -> {:error, "Python bridge not running"}
       _pid -> {:ok, :available}
     end
   end
   
   defp ensure_mock_started(opts) do
-    case Process.whereis(AshDSPy.Adapters.Mock) do
-      nil -> AshDSPy.Adapters.Mock.start_link(opts)
+    case Process.whereis(DSPex.Adapters.Mock) do
+      nil -> DSPex.Adapters.Mock.start_link(opts)
       _pid -> {:ok, :already_started}
     end
   end
@@ -605,26 +605,26 @@ end
 
 **Adapter Behavior Testing:**
 ```elixir
-defmodule AshDSPy.Adapters.BehaviorTest do
+defmodule DSPex.Adapters.BehaviorTest do
   use ExUnit.Case
   
   defmodule TestSignature do
-    use AshDSPy.Signature
+    use DSPex.Signature
     
     signature question: :string -> answer: :string, confidence: :float
   end
   
   @adapters_to_test [
-    AshDSPy.Adapters.Mock,
-    # AshDSPy.Adapters.PythonPort  # Enable when bridge is available
+    DSPex.Adapters.Mock,
+    # DSPex.Adapters.PythonPort  # Enable when bridge is available
   ]
   
   for adapter <- @adapters_to_test do
     describe "#{adapter} adapter behavior" do
       setup do
-        if adapter == AshDSPy.Adapters.Mock do
-          {:ok, _} = AshDSPy.Adapters.Mock.start_link()
-          AshDSPy.Adapters.Mock.reset()
+        if adapter == DSPex.Adapters.Mock do
+          {:ok, _} = DSPex.Adapters.Mock.start_link()
+          DSPex.Adapters.Mock.reset()
         end
         
         {:ok, adapter: adapter}
@@ -681,30 +681,30 @@ defmodule AshDSPy.Adapters.BehaviorTest do
   end
   
   test "adapter factory creates correct adapters" do
-    {:ok, adapter} = AshDSPy.Adapters.Factory.create_adapter(:mock)
-    assert adapter == AshDSPy.Adapters.Mock
+    {:ok, adapter} = DSPex.Adapters.Factory.create_adapter(:mock)
+    assert adapter == DSPex.Adapters.Mock
   end
   
   test "adapter factory validates unknown adapters" do
-    {:error, _reason} = AshDSPy.Adapters.Factory.create_adapter(:unknown)
+    {:error, _reason} = DSPex.Adapters.Factory.create_adapter(:unknown)
   end
   
   test "type converter handles basic types" do
-    assert AshDSPy.Adapters.TypeConverter.convert_type(:string, :python) == "str"
-    assert AshDSPy.Adapters.TypeConverter.convert_type(:integer, :python) == "int"
-    assert AshDSPy.Adapters.TypeConverter.convert_type({:list, :string}, :python) == "List[str]"
+    assert DSPex.Adapters.TypeConverter.convert_type(:string, :python) == "str"
+    assert DSPex.Adapters.TypeConverter.convert_type(:integer, :python) == "int"
+    assert DSPex.Adapters.TypeConverter.convert_type({:list, :string}, :python) == "List[str]"
   end
   
   test "type validator accepts valid inputs" do
-    {:ok, "hello"} = AshDSPy.Adapters.TypeConverter.validate_input("hello", :string)
-    {:ok, 42} = AshDSPy.Adapters.TypeConverter.validate_input(42, :integer)
-    {:ok, [1, 2, 3]} = AshDSPy.Adapters.TypeConverter.validate_input([1, 2, 3], {:list, :integer})
+    {:ok, "hello"} = DSPex.Adapters.TypeConverter.validate_input("hello", :string)
+    {:ok, 42} = DSPex.Adapters.TypeConverter.validate_input(42, :integer)
+    {:ok, [1, 2, 3]} = DSPex.Adapters.TypeConverter.validate_input([1, 2, 3], {:list, :integer})
   end
   
   test "type validator rejects invalid inputs" do
-    {:error, _} = AshDSPy.Adapters.TypeConverter.validate_input(42, :string)
-    {:error, _} = AshDSPy.Adapters.TypeConverter.validate_input("hello", :integer)
-    {:error, _} = AshDSPy.Adapters.TypeConverter.validate_input([1, "two"], {:list, :integer})
+    {:error, _} = DSPex.Adapters.TypeConverter.validate_input(42, :string)
+    {:error, _} = DSPex.Adapters.TypeConverter.validate_input("hello", :integer)
+    {:error, _} = DSPex.Adapters.TypeConverter.validate_input([1, "two"], {:list, :integer})
   end
 end
 ```
@@ -713,7 +713,7 @@ end
 
 **Resource Integration Patterns:**
 ```elixir
-defmodule AshDSPy.ML.Program do
+defmodule DSPex.ML.Program do
   # ... existing resource definition ...
   
   actions do
@@ -726,12 +726,12 @@ defmodule AshDSPy.ML.Program do
       
       run fn input, context ->
         program = context.resource
-        adapter = AshDSPy.Adapters.Registry.get_adapter(input.arguments.adapter)
+        adapter = DSPex.Adapters.Registry.get_adapter(input.arguments.adapter)
         
         case program.dspy_program_id do
           nil -> {:error, "Program not initialized"}
           program_id ->
-            AshDSPy.Adapters.Factory.execute_with_adapter(
+            DSPex.Adapters.Factory.execute_with_adapter(
               adapter,
               :execute_program,
               [program_id, input.arguments.inputs],
@@ -746,7 +746,7 @@ defmodule AshDSPy.ML.Program do
       
       run fn input, context ->
         program = context.resource
-        adapter = AshDSPy.Adapters.Registry.get_adapter(input.arguments.adapter)
+        adapter = DSPex.Adapters.Registry.get_adapter(input.arguments.adapter)
         signature_module = String.to_existing_atom(program.signature.module)
         
         case apply(adapter, :validate_signature, [signature_module]) do
@@ -765,7 +765,7 @@ Based on the complete context above, implement the adapter pattern system with t
 
 ### FILE STRUCTURE TO CREATE:
 ```
-lib/ash_dspy/adapters/
+lib/dspex/adapters/
 ├── adapter.ex             # Core behavior definition
 ├── python_port.ex         # Python bridge adapter
 ├── mock.ex               # Testing mock adapter
@@ -775,7 +775,7 @@ lib/ash_dspy/adapters/
 ├── error_handler.ex      # Error handling and context
 └── supervisor.ex         # Adapter supervision
 
-test/ash_dspy/adapters/
+test/dspex/adapters/
 ├── behavior_test.exs     # Adapter behavior compliance tests
 ├── python_port_test.exs  # Python port adapter tests
 ├── mock_test.exs         # Mock adapter tests
@@ -785,31 +785,31 @@ test/ash_dspy/adapters/
 
 ### SPECIFIC IMPLEMENTATION REQUIREMENTS:
 
-1. **Adapter Behavior (`lib/ash_dspy/adapters/adapter.ex`)**:
+1. **Adapter Behavior (`lib/dspex/adapters/adapter.ex`)**:
    - Define core behavior with comprehensive callbacks
    - Include proper typespecs for all operations
    - Document expected behavior and error patterns
    - Support extended operations for lifecycle management
 
-2. **Python Port Adapter (`lib/ash_dspy/adapters/python_port.ex`)**:
+2. **Python Port Adapter (`lib/dspex/adapters/python_port.ex`)**:
    - Complete implementation using Python bridge
    - Type conversion between Elixir and Python formats
    - Error handling with proper context
    - Performance optimization for common operations
 
-3. **Mock Adapter (`lib/ash_dspy/adapters/mock.ex`)**:
+3. **Mock Adapter (`lib/dspex/adapters/mock.ex`)**:
    - Full GenServer implementation for testing
    - Mock data generation based on signatures
    - Call logging for test verification
    - Configurable behavior for error testing
 
-4. **Registry System (`lib/ash_dspy/adapters/registry.ex`)**:
+4. **Registry System (`lib/dspex/adapters/registry.ex`)**:
    - Configuration-driven adapter selection
    - Adapter validation and capability checking
    - Dynamic adapter loading and management
    - Environment-specific adapter selection
 
-5. **Type Conversion (`lib/ash_dspy/adapters/type_converter.ex`)**:
+5. **Type Conversion (`lib/dspex/adapters/type_converter.ex`)**:
    - Comprehensive type mapping system
    - Validation for all supported types
    - Support for composite and ML-specific types

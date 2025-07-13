@@ -11,7 +11,7 @@ Implement a robust GenServer-based Python bridge that enables bidirectional comm
 From STAGE_1_FOUNDATION_IMPLEMENTATION.md, the Python bridge consists of:
 
 ```
-lib/ash_dspy/python_bridge/
+lib/dspex/python_bridge/
 ├── bridge.ex             # GenServer for Python communication
 └── protocol.ex           # Wire protocol
 priv/python/
@@ -31,7 +31,7 @@ priv/python/
 From STAGE_1_FOUNDATION_IMPLEMENTATION.md:
 
 ```elixir
-defmodule AshDSPy.PythonBridge.Bridge do
+defmodule DSPex.PythonBridge.Bridge do
   @moduledoc """
   GenServer managing Python DSPy process communication.
   """
@@ -39,7 +39,7 @@ defmodule AshDSPy.PythonBridge.Bridge do
   use GenServer
   require Logger
   
-  alias AshDSPy.PythonBridge.Protocol
+  alias DSPex.PythonBridge.Protocol
   
   defstruct [:port, :requests, :request_id]
   
@@ -53,7 +53,7 @@ defmodule AshDSPy.PythonBridge.Bridge do
   
   @impl true
   def init(_opts) do
-    python_script = Path.join(:code.priv_dir(:ash_dspy), "python/dspy_bridge.py")
+    python_script = Path.join(:code.priv_dir(:dspex), "python/dspy_bridge.py")
     
     case System.find_executable("python3") do
       nil -> 
@@ -131,7 +131,7 @@ end
 From STAGE_1_FOUNDATION_IMPLEMENTATION.md:
 
 ```elixir
-defmodule AshDSPy.PythonBridge.Protocol do
+defmodule DSPex.PythonBridge.Protocol do
   @moduledoc """
   Wire protocol for Python bridge communication.
   """
@@ -334,7 +334,7 @@ end
 
 **Process Lifecycle Management:**
 ```elixir
-defmodule AshDSPy.PythonBridge.Supervisor do
+defmodule DSPex.PythonBridge.Supervisor do
   use Supervisor
   
   def start_link(opts) do
@@ -344,9 +344,9 @@ defmodule AshDSPy.PythonBridge.Supervisor do
   @impl true
   def init(_opts) do
     children = [
-      {AshDSPy.PythonBridge.Bridge, []},
+      {DSPex.PythonBridge.Bridge, []},
       # Add process monitor
-      {AshDSPy.PythonBridge.Monitor, []}
+      {DSPex.PythonBridge.Monitor, []}
     ]
     
     Supervisor.init(children, strategy: :one_for_one, max_restarts: 3, max_seconds: 60)
@@ -376,19 +376,19 @@ end
 From STAGE_1_FOUNDATION_IMPLEMENTATION.md:
 
 ```elixir
-defmodule AshDSPy.Application do
+defmodule DSPex.Application do
   use Application
   
   def start(_type, _args) do
     children = [
       # Start Python bridge
-      AshDSPy.PythonBridge.Bridge,
+      DSPex.PythonBridge.Bridge,
       
       # Start Ash resources if using Postgres
-      {AshPostgres.Repo, Application.get_env(:ash_dspy, AshDSPy.Repo)}
+      {AshPostgres.Repo, Application.get_env(:dspex, DSPex.Repo)}
     ]
     
-    opts = [strategy: :one_for_one, name: AshDSPy.Supervisor]
+    opts = [strategy: :one_for_one, name: DSPex.Supervisor]
     Supervisor.start_link(children, opts)
   end
 end
@@ -401,20 +401,20 @@ end
 # config/config.exs
 import Config
 
-config :ash_dspy, :python_bridge,
+config :dspex, :python_bridge,
   python_executable: System.get_env("PYTHON_EXECUTABLE", "python3"),
   script_path: "python/dspy_bridge.py",
   default_timeout: 30_000,
   max_retries: 3
 
-config :ash_dspy, :python_environment,
+config :dspex, :python_environment,
   virtual_env: System.get_env("DSPY_VENV"),
   required_packages: ["dspy-ai", "openai", "numpy"]
 ```
 
 **Runtime Environment Checks:**
 ```elixir
-defmodule AshDSPy.PythonBridge.EnvironmentCheck do
+defmodule DSPex.PythonBridge.EnvironmentCheck do
   @moduledoc """
   Validate Python environment before starting bridge.
   """
@@ -430,7 +430,7 @@ defmodule AshDSPy.PythonBridge.EnvironmentCheck do
   end
   
   defp find_python_executable do
-    python_cmd = Application.get_env(:ash_dspy, :python_bridge)[:python_executable]
+    python_cmd = Application.get_env(:dspex, :python_bridge)[:python_executable]
     
     case System.find_executable(python_cmd) do
       nil -> {:error, "Python executable not found: #{python_cmd}"}
@@ -449,7 +449,7 @@ defmodule AshDSPy.PythonBridge.EnvironmentCheck do
   end
   
   defp validate_bridge_script do
-    script_path = Path.join(:code.priv_dir(:ash_dspy), "python/dspy_bridge.py")
+    script_path = Path.join(:code.priv_dir(:dspex), "python/dspy_bridge.py")
     
     if File.exists?(script_path) do
       {:ok, script_path}
@@ -464,7 +464,7 @@ end
 
 **Bridge Health Monitoring:**
 ```elixir
-defmodule AshDSPy.PythonBridge.Monitor do
+defmodule DSPex.PythonBridge.Monitor do
   use GenServer
   require Logger
   
@@ -491,7 +491,7 @@ defmodule AshDSPy.PythonBridge.Monitor do
         
         if new_failures >= 3 do
           Logger.error("Python bridge unhealthy, restarting...")
-          AshDSPy.PythonBridge.Bridge.restart()
+          DSPex.PythonBridge.Bridge.restart()
         end
         
         schedule_health_check()
@@ -500,7 +500,7 @@ defmodule AshDSPy.PythonBridge.Monitor do
   end
   
   defp perform_health_check do
-    case AshDSPy.PythonBridge.Bridge.call(:ping, %{}, 5_000) do
+    case DSPex.PythonBridge.Bridge.call(:ping, %{}, 5_000) do
       {:ok, %{"status" => "ok"}} -> :ok
       {:ok, response} -> {:error, "unexpected response: #{inspect(response)}"}
       {:error, reason} -> {:error, reason}
@@ -560,24 +560,24 @@ def get_memory_usage(self):
 
 **Bridge Communication Tests:**
 ```elixir
-defmodule AshDSPy.PythonBridge.BridgeTest do
+defmodule DSPex.PythonBridge.BridgeTest do
   use ExUnit.Case
   
   setup do
     # Ensure bridge is running
-    {:ok, _} = AshDSPy.PythonBridge.Bridge.start_link()
+    {:ok, _} = DSPex.PythonBridge.Bridge.start_link()
     :ok
   end
   
   test "basic ping communication" do
-    {:ok, response} = AshDSPy.PythonBridge.Bridge.call(:ping, %{})
+    {:ok, response} = DSPex.PythonBridge.Bridge.call(:ping, %{})
     assert response["status"] == "ok"
     assert is_number(response["timestamp"])
   end
   
   test "program creation and execution" do
     # Create program
-    {:ok, create_response} = AshDSPy.PythonBridge.Bridge.call(:create_program, %{
+    {:ok, create_response} = DSPex.PythonBridge.Bridge.call(:create_program, %{
       id: "test_program",
       signature: %{
         inputs: [%{name: "question", type: "str"}],
@@ -589,7 +589,7 @@ defmodule AshDSPy.PythonBridge.BridgeTest do
     assert create_response["status"] == "created"
     
     # Execute program
-    {:ok, exec_response} = AshDSPy.PythonBridge.Bridge.call(:execute_program, %{
+    {:ok, exec_response} = DSPex.PythonBridge.Bridge.call(:execute_program, %{
       program_id: "test_program",
       inputs: %{question: "What is 2+2?"}
     })
@@ -598,7 +598,7 @@ defmodule AshDSPy.PythonBridge.BridgeTest do
   end
   
   test "error handling for unknown program" do
-    {:error, error_msg} = AshDSPy.PythonBridge.Bridge.call(:execute_program, %{
+    {:error, error_msg} = DSPex.PythonBridge.Bridge.call(:execute_program, %{
       program_id: "nonexistent",
       inputs: %{question: "test"}
     })
@@ -608,7 +608,7 @@ defmodule AshDSPy.PythonBridge.BridgeTest do
   
   test "timeout handling" do
     # Test with very short timeout
-    result = AshDSPy.PythonBridge.Bridge.call(:ping, %{}, 1)
+    result = DSPex.PythonBridge.Bridge.call(:ping, %{}, 1)
     
     case result do
       {:ok, _} -> :ok  # Fast response
@@ -619,7 +619,7 @@ defmodule AshDSPy.PythonBridge.BridgeTest do
   test "concurrent requests" do
     tasks = for i <- 1..10 do
       Task.async(fn ->
-        AshDSPy.PythonBridge.Bridge.call(:ping, %{request_id: i})
+        DSPex.PythonBridge.Bridge.call(:ping, %{request_id: i})
       end)
     end
     
@@ -637,7 +637,7 @@ end
 
 **Connection Pooling:**
 ```elixir
-defmodule AshDSPy.PythonBridge.Pool do
+defmodule DSPex.PythonBridge.Pool do
   @moduledoc """
   Connection pool for Python bridge instances.
   """
@@ -661,7 +661,7 @@ defmodule AshDSPy.PythonBridge.Pool do
     pool_size = Keyword.get(opts, :pool_size, 3)
     
     bridges = for _ <- 1..pool_size do
-      {:ok, pid} = AshDSPy.PythonBridge.Bridge.start_link()
+      {:ok, pid} = DSPex.PythonBridge.Bridge.start_link()
       pid
     end
     
@@ -700,7 +700,7 @@ Based on the complete context above, implement the Python bridge communication l
 
 ### FILE STRUCTURE TO CREATE:
 ```
-lib/ash_dspy/python_bridge/
+lib/dspex/python_bridge/
 ├── bridge.ex             # Main GenServer implementation
 ├── protocol.ex           # Wire protocol handling
 ├── monitor.ex            # Health monitoring
@@ -710,7 +710,7 @@ lib/ash_dspy/python_bridge/
 priv/python/
 └── dspy_bridge.py        # Python bridge script
 
-test/ash_dspy/python_bridge/
+test/dspex/python_bridge/
 ├── bridge_test.exs       # Bridge communication tests
 ├── protocol_test.exs     # Protocol encoding/decoding tests
 └── integration_test.exs  # End-to-end integration tests
@@ -718,26 +718,26 @@ test/ash_dspy/python_bridge/
 
 ### SPECIFIC IMPLEMENTATION REQUIREMENTS:
 
-1. **Bridge GenServer (`lib/ash_dspy/python_bridge/bridge.ex`)**:
+1. **Bridge GenServer (`lib/dspex/python_bridge/bridge.ex`)**:
    - Complete GenServer implementation with proper state management
    - Python subprocess lifecycle management
    - Request/response correlation with unique IDs
    - Timeout handling and error recovery
    - Graceful shutdown and cleanup
 
-2. **Wire Protocol (`lib/ash_dspy/python_bridge/protocol.ex`)**:
+2. **Wire Protocol (`lib/dspex/python_bridge/protocol.ex`)**:
    - JSON encoding/decoding for requests and responses
    - Packet framing with 4-byte length headers
    - Error message standardization
    - Request ID management and correlation
 
-3. **Health Monitoring (`lib/ash_dspy/python_bridge/monitor.ex`)**:
+3. **Health Monitoring (`lib/dspex/python_bridge/monitor.ex`)**:
    - Periodic health checks with ping operations
    - Failure tracking and automatic restart triggers
    - Performance metrics collection
    - Bridge availability monitoring
 
-4. **Environment Validation (`lib/ash_dspy/python_bridge/environment_check.ex`)**:
+4. **Environment Validation (`lib/dspex/python_bridge/environment_check.ex`)**:
    - Python executable detection and validation
    - DSPy package installation verification
    - Script file existence and permissions check

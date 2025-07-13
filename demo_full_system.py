@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Complete AshDSPex + Gemini Integration Demo
+Complete DSPex + Gemini Integration Demo
 
 This script demonstrates the full working integration between:
 1. Elixir signature system (compile-time signature processing)
@@ -25,7 +25,7 @@ def run_elixir_signature_test():
     
     # Test signature compilation
     result = subprocess.run([
-        "mix", "test", "test/ash_dspex/signature_test.exs", "--format", "doc"
+        "mix", "test", "test/dspex/signature_test.exs", "--format", "doc"
     ], capture_output=True, text=True)
     
     if result.returncode == 0:
@@ -263,7 +263,7 @@ def run_python_bridge_test():
 def show_integration_summary():
     """Show what the complete integration achieves."""
     print("\n" + "=" * 60)
-    print("🎉 ASHDSPEX + GEMINI INTEGRATION SUMMARY")
+    print("🎉 DSPEX + GEMINI INTEGRATION SUMMARY")
     print("=" * 60)
     
     print("""
@@ -320,7 +320,7 @@ with Elixir applications using the Ash framework!
 
 def main():
     """Run the complete demonstration."""
-    print("🚀 AshDSPex + Gemini Complete Integration Demo")
+    print("🚀 DSPex + Gemini Complete Integration Demo")
     print("=" * 60)
     
     # Check prerequisites

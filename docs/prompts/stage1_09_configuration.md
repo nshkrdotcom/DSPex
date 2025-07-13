@@ -41,17 +41,17 @@ From STAGE_1_FOUNDATION_IMPLEMENTATION.md:
 # config/config.exs
 import Config
 
-config :ash_dspy, :adapter, AshDSPy.Adapters.PythonPort
+config :dspex, :adapter, DSPex.Adapters.PythonPort
 
-config :ash_dspy, AshDSPy.Repo,
+config :dspex, DSPex.Repo,
   username: "postgres",
   password: "postgres", 
   hostname: "localhost",
-  database: "ash_dspy_dev",
+  database: "dspex_dev",
   pool_size: 10
 
-config :ash_dspy,
-  ecto_repos: [AshDSPy.Repo]
+config :dspex,
+  ecto_repos: [DSPex.Repo]
 ```
 
 ### COMPREHENSIVE APPLICATION CONFIGURATION
@@ -62,13 +62,13 @@ config :ash_dspy,
 import Config
 
 # Core application configuration
-config :ash_dspy,
+config :dspex,
   # Domain and resource configuration
-  domains: [AshDSPy.ML.Domain],
-  ecto_repos: [AshDSPy.Repo],
+  domains: [DSPex.ML.Domain],
+  ecto_repos: [DSPex.Repo],
   
   # Default adapter configuration
-  adapter: AshDSPy.Adapters.PythonPort,
+  adapter: DSPex.Adapters.PythonPort,
   adapter_timeout: 30_000,
   
   # Signature system configuration
@@ -127,7 +127,7 @@ config :ash_dspy,
   ]
 
 # Python bridge configuration
-config :ash_dspy, :python_bridge,
+config :dspex, :python_bridge,
   executable: System.get_env("PYTHON_EXECUTABLE", "python3"),
   script_path: "python/dspy_bridge.py",
   startup_timeout: 30_000,
@@ -139,12 +139,12 @@ config :ash_dspy, :python_bridge,
   }
 
 # Database configuration with connection pooling
-config :ash_dspy, AshDSPy.Repo,
+config :dspex, DSPex.Repo,
   username: System.get_env("DATABASE_USERNAME", "postgres"),
   password: System.get_env("DATABASE_PASSWORD", "postgres"),
   hostname: System.get_env("DATABASE_HOSTNAME", "localhost"),
   port: String.to_integer(System.get_env("DATABASE_PORT", "5432")),
-  database: System.get_env("DATABASE_NAME", "ash_dspy_dev"),
+  database: System.get_env("DATABASE_NAME", "dspex_dev"),
   pool_size: String.to_integer(System.get_env("DATABASE_POOL_SIZE", "10")),
   queue_target: 5000,
   queue_interval: 1000,
@@ -158,27 +158,27 @@ config :ash_dspy, AshDSPy.Repo,
   ]
 
 # Telemetry and monitoring
-config :ash_dspy, :telemetry,
+config :dspex, :telemetry,
   events: [
-    [:ash_dspy, :signature, :compilation],
-    [:ash_dspy, :program, :execution],
-    [:ash_dspy, :adapter, :call],
-    [:ash_dspy, :python_bridge, :communication],
-    [:ash_dspy, :type, :validation]
+    [:dspex, :signature, :compilation],
+    [:dspex, :program, :execution],
+    [:dspex, :adapter, :call],
+    [:dspex, :python_bridge, :communication],
+    [:dspex, :type, :validation]
   ],
   metrics: [
-    counter: [:ash_dspy, :executions, :total],
-    histogram: [:ash_dspy, :execution, :duration],
-    gauge: [:ash_dspy, :programs, :active],
-    summary: [:ash_dspy, :adapter, :response_time]
+    counter: [:dspex, :executions, :total],
+    histogram: [:dspex, :execution, :duration],
+    gauge: [:dspex, :programs, :active],
+    summary: [:dspex, :adapter, :response_time]
   ],
   reporters: [
-    {AshDSPy.Telemetry.ConsoleReporter, []},
-    {AshDSPy.Telemetry.MetricsReporter, []}
+    {DSPex.Telemetry.ConsoleReporter, []},
+    {DSPex.Telemetry.MetricsReporter, []}
   ]
 
 # External service configuration
-config :ash_dspy, :external_services,
+config :dspex, :external_services,
   openai: [
     api_key: System.get_env("OPENAI_API_KEY"),
     api_base: System.get_env("OPENAI_API_BASE", "https://api.openai.com/v1"),
@@ -205,8 +205,8 @@ import_config "#{config_env()}.exs"
 import Config
 
 # Development-specific overrides
-config :ash_dspy,
-  adapter: AshDSPy.Adapters.Mock,  # Use mock adapter for development
+config :dspex,
+  adapter: DSPex.Adapters.Mock,  # Use mock adapter for development
   
   signature_compilation: [
     enable_cache: false,  # Disable cache for hot reloading
@@ -230,15 +230,15 @@ config :ash_dspy,
   ]
 
 # Development database
-config :ash_dspy, AshDSPy.Repo,
-  database: "ash_dspy_dev",
+config :dspex, DSPex.Repo,
+  database: "dspex_dev",
   hostname: "localhost",
   port: 5432,
   show_sensitive_data_on_connection_error: true,
   pool_size: 5
 
 # Development Python bridge
-config :ash_dspy, :python_bridge,
+config :dspex, :python_bridge,
   executable: "python3",
   health_check_interval: 10_000,  # More frequent checks
   environment_variables: %{
@@ -247,9 +247,9 @@ config :ash_dspy, :python_bridge,
   }
 
 # Enable code reloading
-config :ash_dspy, :phoenix_live_reload,
+config :dspex, :phoenix_live_reload,
   patterns: [
-    ~r"lib/ash_dspy/.*(ex)$",
+    ~r"lib/dspex/.*(ex)$",
     ~r"test/.*(exs)$"
   ]
 
@@ -265,8 +265,8 @@ config :logger, :console,
 import Config
 
 # Production-specific configuration
-config :ash_dspy,
-  adapter: AshDSPy.Adapters.PythonPort,  # Use real adapters in production
+config :dspex,
+  adapter: DSPex.Adapters.PythonPort,  # Use real adapters in production
   
   signature_compilation: [
     enable_cache: true,
@@ -305,7 +305,7 @@ config :ash_dspy,
   ]
 
 # Production database with SSL
-config :ash_dspy, AshDSPy.Repo,
+config :dspex, DSPex.Repo,
   url: System.get_env("DATABASE_URL") || raise("DATABASE_URL not set"),
   pool_size: String.to_integer(System.get_env("POOL_SIZE", "20")),
   ssl: true,
@@ -316,15 +316,15 @@ config :ash_dspy, AshDSPy.Repo,
   ]
 
 # Production telemetry with external monitoring
-config :ash_dspy, :telemetry,
+config :dspex, :telemetry,
   reporters: [
-    {AshDSPy.Telemetry.PrometheusReporter, []},
-    {AshDSPy.Telemetry.DatadogReporter, []},
-    {AshDSPy.Telemetry.SentryReporter, []}
+    {DSPex.Telemetry.PrometheusReporter, []},
+    {DSPex.Telemetry.DatadogReporter, []},
+    {DSPex.Telemetry.SentryReporter, []}
   ]
 
 # External service timeouts for production
-config :ash_dspy, :external_services,
+config :dspex, :external_services,
   openai: [
     timeout: 30_000,  # Shorter timeout in production
     max_retries: 2
@@ -350,8 +350,8 @@ config :logger, :console,
 import Config
 
 # Test-specific configuration
-config :ash_dspy,
-  adapter: AshDSPy.Adapters.Mock,  # Always use mock in tests
+config :dspex,
+  adapter: DSPex.Adapters.Mock,  # Always use mock in tests
   
   signature_compilation: [
     enable_cache: false,  # Disable cache for test isolation
@@ -379,16 +379,16 @@ config :ash_dspy,
   ]
 
 # Test database
-config :ash_dspy, AshDSPy.Repo,
+config :dspex, DSPex.Repo,
   username: "postgres",
   password: "postgres",
   hostname: "localhost",
-  database: "ash_dspy_test#{System.get_env("MIX_TEST_PARTITION")}",
+  database: "dspex_test#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: 10
 
 # Disable telemetry in tests
-config :ash_dspy, :telemetry,
+config :dspex, :telemetry,
   events: [],
   metrics: [],
   reporters: []
@@ -401,7 +401,7 @@ config :logger, level: :warning
 
 **Runtime Configuration Validation:**
 ```elixir
-defmodule AshDSPy.Config.Validator do
+defmodule DSPex.Config.Validator do
   @moduledoc """
   Validates application configuration at startup and runtime.
   Ensures all required settings are present and valid.
@@ -410,17 +410,17 @@ defmodule AshDSPy.Config.Validator do
   require Logger
   
   @required_configs [
-    {:ash_dspy, :adapter},
-    {:ash_dspy, :domains},
-    {:ash_dspy, AshDSPy.Repo}
+    {:dspex, :adapter},
+    {:dspex, :domains},
+    {:dspex, DSPex.Repo}
   ]
   
   @adapter_configs %{
-    AshDSPy.Adapters.PythonPort => [
-      {:ash_dspy, :python_bridge, :executable},
-      {:ash_dspy, :python_bridge, :script_path}
+    DSPex.Adapters.PythonPort => [
+      {:dspex, :python_bridge, :executable},
+      {:dspex, :python_bridge, :script_path}
     ],
-    AshDSPy.Adapters.Mock => []
+    DSPex.Adapters.Mock => []
   }
   
   def validate_config! do
@@ -464,17 +464,17 @@ defmodule AshDSPy.Config.Validator do
   end
   
   defp validate_adapter_config do
-    adapter = Application.get_env(:ash_dspy, :adapter)
+    adapter = Application.get_env(:dspex, :adapter)
     
     case adapter do
       nil -> 
-        [{:missing_config, {:ash_dspy, :adapter}}]
+        [{:missing_config, {:dspex, :adapter}}]
       
       adapter_module when is_atom(adapter_module) ->
         validate_adapter_module(adapter_module) ++ validate_adapter_dependencies(adapter_module)
       
       _ -> 
-        [{:invalid_config, {:ash_dspy, :adapter}, "must be an atom"}]
+        [{:invalid_config, {:dspex, :adapter}, "must be an atom"}]
     end
   end
   
@@ -509,7 +509,7 @@ defmodule AshDSPy.Config.Validator do
   end
   
   defp validate_database_config do
-    repo_config = Application.get_env(:ash_dspy, AshDSPy.Repo, [])
+    repo_config = Application.get_env(:dspex, DSPex.Repo, [])
     errors = []
     
     # Check required database fields
@@ -534,10 +534,10 @@ defmodule AshDSPy.Config.Validator do
   end
   
   defp validate_python_bridge_config do
-    adapter = Application.get_env(:ash_dspy, :adapter)
+    adapter = Application.get_env(:dspex, :adapter)
     
-    if adapter == AshDSPy.Adapters.PythonPort do
-      bridge_config = Application.get_env(:ash_dspy, :python_bridge, [])
+    if adapter == DSPex.Adapters.PythonPort do
+      bridge_config = Application.get_env(:dspex, :python_bridge, [])
       errors = []
       
       # Check Python executable
@@ -554,7 +554,7 @@ defmodule AshDSPy.Config.Validator do
           errors ++ [{:missing_python_config, :script_path}]
         
         path ->
-          full_path = Path.join(:code.priv_dir(:ash_dspy), path)
+          full_path = Path.join(:code.priv_dir(:dspex), path)
           if File.exists?(full_path) do
             errors
           else
@@ -567,7 +567,7 @@ defmodule AshDSPy.Config.Validator do
   end
   
   defp validate_security_config do
-    security_config = Application.get_env(:ash_dspy, :security, [])
+    security_config = Application.get_env(:dspex, :security, [])
     errors = []
     
     # Validate rate limiting config
@@ -593,7 +593,7 @@ defmodule AshDSPy.Config.Validator do
   end
   
   defp validate_performance_config do
-    perf_config = Application.get_env(:ash_dspy, :performance, [])
+    perf_config = Application.get_env(:dspex, :performance, [])
     errors = []
     
     # Validate numeric performance settings
@@ -686,15 +686,15 @@ end
 
 **Complete Application Module:**
 ```elixir
-defmodule AshDSPy.Application do
+defmodule DSPex.Application do
   @moduledoc """
-  Main application module for AshDSPy.
+  Main application module for DSPex.
   Defines the supervision tree and startup logic.
   """
   
   use Application
   
-  alias AshDSPy.Config.Validator
+  alias DSPex.Config.Validator
   
   def start(_type, _args) do
     # Validate configuration before starting
@@ -709,25 +709,25 @@ defmodule AshDSPy.Application do
     # Start supervisor with fault tolerance strategy
     opts = [
       strategy: :one_for_one, 
-      name: AshDSPy.Supervisor,
+      name: DSPex.Supervisor,
       max_restarts: 3,
       max_seconds: 60
     ]
     
     case Supervisor.start_link(children, opts) do
       {:ok, pid} ->
-        Logger.info("AshDSPy application started successfully")
+        Logger.info("DSPex application started successfully")
         post_startup_tasks()
         {:ok, pid}
       
       {:error, reason} ->
-        Logger.error("Failed to start AshDSPy application: #{inspect(reason)}")
+        Logger.error("Failed to start DSPex application: #{inspect(reason)}")
         {:error, reason}
     end
   end
   
   def stop(_state) do
-    Logger.info("AshDSPy application stopping")
+    Logger.info("DSPex application stopping")
     cleanup_resources()
     :ok
   end
@@ -736,19 +736,19 @@ defmodule AshDSPy.Application do
     # Base children that always start
     base_children = [
       # Configuration cache
-      {AshDSPy.Config.Cache, []},
+      {DSPex.Config.Cache, []},
       
       # Type system cache
-      {AshDSPy.Types.Cache, []},
+      {DSPex.Types.Cache, []},
       
       # Database repo (if configured)
       database_child(),
       
       # Telemetry supervisor
-      {AshDSPy.Telemetry.Supervisor, []},
+      {DSPex.Telemetry.Supervisor, []},
       
       # Core domain supervisor
-      {AshDSPy.ML.Supervisor, []}
+      {DSPex.ML.Supervisor, []}
     ]
     
     # Add adapter-specific children
@@ -762,30 +762,30 @@ defmodule AshDSPy.Application do
   end
   
   defp database_child do
-    if Application.get_env(:ash_dspy, AshDSPy.Repo) do
-      {AshDSPy.Repo, []}
+    if Application.get_env(:dspex, DSPex.Repo) do
+      {DSPex.Repo, []}
     else
       nil
     end
   end
   
   defp build_adapter_children do
-    adapter = Application.get_env(:ash_dspy, :adapter)
+    adapter = Application.get_env(:dspex, :adapter)
     
     case adapter do
-      AshDSPy.Adapters.PythonPort ->
+      DSPex.Adapters.PythonPort ->
         [
           # Python bridge
-          {AshDSPy.PythonBridge.Supervisor, []},
+          {DSPex.PythonBridge.Supervisor, []},
           
           # Bridge health monitor
-          {AshDSPy.PythonBridge.Monitor, []}
+          {DSPex.PythonBridge.Monitor, []}
         ]
       
-      AshDSPy.Adapters.Mock ->
+      DSPex.Adapters.Mock ->
         [
           # Mock adapter
-          {AshDSPy.Adapters.Mock, []}
+          {DSPex.Adapters.Mock, []}
         ]
       
       _ ->
@@ -798,21 +798,21 @@ defmodule AshDSPy.Application do
     
     # Add rate limiter if security is enabled
     optional = if security_enabled?() do
-      optional ++ [{AshDSPy.Security.RateLimiter, []}]
+      optional ++ [{DSPex.Security.RateLimiter, []}]
     else
       optional
     end
     
     # Add performance monitor if configured
     optional = if performance_monitoring_enabled?() do
-      optional ++ [{AshDSPy.Performance.Monitor, []}]
+      optional ++ [{DSPex.Performance.Monitor, []}]
     else
       optional
     end
     
     # Add external service monitors
     optional = if external_services_configured?() do
-      optional ++ [{AshDSPy.ExternalServices.Supervisor, []}]
+      optional ++ [{DSPex.ExternalServices.Supervisor, []}]
     else
       optional
     end
@@ -821,18 +821,18 @@ defmodule AshDSPy.Application do
   end
   
   defp security_enabled? do
-    Application.get_env(:ash_dspy, :security, [])
+    Application.get_env(:dspex, :security, [])
     |> Keyword.get(:rate_limiting, [])
     |> Keyword.get(:enabled, false)
   end
   
   defp performance_monitoring_enabled? do
-    Application.get_env(:ash_dspy, :performance, [])
+    Application.get_env(:dspex, :performance, [])
     |> Keyword.get(:monitoring_enabled, false)
   end
   
   defp external_services_configured? do
-    external_config = Application.get_env(:ash_dspy, :external_services, [])
+    external_config = Application.get_env(:dspex, :external_services, [])
     
     Enum.any?([:openai, :anthropic], fn service ->
       service_config = Keyword.get(external_config, service, [])
@@ -842,20 +842,20 @@ defmodule AshDSPy.Application do
   
   defp setup_telemetry do
     # Attach telemetry handlers
-    events = Application.get_env(:ash_dspy, :telemetry, [])
+    events = Application.get_env(:dspex, :telemetry, [])
              |> Keyword.get(:events, [])
     
     Enum.each(events, fn event ->
       :telemetry.attach(
-        "ash_dspy_#{Enum.join(event, "_")}",
+        "dspex_#{Enum.join(event, "_")}",
         event,
-        &AshDSPy.Telemetry.Handler.handle_event/4,
+        &DSPex.Telemetry.Handler.handle_event/4,
         %{}
       )
     end)
     
     # Start telemetry reporters
-    reporters = Application.get_env(:ash_dspy, :telemetry, [])
+    reporters = Application.get_env(:dspex, :telemetry, [])
                |> Keyword.get(:reporters, [])
     
     Enum.each(reporters, fn {reporter_module, opts} ->
@@ -866,14 +866,14 @@ defmodule AshDSPy.Application do
   defp post_startup_tasks do
     # Warm up caches
     Task.start(fn ->
-      AshDSPy.Types.Cache.warm_up()
-      AshDSPy.Config.Cache.warm_up()
+      DSPex.Types.Cache.warm_up()
+      DSPex.Config.Cache.warm_up()
     end)
     
     # Verify adapter connectivity
     Task.start(fn ->
-      adapter = Application.get_env(:ash_dspy, :adapter)
-      case AshDSPy.Adapters.Registry.validate_adapter(adapter) do
+      adapter = Application.get_env(:dspex, :adapter)
+      case DSPex.Adapters.Registry.validate_adapter(adapter) do
         {:ok, _} -> 
           Logger.info("Adapter #{adapter} validated successfully")
         {:error, reason} -> 
@@ -884,7 +884,7 @@ defmodule AshDSPy.Application do
     # Run health checks
     Task.start(fn ->
       Process.sleep(5000)  # Wait for services to fully start
-      case AshDSPy.Health.Check.run_startup_checks() do
+      case DSPex.Health.Check.run_startup_checks() do
         :ok -> 
           Logger.info("Startup health checks passed")
         {:error, reason} -> 
@@ -895,14 +895,14 @@ defmodule AshDSPy.Application do
   
   defp cleanup_resources do
     # Cleanup type caches
-    AshDSPy.Types.Cache.clear()
+    DSPex.Types.Cache.clear()
     
     # Cleanup configuration cache
-    AshDSPy.Config.Cache.clear()
+    DSPex.Config.Cache.clear()
     
     # Close database connections
-    if Process.whereis(AshDSPy.Repo) do
-      AshDSPy.Repo.stop()
+    if Process.whereis(DSPex.Repo) do
+      DSPex.Repo.stop()
     end
     
     # Cleanup telemetry
@@ -915,7 +915,7 @@ end
 
 **ML Domain Supervisor:**
 ```elixir
-defmodule AshDSPy.ML.Supervisor do
+defmodule DSPex.ML.Supervisor do
   @moduledoc """
   Supervisor for ML domain components.
   """
@@ -930,16 +930,16 @@ defmodule AshDSPy.ML.Supervisor do
   def init(_opts) do
     children = [
       # Signature registry
-      {Registry, keys: :unique, name: AshDSPy.ML.SignatureRegistry},
+      {Registry, keys: :unique, name: DSPex.ML.SignatureRegistry},
       
       # Program manager
-      {AshDSPy.ML.ProgramManager, []},
+      {DSPex.ML.ProgramManager, []},
       
       # Execution tracker
-      {AshDSPy.ML.ExecutionTracker, []},
+      {DSPex.ML.ExecutionTracker, []},
       
       # Metrics collector
-      {AshDSPy.ML.MetricsCollector, []}
+      {DSPex.ML.MetricsCollector, []}
     ]
     
     Supervisor.init(children, strategy: :one_for_one)
@@ -951,7 +951,7 @@ end
 
 **Environment Variable Loader:**
 ```elixir
-defmodule AshDSPy.Config.Environment do
+defmodule DSPex.Config.Environment do
   @moduledoc """
   Manages environment variable loading and validation.
   """
@@ -1045,7 +1045,7 @@ defmodule AshDSPy.Config.Environment do
   end
   
   defp config_env do
-    Application.get_env(:ash_dspy, :environment) || Mix.env()
+    Application.get_env(:dspex, :environment) || Mix.env()
   end
 end
 ```
@@ -1054,7 +1054,7 @@ end
 
 **Secret Management System:**
 ```elixir
-defmodule AshDSPy.Config.Secrets do
+defmodule DSPex.Config.Secrets do
   @moduledoc """
   Secure secret management for the application.
   """
@@ -1077,7 +1077,7 @@ defmodule AshDSPy.Config.Secrets do
   
   defp load_production_secrets! do
     # In production, secrets should come from secure sources
-    secret_source = Application.get_env(:ash_dspy, :secret_source, :env_vars)
+    secret_source = Application.get_env(:dspex, :secret_source, :env_vars)
     
     case secret_source do
       :env_vars -> 
@@ -1145,7 +1145,7 @@ defmodule AshDSPy.Config.Secrets do
   
   defp load_from_vault do
     # Implementation for HashiCorp Vault
-    vault_config = Application.get_env(:ash_dspy, :vault, [])
+    vault_config = Application.get_env(:dspex, :vault, [])
     vault_url = Keyword.get(vault_config, :url)
     vault_token = System.get_env("VAULT_TOKEN")
     
@@ -1161,7 +1161,7 @@ defmodule AshDSPy.Config.Secrets do
   
   defp load_from_aws_secrets_manager do
     # Implementation for AWS Secrets Manager
-    secret_name = Application.get_env(:ash_dspy, :aws_secret_name)
+    secret_name = Application.get_env(:dspex, :aws_secret_name)
     
     unless secret_name do
       raise "AWS Secrets Manager secret name not configured"
@@ -1203,7 +1203,7 @@ defmodule AshDSPy.Config.Secrets do
   end
   
   defp config_env do
-    Application.get_env(:ash_dspy, :environment) || Mix.env()
+    Application.get_env(:dspex, :environment) || Mix.env()
   end
 end
 ```
@@ -1212,7 +1212,7 @@ end
 
 **Configuration Caching System:**
 ```elixir
-defmodule AshDSPy.Config.Cache do
+defmodule DSPex.Config.Cache do
   @moduledoc """
   Caches frequently accessed configuration values for performance.
   """
@@ -1246,10 +1246,10 @@ defmodule AshDSPy.Config.Cache do
   def warm_up do
     # Pre-load commonly accessed configuration
     common_keys = [
-      {:ash_dspy, :adapter},
-      {:ash_dspy, :performance},
-      {:ash_dspy, :security},
-      {:ash_dspy, :wire_protocol}
+      {:dspex, :adapter},
+      {:dspex, :performance},
+      {:dspex, :security},
+      {:dspex, :wire_protocol}
     ]
     
     Enum.each(common_keys, fn key ->
@@ -1341,7 +1341,7 @@ config/
 ├── test.exs                # Test environment
 └── runtime.exs             # Runtime configuration
 
-lib/ash_dspy/
+lib/dspex/
 ├── application.ex          # Main application module
 ├── config/
 │   ├── validator.ex        # Configuration validation
@@ -1369,25 +1369,25 @@ priv/
    - Security considerations for each environment
    - Database, Python bridge, and external service configuration
 
-2. **Application Module (`lib/ash_dspy/application.ex`)**:
+2. **Application Module (`lib/dspex/application.ex`)**:
    - Comprehensive supervision tree setup
    - Configuration validation on startup
    - Environment-specific service initialization
    - Graceful shutdown and cleanup
 
-3. **Configuration Validation (`lib/ash_dspy/config/validator.ex`)**:
+3. **Configuration Validation (`lib/dspex/config/validator.ex`)**:
    - Runtime configuration validation
    - Adapter-specific requirement checking
    - Database and external service validation
    - Clear error messages and recommendations
 
-4. **Environment Management (`lib/ash_dspy/config/environment.ex`)**:
+4. **Environment Management (`lib/dspex/config/environment.ex`)**:
    - Environment variable loading and validation
    - Type conversion utilities
    - Required vs optional variable handling
    - Environment-specific requirements
 
-5. **Secret Management (`lib/ash_dspy/config/secrets.ex`)**:
+5. **Secret Management (`lib/dspex/config/secrets.ex`)**:
    - Multiple secret source support
    - Production-ready secret handling
    - Development environment flexibility

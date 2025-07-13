@@ -215,7 +215,7 @@ end
 ### CORE PREDICTION ENGINE
 
 ```elixir
-defmodule AshDSPy.Prediction.Engine do
+defmodule DSPex.Prediction.Engine do
   @moduledoc """
   Core prediction execution engine with strategy selection and monitoring.
   
@@ -231,7 +231,7 @@ defmodule AshDSPy.Prediction.Engine do
   use GenServer
   require Logger
   
-  alias AshDSPy.Prediction.{
+  alias DSPex.Prediction.{
     Strategy,
     History,
     Metrics,
@@ -267,7 +267,7 @@ defmodule AshDSPy.Prediction.Engine do
   @doc """
   Execute a prediction with the given signature and inputs.
   """
-  @spec predict(AshDSPy.Signature.t(), map(), prediction_opts()) :: 
+  @spec predict(DSPex.Signature.t(), map(), prediction_opts()) :: 
     {:ok, prediction_result()} | {:error, term()}
   def predict(signature, inputs, opts \\ []) do
     GenServer.call(__MODULE__, {:predict, signature, inputs, opts}, 
@@ -277,7 +277,7 @@ defmodule AshDSPy.Prediction.Engine do
   @doc """
   Execute multiple predictions in parallel.
   """
-  @spec predict_batch([{AshDSPy.Signature.t(), map()}], prediction_opts()) ::
+  @spec predict_batch([{DSPex.Signature.t(), map()}], prediction_opts()) ::
     {:ok, [prediction_result()]} | {:error, term()}
   def predict_batch(predictions, opts \\ []) do
     GenServer.call(__MODULE__, {:predict_batch, predictions, opts},
@@ -557,10 +557,10 @@ defmodule AshDSPy.Prediction.Engine do
   
   defp load_strategies do
     %{
-      standard: AshDSPy.Prediction.Strategy.Standard,
-      cot: AshDSPy.Prediction.Strategy.ChainOfThought,
-      react: AshDSPy.Prediction.Strategy.React,
-      program: AshDSPy.Prediction.Strategy.Program
+      standard: DSPex.Prediction.Strategy.Standard,
+      cot: DSPex.Prediction.Strategy.ChainOfThought,
+      react: DSPex.Prediction.Strategy.React,
+      program: DSPex.Prediction.Strategy.Program
     }
   end
 end
@@ -569,18 +569,18 @@ end
 ### PREDICTION STRATEGY SYSTEM
 
 ```elixir
-defmodule AshDSPy.Prediction.Strategy do
+defmodule DSPex.Prediction.Strategy do
   @moduledoc """
   Behavior and implementations for prediction execution strategies.
   """
   
   @callback generate_prompt(context :: map()) :: String.t()
   @callback parse_result(raw_result :: String.t(), context :: map()) :: map()
-  @callback supports_signature?(signature :: AshDSPy.Signature.t()) :: boolean()
+  @callback supports_signature?(signature :: DSPex.Signature.t()) :: boolean()
   
   defmacro __using__(_opts) do
     quote do
-      @behaviour AshDSPy.Prediction.Strategy
+      @behaviour DSPex.Prediction.Strategy
       
       def supports_signature?(_signature), do: true
       
@@ -589,12 +589,12 @@ defmodule AshDSPy.Prediction.Strategy do
   end
 end
 
-defmodule AshDSPy.Prediction.Strategy.Standard do
+defmodule DSPex.Prediction.Strategy.Standard do
   @moduledoc """
   Standard prediction strategy with basic prompt generation and parsing.
   """
   
-  use AshDSPy.Prediction.Strategy
+  use DSPex.Prediction.Strategy
   
   @impl true
   def generate_prompt(context) do
@@ -699,7 +699,7 @@ end
 ### EXECUTION HISTORY TRACKING
 
 ```elixir
-defmodule AshDSPy.Prediction.History do
+defmodule DSPex.Prediction.History do
   @moduledoc """
   Prediction execution history tracking and analysis.
   
@@ -969,7 +969,7 @@ end
 ### PERFORMANCE METRICS COLLECTION
 
 ```elixir
-defmodule AshDSPy.Prediction.Metrics do
+defmodule DSPex.Prediction.Metrics do
   @moduledoc """
   Comprehensive metrics collection and analysis for prediction pipeline.
   
@@ -984,7 +984,7 @@ defmodule AshDSPy.Prediction.Metrics do
   use GenServer
   require Logger
   
-  alias AshDSPy.Telemetry
+  alias DSPex.Telemetry
   
   @metrics_table :prediction_metrics
   @aggregation_interval :timer.seconds(30)
@@ -1120,13 +1120,13 @@ defmodule AshDSPy.Prediction.Metrics do
     :telemetry.attach_many(
       "ash-dspy-prediction-metrics",
       [
-        [:ash_dspy, :prediction, :start],
-        [:ash_dspy, :prediction, :stop],
-        [:ash_dspy, :prediction, :exception],
-        [:ash_dspy, :provider, :request, :start],
-        [:ash_dspy, :provider, :request, :stop],
-        [:ash_dspy, :cache, :hit],
-        [:ash_dspy, :cache, :miss]
+        [:dspex, :prediction, :start],
+        [:dspex, :prediction, :stop],
+        [:dspex, :prediction, :exception],
+        [:dspex, :provider, :request, :start],
+        [:dspex, :provider, :request, :stop],
+        [:dspex, :cache, :hit],
+        [:dspex, :cache, :miss]
       ],
       &handle_telemetry_event/4,
       nil
@@ -1135,27 +1135,27 @@ defmodule AshDSPy.Prediction.Metrics do
   
   defp handle_telemetry_event(event_name, measurements, metadata, _config) do
     case event_name do
-      [:ash_dspy, :prediction, :start] ->
+      [:dspex, :prediction, :start] ->
         increment_gauge(:active_predictions, 1)
         
-      [:ash_dspy, :prediction, :stop] ->
+      [:dspex, :prediction, :stop] ->
         increment_gauge(:active_predictions, -1)
         increment_counter(:predictions_success)
         record_histogram(:prediction_duration_ms, measurements.duration)
         
-      [:ash_dspy, :prediction, :exception] ->
+      [:dspex, :prediction, :exception] ->
         increment_gauge(:active_predictions, -1)
         increment_counter(:predictions_error)
         
-      [:ash_dspy, :provider, :request, :stop] ->
+      [:dspex, :provider, :request, :stop] ->
         if tokens = measurements[:tokens_used] do
           increment_counter(:tokens_used, tokens)
         end
         
-      [:ash_dspy, :cache, :hit] ->
+      [:dspex, :cache, :hit] ->
         increment_counter(:cache_hits)
         
-      [:ash_dspy, :cache, :miss] ->
+      [:dspex, :cache, :miss] ->
         increment_counter(:cache_misses)
         
       _ -> :ok
@@ -1329,7 +1329,7 @@ end
 ### PROVIDER COORDINATION
 
 ```elixir
-defmodule AshDSPy.Prediction.ProviderCoordinator do
+defmodule DSPex.Prediction.ProviderCoordinator do
   @moduledoc """
   Multi-provider coordination with intelligent routing and fallbacks.
   
@@ -1344,7 +1344,7 @@ defmodule AshDSPy.Prediction.ProviderCoordinator do
   use GenServer
   require Logger
   
-  alias AshDSPy.Providers
+  alias DSPex.Providers
   
   @health_check_interval :timer.seconds(30)
   @provider_timeout 30_000
@@ -1528,7 +1528,7 @@ defmodule AshDSPy.Prediction.ProviderCoordinator do
       
       # Emit telemetry
       :telemetry.execute(
-        [:ash_dspy, :provider, :request, :stop],
+        [:dspex, :provider, :request, :stop],
         %{duration: duration, tokens_used: result[:usage][:total_tokens]},
         %{provider: provider.name, success: true}
       )
@@ -1539,7 +1539,7 @@ defmodule AshDSPy.Prediction.ProviderCoordinator do
         duration = System.monotonic_time(:millisecond) - start_time
         
         :telemetry.execute(
-          [:ash_dspy, :provider, :request, :stop],
+          [:dspex, :provider, :request, :stop],
           %{duration: duration},
           %{provider: provider.name, success: false, error: e}
         )
@@ -1712,7 +1712,7 @@ defmodule AshDSPy.Prediction.ProviderCoordinator do
   defp default_providers do
     [
       openai: %{
-        module: AshDSPy.Providers.OpenAI,
+        module: DSPex.Providers.OpenAI,
         config: %{
           api_key: System.get_env("OPENAI_API_KEY"),
           model: "gpt-4",
@@ -1721,7 +1721,7 @@ defmodule AshDSPy.Prediction.ProviderCoordinator do
         }
       },
       anthropic: %{
-        module: AshDSPy.Providers.Anthropic,
+        module: DSPex.Providers.Anthropic,
         config: %{
           api_key: System.get_env("ANTHROPIC_API_KEY"),
           model: "claude-3-opus",
@@ -1737,7 +1737,7 @@ end
 ### RESULT VALIDATION AND QUALITY ASSESSMENT
 
 ```elixir
-defmodule AshDSPy.Prediction.Validator do
+defmodule DSPex.Prediction.Validator do
   @moduledoc """
   Comprehensive result validation and quality assessment.
   
@@ -1749,7 +1749,7 @@ defmodule AshDSPy.Prediction.Validator do
   - Consistency checks
   """
   
-  alias AshDSPy.Types
+  alias DSPex.Types
   
   @doc """
   Validate prediction outputs against signature.
@@ -1992,7 +1992,7 @@ end
 ### ADAPTIVE STRATEGY SELECTION
 
 ```elixir
-defmodule AshDSPy.Prediction.AdaptiveStrategy do
+defmodule DSPex.Prediction.AdaptiveStrategy do
   @moduledoc """
   Machine learning-based adaptive strategy selection.
   
@@ -2201,14 +2201,14 @@ end
 ### INTEGRATION WITH ASH FRAMEWORK
 
 ```elixir
-defmodule AshDSPy.Prediction.AshIntegration do
+defmodule DSPex.Prediction.AshIntegration do
   @moduledoc """
   Integration with Ash framework for prediction operations.
   """
   
   use Ash.Resource.Change
   
-  alias AshDSPy.Prediction.Engine
+  alias DSPex.Prediction.Engine
   
   @doc """
   Ash change for executing predictions.
@@ -2254,11 +2254,11 @@ end
 ### COMPREHENSIVE TESTING
 
 ```elixir
-defmodule AshDSPy.Prediction.EngineTest do
+defmodule DSPex.Prediction.EngineTest do
   use ExUnit.Case, async: true
   
-  alias AshDSPy.Prediction.Engine
-  alias AshDSPy.Signature
+  alias DSPex.Prediction.Engine
+  alias DSPex.Signature
   
   setup do
     # Start test instance
@@ -2362,7 +2362,7 @@ defmodule AshDSPy.Prediction.EngineTest do
       
       # Should select CoT strategy for reasoning
       assert {:ok, result} = Engine.predict(reasoning_signature, inputs)
-      assert result.metadata.strategy == AshDSPy.Prediction.Strategy.ChainOfThought
+      assert result.metadata.strategy == DSPex.Prediction.Strategy.ChainOfThought
     end
   end
   
@@ -2410,7 +2410,7 @@ end
 
 ```elixir
 # config/config.exs
-config :ash_dspy, :prediction,
+config :dspex, :prediction,
   # Engine configuration
   max_concurrent_predictions: 50,
   default_timeout: 30_000,
@@ -2427,13 +2427,13 @@ config :ash_dspy, :prediction,
   # Provider configuration
   providers: [
     openai: [
-      module: AshDSPy.Providers.OpenAI,
+      module: DSPex.Providers.OpenAI,
       api_key: {:system, "OPENAI_API_KEY"},
       default_model: "gpt-4",
       rate_limit: 1000
     ],
     anthropic: [
-      module: AshDSPy.Providers.Anthropic,
+      module: DSPex.Providers.Anthropic,
       api_key: {:system, "ANTHROPIC_API_KEY"},
       default_model: "claude-3-opus",
       rate_limit: 500

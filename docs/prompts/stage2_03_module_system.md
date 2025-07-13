@@ -167,7 +167,7 @@ end
 **Core Module Behavior with GenServer Integration:**
 
 ```elixir
-defmodule AshDSPy.Module.Native do
+defmodule DSPex.Module.Native do
   @moduledoc """
   Native Elixir module system using GenServer for state management and supervision.
   Provides 100% DSPy module compatibility with enhanced fault tolerance.
@@ -176,8 +176,8 @@ defmodule AshDSPy.Module.Native do
   defmacro __using__(opts) do
     quote do
       use GenServer
-      import AshDSPy.Module.Native
-      import AshDSPy.Module.DSL
+      import DSPex.Module.Native
+      import DSPex.Module.DSL
       
       # Module registration attributes
       Module.register_attribute(__MODULE__, :module_parameters, accumulate: true)
@@ -186,7 +186,7 @@ defmodule AshDSPy.Module.Native do
       Module.register_attribute(__MODULE__, :module_config, accumulate: false)
       Module.register_attribute(__MODULE__, :module_metadata, accumulate: false)
       
-      @before_compile AshDSPy.Module.Native
+      @before_compile DSPex.Module.Native
     end
   end
   
@@ -281,7 +281,7 @@ defmodule AshDSPy.Module.Native do
         module_id = Keyword.get(opts, :module_id, generate_module_id())
         
         # Initialize state
-        state = %AshDSPy.Module.State{
+        state = %DSPex.Module.State{
           module_id: module_id,
           module: __MODULE__,
           parameters: initialize_parameters(unquote(Macro.escape(parameters)), opts),
@@ -297,7 +297,7 @@ defmodule AshDSPy.Module.Native do
         }
         
         # Register module
-        AshDSPy.Module.Registry.register_module(module_id, __MODULE__, self())
+        DSPex.Module.Registry.register_module(module_id, __MODULE__, self())
         
         # Start monitoring sub-modules
         monitor_sub_modules(state.sub_modules)
@@ -544,7 +544,7 @@ end
 **Advanced State Management with Persistence:**
 
 ```elixir
-defmodule AshDSPy.Module.State do
+defmodule DSPex.Module.State do
   @moduledoc """
   Module state structure with comprehensive tracking and persistence.
   """
@@ -696,7 +696,7 @@ end
 **Advanced Parameter Management System:**
 
 ```elixir
-defmodule AshDSPy.Module.Parameter do
+defmodule DSPex.Module.Parameter do
   @moduledoc """
   Parameter management with learning state tracking and optimization.
   """
@@ -832,7 +832,7 @@ defmodule AshDSPy.Module.Parameter do
   end
 end
 
-defmodule AshDSPy.Module.ParameterStore do
+defmodule DSPex.Module.ParameterStore do
   @moduledoc """
   Centralized parameter storage with persistence and sharing capabilities.
   """
@@ -937,7 +937,7 @@ end
 **Dynamic Module Discovery and Management:**
 
 ```elixir
-defmodule AshDSPy.Module.Registry do
+defmodule DSPex.Module.Registry do
   @moduledoc """
   Module registry for discovery, management, and lifecycle coordination.
   """
@@ -1103,7 +1103,7 @@ defmodule AshDSPy.Module.Registry do
     module_opts = Keyword.put(opts, :module_id, module_id)
     
     case DynamicSupervisor.start_child(
-      AshDSPy.Module.DynamicSupervisor,
+      DSPex.Module.DynamicSupervisor,
       {module_type, module_opts}
     ) do
       {:ok, pid} ->
@@ -1258,7 +1258,7 @@ end
 
 ### PRIMARY DELIVERABLES
 
-1. **Native Module Behavior** - Complete `AshDSPy.Module.Native` with DSL and GenServer integration
+1. **Native Module Behavior** - Complete `DSPex.Module.Native` with DSL and GenServer integration
 2. **Parameter Management** - Advanced parameter tracking with learning state and optimization
 3. **Module Registry** - Dynamic discovery, lifecycle management, and hot swapping
 4. **State Management** - Comprehensive state persistence and recovery systems

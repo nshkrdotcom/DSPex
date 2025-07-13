@@ -1,4 +1,4 @@
-defmodule AshDSPex.MonitorTestHelpers do
+defmodule DSPex.MonitorTestHelpers do
   @moduledoc """
   Test helpers for monitor behavior verification.
   Eliminates timing assumptions with event-driven health checks.
@@ -8,7 +8,7 @@ defmodule AshDSPex.MonitorTestHelpers do
   """
 
   require Logger
-  import AshDSPex.SupervisionTestHelpers, only: [wait_for: 2]
+  import DSPex.SupervisionTestHelpers, only: [wait_for: 2]
 
   @doc """
   Waits for a monitor to reach a specific health status.

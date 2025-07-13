@@ -13,8 +13,8 @@ Stage 3 transforms the DSPy-Ash integration into a production-ready system with 
 ### 1.1 Enhanced ML Domain with GraphQL
 
 ```elixir
-# lib/ash_dspy/ml/domain.ex (enhanced)
-defmodule AshDSPy.ML.Domain do
+# lib/dspex/ml/domain.ex (enhanced)
+defmodule DSPex.ML.Domain do
   @moduledoc """
   ML domain with full GraphQL API generation.
   """
@@ -22,11 +22,11 @@ defmodule AshDSPy.ML.Domain do
   use Ash.Domain, extensions: [AshGraphQL.Domain, AshJsonApi.Domain]
   
   resources do
-    resource AshDSPy.ML.Signature
-    resource AshDSPy.ML.Program
-    resource AshDSPy.ML.Execution
-    resource AshDSPy.ML.Dataset
-    resource AshDSPy.ML.OptimizationJob
+    resource DSPex.ML.Signature
+    resource DSPex.ML.Program
+    resource DSPex.ML.Execution
+    resource DSPex.ML.Dataset
+    resource DSPex.ML.OptimizationJob
   end
   
   graphql do
@@ -118,14 +118,14 @@ end
 ### 1.2 GraphQL Schema Types
 
 ```elixir
-# lib/ash_dspy/ml/graphql_types.ex
-defmodule AshDSPy.ML.GraphQLTypes do
+# lib/dspex/ml/graphql_types.ex
+defmodule DSPex.ML.GraphQLTypes do
   @moduledoc """
   Custom GraphQL types for ML operations.
   """
   
   use Absinthe.Schema.Notation
-  use AshGraphQL, domains: [AshDSPy.ML.Domain]
+  use AshGraphQL, domains: [DSPex.ML.Domain]
   
   # Custom scalar types for ML
   scalar :embedding do
@@ -216,48 +216,48 @@ end
 ### 1.3 GraphQL Schema
 
 ```elixir
-# lib/ash_dspy_web/schema.ex
-defmodule AshDSPyWeb.Schema do
+# lib/dspex_web/schema.ex
+defmodule DSPexWeb.Schema do
   @moduledoc """
   GraphQL schema for DSPy ML operations.
   """
   
   use Absinthe.Schema
-  use AshGraphQL, domains: [AshDSPy.ML.Domain]
+  use AshGraphQL, domains: [DSPex.ML.Domain]
   
-  import_types AshDSPy.ML.GraphQLTypes
+  import_types DSPex.ML.GraphQLTypes
   import_types Absinthe.Type.Custom
   
   query do
     # Program queries
     field :program, :program do
       arg :id, non_null(:id)
-      resolve AshGraphQL.Resolver.resolve(&AshDSPy.ML.Program.get_program/2)
+      resolve AshGraphQL.Resolver.resolve(&DSPex.ML.Program.get_program/2)
     end
     
     field :programs, list_of(:program) do
       arg :filter, :program_filter
       arg :sort, list_of(:program_sort)
-      resolve AshGraphQL.Resolver.resolve(&AshDSPy.ML.Program.list_programs/2)
+      resolve AshGraphQL.Resolver.resolve(&DSPex.ML.Program.list_programs/2)
     end
     
     # Execution queries
     field :execution, :execution do
       arg :id, non_null(:id)
-      resolve AshGraphQL.Resolver.resolve(&AshDSPy.ML.Execution.get_execution/2)
+      resolve AshGraphQL.Resolver.resolve(&DSPex.ML.Execution.get_execution/2)
     end
     
     field :executions, list_of(:execution) do
       arg :program_id, :id
       arg :filter, :execution_filter
       arg :sort, list_of(:execution_sort)
-      resolve AshGraphQL.Resolver.resolve(&AshDSPy.ML.Execution.list_executions/2)
+      resolve AshGraphQL.Resolver.resolve(&DSPex.ML.Execution.list_executions/2)
     end
     
     # Performance metrics
     field :program_metrics, :performance_metrics do
       arg :program_id, non_null(:id)
-      resolve &AshDSPy.GraphQL.Resolvers.program_metrics/3
+      resolve &DSPex.GraphQL.Resolvers.program_metrics/3
     end
   end
   
@@ -268,13 +268,13 @@ defmodule AshDSPyWeb.Schema do
       arg :signature_module, non_null(:string)
       arg :description, :string
       
-      resolve &AshDSPy.GraphQL.Resolvers.create_program/3
+      resolve &DSPex.GraphQL.Resolvers.create_program/3
     end
     
     field :deploy_program, :program do
       arg :id, non_null(:id)
       
-      resolve &AshDSPy.GraphQL.Resolvers.deploy_program/3
+      resolve &DSPex.GraphQL.Resolvers.deploy_program/3
     end
     
     # Execution
@@ -282,7 +282,7 @@ defmodule AshDSPyWeb.Schema do
       arg :program_id, non_null(:id)
       arg :inputs, non_null(:json)
       
-      resolve &AshDSPy.GraphQL.Resolvers.execute_program/3
+      resolve &DSPex.GraphQL.Resolvers.execute_program/3
     end
     
     # Optimization
@@ -293,7 +293,7 @@ defmodule AshDSPyWeb.Schema do
       arg :metric, :string, default_value: "exact_match"
       arg :config, :json, default_value: %{}
       
-      resolve &AshDSPy.GraphQL.Resolvers.optimize_program/3
+      resolve &DSPex.GraphQL.Resolvers.optimize_program/3
     end
   end
   
@@ -336,13 +336,13 @@ end
 ### 1.4 GraphQL Resolvers
 
 ```elixir
-# lib/ash_dspy/graphql/resolvers.ex
-defmodule AshDSPy.GraphQL.Resolvers do
+# lib/dspex/graphql/resolvers.ex
+defmodule DSPex.GraphQL.Resolvers do
   @moduledoc """
   GraphQL resolvers for DSPy operations.
   """
   
-  alias AshDSPy.ML.{Program, Execution, OptimizationJob}
+  alias DSPex.ML.{Program, Execution, OptimizationJob}
   
   def create_program(_parent, args, _resolution) do
     signature_module = Module.safe_concat([args.signature_module])
@@ -390,7 +390,7 @@ defmodule AshDSPy.GraphQL.Resolvers do
             
             # Publish subscription update
             Absinthe.Subscription.publish(
-              AshDSPyWeb.Endpoint,
+              DSPexWeb.Endpoint,
               completed,
               execution_updates: ["executions", "executions:#{program_id}"]
             )
@@ -423,7 +423,7 @@ defmodule AshDSPy.GraphQL.Resolvers do
     })
     
     # Enqueue background job
-    AshDSPy.Workers.OptimizationWorker.new(%{
+    DSPex.Workers.OptimizationWorker.new(%{
       optimization_job_id: job.id
     })
     |> Oban.insert()
@@ -488,29 +488,29 @@ end
 ### 2.1 Oban Configuration
 
 ```elixir
-# lib/ash_dspy/application.ex (add Oban)
-defmodule AshDSPy.Application do
+# lib/dspex/application.ex (add Oban)
+defmodule DSPex.Application do
   use Application
   
   def start(_type, _args) do
     children = [
       # Schema cache
-      AshDSPy.Validation.SchemaCache,
+      DSPex.Validation.SchemaCache,
       
       # Python bridge
-      AshDSPy.PythonBridge.Bridge,
+      DSPex.PythonBridge.Bridge,
       
       # Database
-      AshDSPy.Repo,
+      DSPex.Repo,
       
       # Oban for background jobs
-      {Oban, Application.fetch_env!(:ash_dspy, Oban)},
+      {Oban, Application.fetch_env!(:dspex, Oban)},
       
       # Web endpoint
-      AshDSPyWeb.Endpoint
+      DSPexWeb.Endpoint
     ]
     
-    opts = [strategy: :one_for_one, name: AshDSPy.Supervisor]
+    opts = [strategy: :one_for_one, name: DSPex.Supervisor]
     Supervisor.start_link(children, opts)
   end
 end
@@ -519,14 +519,14 @@ end
 ### 2.2 OptimizationJob Resource
 
 ```elixir
-# lib/ash_dspy/ml/optimization_job.ex
-defmodule AshDSPy.ML.OptimizationJob do
+# lib/dspex/ml/optimization_job.ex
+defmodule DSPex.ML.OptimizationJob do
   @moduledoc """
   Resource for tracking optimization jobs.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer,
     extensions: [AshStateMachine, AshOban]
   
@@ -554,8 +554,8 @@ defmodule AshDSPy.ML.OptimizationJob do
   end
   
   relationships do
-    belongs_to :program, AshDSPy.ML.Program
-    belongs_to :dataset, AshDSPy.ML.Dataset
+    belongs_to :program, DSPex.ML.Program
+    belongs_to :dataset, DSPex.ML.Dataset
   end
   
   state_machine do
@@ -575,7 +575,7 @@ defmodule AshDSPy.ML.OptimizationJob do
     triggers do
       trigger :enqueue_optimization do
         action :create
-        worker AshDSPy.Workers.OptimizationWorker
+        worker DSPex.Workers.OptimizationWorker
         
         scheduler fn record ->
           %{optimization_job_id: record.id}
@@ -634,15 +634,15 @@ end
 ### 2.3 Optimization Worker
 
 ```elixir
-# lib/ash_dspy/workers/optimization_worker.ex
-defmodule AshDSPy.Workers.OptimizationWorker do
+# lib/dspex/workers/optimization_worker.ex
+defmodule DSPex.Workers.OptimizationWorker do
   @moduledoc """
   Oban worker for running DSPy program optimizations.
   """
   
   use Oban.Worker, queue: :ml_optimization, max_attempts: 3
   
-  alias AshDSPy.ML.{OptimizationJob, Program, Dataset}
+  alias DSPex.ML.{OptimizationJob, Program, Dataset}
   
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"optimization_job_id" => job_id}}) do
@@ -662,7 +662,7 @@ defmodule AshDSPy.Workers.OptimizationWorker do
       dataset = Dataset.get!(started_job.dataset_id)
       
       # Run optimization via adapter
-      adapter = Application.get_env(:ash_dspy, :adapter)
+      adapter = Application.get_env(:dspex, :adapter)
       
       start_time = System.monotonic_time(:millisecond)
       
@@ -727,7 +727,7 @@ defmodule AshDSPy.Workers.OptimizationWorker do
   
   defp publish_optimization_update(job) do
     Absinthe.Subscription.publish(
-      AshDSPyWeb.Endpoint,
+      DSPexWeb.Endpoint,
       job,
       optimization_updates: ["optimizations", "optimizations:#{job.program_id}"]
     )
@@ -738,14 +738,14 @@ end
 ### 2.4 Dataset Resource
 
 ```elixir
-# lib/ash_dspy/ml/dataset.ex
-defmodule AshDSPy.ML.Dataset do
+# lib/dspex/ml/dataset.ex
+defmodule DSPex.ML.Dataset do
   @moduledoc """
   Resource for managing training/evaluation datasets.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer
   
   attributes do
@@ -766,7 +766,7 @@ defmodule AshDSPy.ML.Dataset do
   end
   
   relationships do
-    has_many :optimization_jobs, AshDSPy.ML.OptimizationJob
+    has_many :optimization_jobs, DSPex.ML.OptimizationJob
   end
   
   actions do
@@ -776,7 +776,7 @@ defmodule AshDSPy.ML.Dataset do
       argument :file_path, :string, allow_nil?: false
       argument :format, :atom, constraints: [one_of: [:json, :csv, :jsonl]], default: :json
       
-      change AshDSPy.ML.Changes.LoadDatasetFromFile
+      change DSPex.ML.Changes.LoadDatasetFromFile
     end
     
     action :validate_for_signature, :map do
@@ -786,7 +786,7 @@ defmodule AshDSPy.ML.Dataset do
         dataset = context.resource
         signature_module = input.arguments.signature_module
         
-        AshDSPy.ML.Actions.ValidateDatasetForSignature.run(dataset, signature_module)
+        DSPex.ML.Actions.ValidateDatasetForSignature.run(dataset, signature_module)
       end
     end
     
@@ -865,8 +865,8 @@ end
 ### 3.1 Telemetry Setup
 
 ```elixir
-# lib/ash_dspy/telemetry.ex
-defmodule AshDSPy.Telemetry do
+# lib/dspex/telemetry.ex
+defmodule DSPex.Telemetry do
   @moduledoc """
   Telemetry setup for DSPy operations monitoring.
   """
@@ -891,80 +891,80 @@ defmodule AshDSPy.Telemetry do
   def metrics do
     [
       # Program execution metrics
-      counter("ash_dspy.program.execution.count",
+      counter("dspex.program.execution.count",
         tags: [:program_id, :status]
       ),
       
-      distribution("ash_dspy.program.execution.duration",
+      distribution("dspex.program.execution.duration",
         unit: {:native, :millisecond},
         tags: [:program_id]
       ),
       
-      distribution("ash_dspy.program.execution.token_usage",
+      distribution("dspex.program.execution.token_usage",
         tags: [:program_id, :token_type]
       ),
       
       # Optimization metrics  
-      counter("ash_dspy.optimization.count",
+      counter("dspex.optimization.count",
         tags: [:optimizer, :status]
       ),
       
-      distribution("ash_dspy.optimization.duration",
+      distribution("dspex.optimization.duration",
         unit: {:native, :millisecond},
         tags: [:optimizer]
       ),
       
-      distribution("ash_dspy.optimization.score",
+      distribution("dspex.optimization.score",
         tags: [:optimizer, :metric]
       ),
       
       # Python bridge metrics
-      counter("ash_dspy.python_bridge.requests.count",
+      counter("dspex.python_bridge.requests.count",
         tags: [:command, :status]
       ),
       
-      distribution("ash_dspy.python_bridge.requests.duration",
+      distribution("dspex.python_bridge.requests.duration",
         unit: {:native, :millisecond},
         tags: [:command]
       ),
       
       # System metrics
-      last_value("ash_dspy.programs.active_count"),
-      last_value("ash_dspy.executions.queue_length"),
-      last_value("ash_dspy.python_bridge.connection_status")
+      last_value("dspex.programs.active_count"),
+      last_value("dspex.executions.queue_length"),
+      last_value("dspex.python_bridge.connection_status")
     ]
   end
   
   defp periodic_measurements do
     [
       # Measure active programs
-      {AshDSPy.Telemetry, :measure_active_programs, []},
+      {DSPex.Telemetry, :measure_active_programs, []},
       
       # Measure queue lengths
-      {AshDSPy.Telemetry, :measure_queue_lengths, []},
+      {DSPex.Telemetry, :measure_queue_lengths, []},
       
       # Measure Python bridge health
-      {AshDSPy.Telemetry, :measure_python_bridge_health, []}
+      {DSPex.Telemetry, :measure_python_bridge_health, []}
     ]
   end
   
   def measure_active_programs do
-    count = AshDSPy.ML.Program.count!(filter: [status: [:ready, :optimized, :deployed]])
-    :telemetry.execute([:ash_dspy, :programs], %{active_count: count})
+    count = DSPex.ML.Program.count!(filter: [status: [:ready, :optimized, :deployed]])
+    :telemetry.execute([:dspex, :programs], %{active_count: count})
   end
   
   def measure_queue_lengths do
-    running = AshDSPy.ML.Execution.count!(filter: [status: :running])
-    :telemetry.execute([:ash_dspy, :executions], %{queue_length: running})
+    running = DSPex.ML.Execution.count!(filter: [status: :running])
+    :telemetry.execute([:dspex, :executions], %{queue_length: running})
   end
   
   def measure_python_bridge_health do
-    status = case Process.whereis(AshDSPy.PythonBridge.Bridge) do
+    status = case Process.whereis(DSPex.PythonBridge.Bridge) do
       nil -> 0
       _pid -> 1
     end
     
-    :telemetry.execute([:ash_dspy, :python_bridge], %{connection_status: status})
+    :telemetry.execute([:dspex, :python_bridge], %{connection_status: status})
   end
 end
 ```
@@ -972,8 +972,8 @@ end
 ### 3.2 Execution Instrumentation
 
 ```elixir
-# lib/ash_dspy/instrumentation/execution.ex
-defmodule AshDSPy.Instrumentation.Execution do
+# lib/dspex/instrumentation/execution.ex
+defmodule DSPex.Instrumentation.Execution do
   @moduledoc """
   Telemetry instrumentation for program executions.
   """
@@ -988,7 +988,7 @@ defmodule AshDSPy.Instrumentation.Execution do
     }
     
     :telemetry.span(
-      [:ash_dspy, :program, :execution],
+      [:dspex, :program, :execution],
       metadata,
       fn ->
         case fun.() do
@@ -1024,8 +1024,8 @@ end
 ### 3.3 LiveDashboard Integration
 
 ```elixir
-# lib/ash_dspy_web/telemetry.ex
-defmodule AshDSPyWeb.Telemetry do
+# lib/dspex_web/telemetry.ex
+defmodule DSPexWeb.Telemetry do
   @moduledoc """
   Phoenix LiveDashboard integration for DSPy monitoring.
   """
@@ -1059,19 +1059,19 @@ defmodule AshDSPyWeb.Telemetry do
       ),
       
       # Database metrics
-      summary("ash_dspy.repo.query.total_time",
+      summary("dspex.repo.query.total_time",
         unit: {:native, :millisecond}
       ),
-      summary("ash_dspy.repo.query.decode_time",
+      summary("dspex.repo.query.decode_time",
         unit: {:native, :millisecond}
       ),
-      summary("ash_dspy.repo.query.query_time",
+      summary("dspex.repo.query.query_time",
         unit: {:native, :millisecond}
       ),
-      summary("ash_dspy.repo.query.queue_time",
+      summary("dspex.repo.query.queue_time",
         unit: {:native, :millisecond}
       ),
-      summary("ash_dspy.repo.query.idle_time",
+      summary("dspex.repo.query.idle_time",
         unit: {:native, :millisecond}
       ),
       
@@ -1081,8 +1081,8 @@ defmodule AshDSPyWeb.Telemetry do
       summary("vm.total_run_queue_lengths.cpu"),
       summary("vm.total_run_queue_lengths.io"),
       
-      # DSPy specific metrics from AshDSPy.Telemetry
-      *AshDSPy.Telemetry.metrics()
+      # DSPy specific metrics from DSPex.Telemetry
+      *DSPex.Telemetry.metrics()
     ]
   end
 end
@@ -1091,8 +1091,8 @@ end
 ### 3.4 Performance Monitoring
 
 ```elixir
-# lib/ash_dspy/monitoring/performance_monitor.ex
-defmodule AshDSPy.Monitoring.PerformanceMonitor do
+# lib/dspex/monitoring/performance_monitor.ex
+defmodule DSPex.Monitoring.PerformanceMonitor do
   @moduledoc """
   Monitor and alert on DSPy performance issues.
   """
@@ -1113,9 +1113,9 @@ defmodule AshDSPy.Monitoring.PerformanceMonitor do
   def init(opts) do
     # Attach telemetry handlers
     events = [
-      [:ash_dspy, :program, :execution, :stop],
-      [:ash_dspy, :optimization, :stop],
-      [:ash_dspy, :python_bridge, :requests, :stop]
+      [:dspex, :program, :execution, :stop],
+      [:dspex, :optimization, :stop],
+      [:dspex, :python_bridge, :requests, :stop]
     ]
     
     :telemetry.attach_many("performance_monitor", events, &handle_event/4, nil)
@@ -1129,15 +1129,15 @@ defmodule AshDSPy.Monitoring.PerformanceMonitor do
     {:ok, state}
   end
   
-  def handle_event([:ash_dspy, :program, :execution, :stop], measurements, metadata, _config) do
+  def handle_event([:dspex, :program, :execution, :stop], measurements, metadata, _config) do
     GenServer.cast(__MODULE__, {:execution_completed, measurements, metadata})
   end
   
-  def handle_event([:ash_dspy, :optimization, :stop], measurements, metadata, _config) do
+  def handle_event([:dspex, :optimization, :stop], measurements, metadata, _config) do
     GenServer.cast(__MODULE__, {:optimization_completed, measurements, metadata})
   end
   
-  def handle_event([:ash_dspy, :python_bridge, :requests, :stop], measurements, metadata, _config) do
+  def handle_event([:dspex, :python_bridge, :requests, :stop], measurements, metadata, _config) do
     GenServer.cast(__MODULE__, {:bridge_request_completed, measurements, metadata})
   end
   
@@ -1231,7 +1231,7 @@ defmodule AshDSPy.Monitoring.PerformanceMonitor do
     # Get recent executions for this program
     recent_window = DateTime.add(DateTime.utc_now(), -300, :second)  # Last 5 minutes
     
-    executions = AshDSPy.ML.Execution.list!(
+    executions = DSPex.ML.Execution.list!(
       filter: [
         program_id: program_id,
         started_at: [greater_than: recent_window]
@@ -1270,9 +1270,9 @@ end
 ### 4.1 Phoenix Router
 
 ```elixir
-# lib/ash_dspy_web/router.ex
-defmodule AshDSPyWeb.Router do
-  use AshDSPyWeb, :router
+# lib/dspex_web/router.ex
+defmodule DSPexWeb.Router do
+  use DSPexWeb, :router
   
   pipeline :api do
     plug :accepts, ["json"]
@@ -1282,7 +1282,7 @@ defmodule AshDSPyWeb.Router do
     plug :accepts, ["html"]
     plug :fetch_session
     plug :fetch_live_flash
-    plug :put_root_layout, {AshDSPyWeb.LayoutView, :root}
+    plug :put_root_layout, {DSPexWeb.LayoutView, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
   end
@@ -1292,30 +1292,30 @@ defmodule AshDSPyWeb.Router do
     
     # LiveDashboard
     live_dashboard "/dashboard",
-      metrics: AshDSPyWeb.Telemetry,
+      metrics: DSPexWeb.Telemetry,
       additional_pages: [
-        dspy_overview: AshDSPyWeb.DSPyDashboard
+        dspy_overview: DSPexWeb.DSPyDashboard
       ]
     
     # Live views for ML operations
-    live "/", AshDSPyWeb.ProgramLive.Index, :index
-    live "/programs/new", AshDSPyWeb.ProgramLive.Index, :new
-    live "/programs/:id", AshDSPyWeb.ProgramLive.Show, :show
-    live "/programs/:id/execute", AshDSPyWeb.ProgramLive.Show, :execute
-    live "/programs/:id/optimize", AshDSPyWeb.ProgramLive.Show, :optimize
+    live "/", DSPexWeb.ProgramLive.Index, :index
+    live "/programs/new", DSPexWeb.ProgramLive.Index, :new
+    live "/programs/:id", DSPexWeb.ProgramLive.Show, :show
+    live "/programs/:id/execute", DSPexWeb.ProgramLive.Show, :execute
+    live "/programs/:id/optimize", DSPexWeb.ProgramLive.Show, :optimize
   end
   
   scope "/api" do
     pipe_through :api
     
     # GraphQL API
-    forward "/graphql", Absinthe.Plug, schema: AshDSPyWeb.Schema
+    forward "/graphql", Absinthe.Plug, schema: DSPexWeb.Schema
     
     # GraphQL subscriptions
     forward "/socket", Absinthe.Plug.GraphiQL,
-      schema: AshDSPyWeb.Schema,
+      schema: DSPexWeb.Schema,
       interface: :simple,
-      socket: AshDSPyWeb.UserSocket
+      socket: DSPexWeb.UserSocket
   end
   
   # JSON API routes (auto-generated by Ash)
@@ -1324,7 +1324,7 @@ defmodule AshDSPyWeb.Router do
     
     # These routes are auto-generated by AshJsonApi
     forward "/", AshJsonApi.Router,
-      domains: [AshDSPy.ML.Domain],
+      domains: [DSPex.ML.Domain],
       json_schema: "/api/ml/json_schema"
   end
 end
@@ -1333,10 +1333,10 @@ end
 ### 4.2 WebSocket for Real-time Updates
 
 ```elixir
-# lib/ash_dspy_web/channels/user_socket.ex
-defmodule AshDSPyWeb.UserSocket do
+# lib/dspex_web/channels/user_socket.ex
+defmodule DSPexWeb.UserSocket do
   use Phoenix.Socket
-  use Absinthe.Phoenix.Socket, schema: AshDSPyWeb.Schema
+  use Absinthe.Phoenix.Socket, schema: DSPexWeb.Schema
   
   @impl true
   def connect(_params, socket, _connect_info) do
@@ -1354,10 +1354,10 @@ end
 # test/stage3_production_features_test.exs
 defmodule Stage3ProductionFeaturesTest do
   use ExUnit.Case, async: false
-  use AshDSPyWeb.ConnCase
+  use DSPexWeb.ConnCase
   
   defmodule TestSignature do
-    use AshDSPy.Signature
+    use DSPex.Signature
     signature question: :string -> answer: :string, confidence: :float
   end
   
@@ -1390,7 +1390,7 @@ defmodule Stage3ProductionFeaturesTest do
   
   test "GraphQL program execution" do
     # Create program first
-    {:ok, program} = AshDSPy.ML.Program.create_with_signature(%{
+    {:ok, program} = DSPex.ML.Program.create_with_signature(%{
       name: "GraphQL Test Program",
       signature_module: TestSignature
     })
@@ -1422,12 +1422,12 @@ defmodule Stage3ProductionFeaturesTest do
   
   test "optimization job creation and processing" do
     # Create program and dataset
-    {:ok, program} = AshDSPy.ML.Program.create_with_signature(%{
+    {:ok, program} = DSPex.ML.Program.create_with_signature(%{
       name: "Optimization Test",
       signature_module: TestSignature
     })
     
-    {:ok, dataset} = AshDSPy.ML.Dataset.create!(%{
+    {:ok, dataset} = DSPex.ML.Dataset.create!(%{
       name: "Test Dataset",
       data: [
         %{"inputs" => %{"question" => "What is AI?"}, "outputs" => %{"answer" => "Artificial Intelligence"}},
@@ -1437,7 +1437,7 @@ defmodule Stage3ProductionFeaturesTest do
     })
     
     # Create optimization job
-    {:ok, job} = AshDSPy.ML.OptimizationJob.create_and_enqueue(%{
+    {:ok, job} = DSPex.ML.OptimizationJob.create_and_enqueue(%{
       program_id: program.id,
       dataset_id: dataset.id,
       optimizer: "BootstrapFewShot",
@@ -1455,12 +1455,12 @@ defmodule Stage3ProductionFeaturesTest do
   
   test "REST API program listing" do
     # Create some programs
-    {:ok, _program1} = AshDSPy.ML.Program.create_with_signature(%{
+    {:ok, _program1} = DSPex.ML.Program.create_with_signature(%{
       name: "REST Test 1",
       signature_module: TestSignature
     })
     
-    {:ok, _program2} = AshDSPy.ML.Program.create_with_signature(%{
+    {:ok, _program2} = DSPex.ML.Program.create_with_signature(%{
       name: "REST Test 2", 
       signature_module: TestSignature
     })
@@ -1478,7 +1478,7 @@ defmodule Stage3ProductionFeaturesTest do
   
   test "telemetry metrics collection" do
     # Create and execute a program to generate telemetry
-    {:ok, program} = AshDSPy.ML.Program.create_with_signature(%{
+    {:ok, program} = DSPex.ML.Program.create_with_signature(%{
       name: "Telemetry Test",
       signature_module: TestSignature
     })
@@ -1488,7 +1488,7 @@ defmodule Stage3ProductionFeaturesTest do
     
     :telemetry.attach_many(
       "test_handler",
-      [[:ash_dspy, :program, :execution, :stop]],
+      [[:dspex, :program, :execution, :stop]],
       fn event, measurements, metadata, _config ->
         send(test_pid, {:telemetry_event, event, measurements, metadata})
       end,
@@ -1496,10 +1496,10 @@ defmodule Stage3ProductionFeaturesTest do
     )
     
     # Execute program (may fail, but should still emit telemetry)
-    _result = AshDSPy.ML.Program.execute(program, %{inputs: %{question: "test"}})
+    _result = DSPex.ML.Program.execute(program, %{inputs: %{question: "test"}})
     
     # Should receive telemetry event
-    assert_receive {:telemetry_event, [:ash_dspy, :program, :execution, :stop], measurements, metadata}, 1000
+    assert_receive {:telemetry_event, [:dspex, :program, :execution, :stop], measurements, metadata}, 1000
     
     assert measurements.duration > 0
     assert metadata.program_id == program.id

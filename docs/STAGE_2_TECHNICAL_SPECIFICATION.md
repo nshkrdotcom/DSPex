@@ -53,11 +53,11 @@ Stage 2 implements a complete native Elixir DSPy system that eliminates the Pyth
 **Core Innovation**: Replace Python-based signature parsing with native Elixir compilation that integrates deeply with ExDantic for superior type safety and performance.
 
 **Key Components:**
-- **AshDSPy.Signature.Native** - Core signature behavior with compile-time processing
-- **AshDSPy.Signature.ExDanticCompiler** - ExDantic integration for type compilation
-- **AshDSPy.Signature.SchemaGenerator** - Multi-provider JSON schema generation
-- **AshDSPy.Signature.Cache** - High-performance signature caching with ETS
-- **AshDSPy.Signature.Optimizer** - Compile-time optimizations and analysis
+- **DSPex.Signature.Native** - Core signature behavior with compile-time processing
+- **DSPex.Signature.ExDanticCompiler** - ExDantic integration for type compilation
+- **DSPex.Signature.SchemaGenerator** - Multi-provider JSON schema generation
+- **DSPex.Signature.Cache** - High-performance signature caching with ETS
+- **DSPex.Signature.Optimizer** - Compile-time optimizations and analysis
 
 ### 1.2 DSPy Signature Analysis Integration
 
@@ -78,7 +78,7 @@ class QASignature(dspy.Signature):
 ```elixir
 # Native Elixir Pattern with ExDantic Integration
 defmodule QASignature do
-  use AshDSPy.Signature.Native
+  use DSPex.Signature.Native
   
   @doc "Answer questions with reasoning."
   signature question: :string -> answer: :string, desc: "reasoning and answer"
@@ -90,13 +90,13 @@ end
 **Schema Creation with Provider Optimization:**
 
 ```elixir
-defmodule AshDSPy.Signature.ExDanticCompiler do
+defmodule DSPex.Signature.ExDanticCompiler do
   @moduledoc """
   Compiles DSPy signatures into ExDantic schemas with provider-specific optimizations.
   """
   
   alias Exdantic.{Schema, TypeAdapter, Config}
-  alias AshDSPy.Types.{MLTypes, ProviderTypes}
+  alias DSPex.Types.{MLTypes, ProviderTypes}
   
   def compile_signature(signature_ast, provider \\ :openai) do
     {input_fields, output_fields} = parse_signature_ast(signature_ast)
@@ -111,7 +111,7 @@ defmodule AshDSPy.Signature.ExDanticCompiler do
     # Create validation pipeline
     validation_pipeline = create_validation_pipeline(input_schema, output_schema)
     
-    %AshDSPy.Signature.Compiled{
+    %DSPex.Signature.Compiled{
       input_schema: input_schema,
       output_schema: output_schema,
       json_schemas: json_schemas,
@@ -205,7 +205,7 @@ end
 **ETS-Based Signature Cache with Intelligent Eviction:**
 
 ```elixir
-defmodule AshDSPy.Signature.Cache do
+defmodule DSPex.Signature.Cache do
   use GenServer
   
   @table_name :signature_cache
@@ -408,7 +408,7 @@ DSPy modules use a class-based approach with parameter tracking and forward meth
 **Architecture:**
 
 ```elixir
-defmodule AshDSPy.Module.Native do
+defmodule DSPex.Module.Native do
   @moduledoc """
   Native Elixir implementation of DSPy module system using GenServer for state management.
   """
@@ -416,14 +416,14 @@ defmodule AshDSPy.Module.Native do
   defmacro __using__(opts) do
     quote do
       use GenServer
-      import AshDSPy.Module.Native
+      import DSPex.Module.Native
       
       # Module registration
       Module.register_attribute(__MODULE__, :module_parameters, accumulate: true)
       Module.register_attribute(__MODULE__, :module_predictors, accumulate: true)
       Module.register_attribute(__MODULE__, :module_metadata, accumulate: false)
       
-      @before_compile AshDSPy.Module.Native
+      @before_compile DSPex.Module.Native
     end
   end
   
@@ -458,7 +458,7 @@ defmodule AshDSPy.Module.Native do
       
       # GenServer callbacks
       def init(opts) do
-        state = %AshDSPy.Module.State{
+        state = %DSPex.Module.State{
           module: __MODULE__,
           parameters: initialize_parameters(unquote(Macro.escape(parameters)), opts),
           predictors: initialize_predictors(unquote(Macro.escape(predictors)), opts),
@@ -536,12 +536,12 @@ end
 **Advanced Program Orchestration:**
 
 ```elixir
-defmodule AshDSPy.Program.ExecutionEngine do
+defmodule DSPex.Program.ExecutionEngine do
   use GenServer
   
-  alias AshDSPy.Module.Registry
-  alias AshDSPy.Adapters.ProviderManager
-  alias AshDSPy.Telemetry.Tracker
+  alias DSPex.Module.Registry
+  alias DSPex.Adapters.ProviderManager
+  alias DSPex.Telemetry.Tracker
   
   defstruct [
     :program_id,
@@ -560,7 +560,7 @@ defmodule AshDSPy.Program.ExecutionEngine do
     execution_id = generate_execution_id()
     
     # Start telemetry span
-    :telemetry.span([:ash_dspy, :program, :execution], 
+    :telemetry.span([:dspex, :program, :execution], 
       %{program_id: state.program_id, execution_id: execution_id}, fn ->
       
       # Execute with full tracking
@@ -658,7 +658,7 @@ defmodule AshDSPy.Program.ExecutionEngine do
     case Registry.get_or_start_module(module_spec.name, module_spec.config) do
       {:ok, module_pid} ->
         # Execute module with monitoring
-        :telemetry.span([:ash_dspy, :module, :execution],
+        :telemetry.span([:dspex, :module, :execution],
           %{module: module_spec.name, program: state.program_id}, fn ->
           
           result = GenServer.call(module_pid, {:forward, inputs}, get_module_timeout(opts))
@@ -679,15 +679,15 @@ end
 **High-Performance Provider Clients:**
 
 ```elixir
-defmodule AshDSPy.Providers.NativeClient do
+defmodule DSPex.Providers.NativeClient do
   @moduledoc """
   High-performance native HTTP client for ML providers with advanced features.
   """
   
   use GenServer
   
-  alias AshDSPy.Providers.{RateLimiter, CircuitBreaker, RetryStrategy}
-  alias AshDSPy.Telemetry.Tracker
+  alias DSPex.Providers.{RateLimiter, CircuitBreaker, RetryStrategy}
+  alias DSPex.Telemetry.Tracker
   
   defstruct [
     :provider_name,
@@ -770,7 +770,7 @@ defmodule AshDSPy.Providers.NativeClient do
         duration = System.monotonic_time(:microsecond) - request_context.start_time
         
         # Emit telemetry
-        :telemetry.execute([:ash_dspy, :provider, :request], 
+        :telemetry.execute([:dspex, :provider, :request], 
           %{duration: duration}, 
           %{
             provider: state.provider_name,
@@ -874,15 +874,15 @@ end
 **OpenAI Native Integration:**
 
 ```elixir
-defmodule AshDSPy.Providers.OpenAI do
+defmodule DSPex.Providers.OpenAI do
   @moduledoc """
   Native OpenAI provider integration with advanced features.
   """
   
-  use AshDSPy.Providers.ProviderBehaviour
+  use DSPex.Providers.ProviderBehaviour
   
-  alias AshDSPy.Providers.{NativeClient, ResponseParser}
-  alias AshDSPy.Types.{Conversion, Validation}
+  alias DSPex.Providers.{NativeClient, ResponseParser}
+  alias DSPex.Types.{Conversion, Validation}
   
   @base_url "https://api.openai.com/v1"
   @supported_models [
@@ -1123,16 +1123,16 @@ end
 DSPy's Predict class handles signature execution with provider interaction. The native Elixir implementation uses GenServer-based execution with comprehensive monitoring.
 
 ```elixir
-defmodule AshDSPy.Predict.Engine do
+defmodule DSPex.Predict.Engine do
   @moduledoc """
   Native prediction engine with advanced execution strategies.
   """
   
   use GenServer
   
-  alias AshDSPy.Signature.{Registry, Cache}
-  alias AshDSPy.Providers.ProviderManager
-  alias AshDSPy.Execution.{Context, Monitor}
+  alias DSPex.Signature.{Registry, Cache}
+  alias DSPex.Providers.ProviderManager
+  alias DSPex.Execution.{Context, Monitor}
   
   defstruct [
     :signature,
@@ -1171,7 +1171,7 @@ defmodule AshDSPy.Predict.Engine do
     execution_id = generate_execution_id()
     
     # Start execution with telemetry span
-    :telemetry.span([:ash_dspy, :predict, :execution],
+    :telemetry.span([:dspex, :predict, :execution],
       %{
         signature: state.signature.name,
         provider: state.provider,
@@ -1222,7 +1222,7 @@ defmodule AshDSPy.Predict.Engine do
         new_metrics = update_performance_metrics(state.performance_metrics, history_entry)
         
         # Emit telemetry
-        :telemetry.execute([:ash_dspy, :predict, :completed],
+        :telemetry.execute([:dspex, :predict, :completed],
           %{duration: duration},
           %{
             signature: state.signature.name,
@@ -1381,13 +1381,13 @@ end
 **Native CoT with Step Validation:**
 
 ```elixir
-defmodule AshDSPy.Predict.ChainOfThought do
+defmodule DSPex.Predict.ChainOfThought do
   @moduledoc """
   Native Chain of Thought implementation with step-by-step validation.
   """
   
-  alias AshDSPy.Signature.Enhanced
-  alias AshDSPy.Validation.ReasoningChain
+  alias DSPex.Signature.Enhanced
+  alias DSPex.Validation.ReasoningChain
   
   def execute(signature, inputs, config) do
     # Build enhanced signature for CoT
@@ -1430,7 +1430,7 @@ defmodule AshDSPy.Predict.ChainOfThought do
       step_validation: true
     })
     
-    AshDSPy.Providers.ProviderManager.execute_signature(
+    DSPex.Providers.ProviderManager.execute_signature(
       config[:provider] || :openai,
       cot_signature,
       inputs,
@@ -1543,7 +1543,7 @@ end
 **Comprehensive ML Type System:**
 
 ```elixir
-defmodule AshDSPy.Types.MLRegistry do
+defmodule DSPex.Types.MLRegistry do
   @moduledoc """
   Comprehensive type registry for ML-specific types with ExDantic integration.
   """
@@ -1551,7 +1551,7 @@ defmodule AshDSPy.Types.MLRegistry do
   use GenServer
   
   alias Exdantic.{TypeAdapter, Validator}
-  alias AshDSPy.Types.{Constraints, Coercion, Validation}
+  alias DSPex.Types.{Constraints, Coercion, Validation}
   
   # Core ML Types
   @ml_types %{
@@ -1962,32 +1962,32 @@ end
 **Advanced ML Metrics Collection:**
 
 ```elixir
-defmodule AshDSPy.Telemetry.MLMetrics do
+defmodule DSPex.Telemetry.MLMetrics do
   @moduledoc """
   Comprehensive telemetry system optimized for ML workloads.
   """
   
   use GenServer
   
-  alias AshDSPy.Telemetry.{Aggregator, Exporter, Alerting}
+  alias DSPex.Telemetry.{Aggregator, Exporter, Alerting}
   
   # Telemetry events for ML operations
   @ml_events [
-    [:ash_dspy, :signature, :compilation],
-    [:ash_dspy, :signature, :validation],
-    [:ash_dspy, :prediction, :execution],
-    [:ash_dspy, :prediction, :chain_of_thought],
-    [:ash_dspy, :provider, :request],
-    [:ash_dspy, :provider, :response],
-    [:ash_dspy, :module, :execution],
-    [:ash_dspy, :program, :execution],
-    [:ash_dspy, :cache, :hit],
-    [:ash_dspy, :cache, :miss],
-    [:ash_dspy, :memory, :pressure],
-    [:ash_dspy, :optimization, :iteration],
-    [:ash_dspy, :evaluation, :metric],
-    [:ash_dspy, :distributed, :coordination],
-    [:ash_dspy, :error, :recovery]
+    [:dspex, :signature, :compilation],
+    [:dspex, :signature, :validation],
+    [:dspex, :prediction, :execution],
+    [:dspex, :prediction, :chain_of_thought],
+    [:dspex, :provider, :request],
+    [:dspex, :provider, :response],
+    [:dspex, :module, :execution],
+    [:dspex, :program, :execution],
+    [:dspex, :cache, :hit],
+    [:dspex, :cache, :miss],
+    [:dspex, :memory, :pressure],
+    [:dspex, :optimization, :iteration],
+    [:dspex, :evaluation, :metric],
+    [:dspex, :distributed, :coordination],
+    [:dspex, :error, :recovery]
   ]
   
   def start_link(opts) do
@@ -2030,7 +2030,7 @@ defmodule AshDSPy.Telemetry.MLMetrics do
     {:ok, state}
   end
   
-  def handle_ml_event([:ash_dspy, :prediction, :execution], measurements, metadata, config) do
+  def handle_ml_event([:dspex, :prediction, :execution], measurements, metadata, config) do
     # Record prediction execution metrics
     record_metric(:prediction_duration, measurements.duration, %{
       signature: metadata.signature,
@@ -2083,7 +2083,7 @@ defmodule AshDSPy.Telemetry.MLMetrics do
     })
   end
   
-  def handle_ml_event([:ash_dspy, :provider, :request], measurements, metadata, config) do
+  def handle_ml_event([:dspex, :provider, :request], measurements, metadata, config) do
     # Track provider performance
     record_metric(:provider_latency, measurements.duration, %{
       provider: metadata.provider,
@@ -2111,7 +2111,7 @@ defmodule AshDSPy.Telemetry.MLMetrics do
     end
   end
   
-  def handle_ml_event([:ash_dspy, :signature, :compilation], measurements, metadata, config) do
+  def handle_ml_event([:dspex, :signature, :compilation], measurements, metadata, config) do
     # Track signature compilation performance
     record_metric(:signature_compilation_duration, measurements.duration, %{
       signature_hash: metadata.signature_hash,
@@ -2133,7 +2133,7 @@ defmodule AshDSPy.Telemetry.MLMetrics do
     end
   end
   
-  def handle_ml_event([:ash_dspy, :memory, :pressure], measurements, metadata, config) do
+  def handle_ml_event([:dspex, :memory, :pressure], measurements, metadata, config) do
     # Track memory usage patterns
     record_gauge(:memory_usage, measurements.memory_usage, %{
       component: metadata.component
@@ -2157,7 +2157,7 @@ defmodule AshDSPy.Telemetry.MLMetrics do
     end
   end
   
-  def handle_ml_event([:ash_dspy, :optimization, :iteration], measurements, metadata, config) do
+  def handle_ml_event([:dspex, :optimization, :iteration], measurements, metadata, config) do
     # Track optimization progress
     record_metric(:optimization_score, measurements.score, %{
       optimizer: metadata.optimizer,
@@ -2315,16 +2315,16 @@ end
 **Zero-Downtime Model Updates:**
 
 ```elixir
-defmodule AshDSPy.Deployment.HotSwap do
+defmodule DSPex.Deployment.HotSwap do
   @moduledoc """
   Hot code deployment system for zero-downtime model updates and feature rollouts.
   """
   
   use GenServer
   
-  alias AshDSPy.Module.Registry
-  alias AshDSPy.Telemetry.Tracker
-  alias AshDSPy.Deployment.{VersionManager, TrafficSplitter, HealthChecker}
+  alias DSPex.Module.Registry
+  alias DSPex.Telemetry.Tracker
+  alias DSPex.Deployment.{VersionManager, TrafficSplitter, HealthChecker}
   
   defstruct [
     :active_versions,
@@ -2513,14 +2513,14 @@ defmodule AshDSPy.Deployment.HotSwap do
     
     Enum.each(steps, fn percentage ->
       # Update traffic split
-      send(AshDSPy.Deployment.HotSwap, {:rollout_progress, component_id, percentage})
+      send(DSPex.Deployment.HotSwap, {:rollout_progress, component_id, percentage})
       
       # Wait for step duration with periodic health checks
       monitor_step_health(component_id, step_duration, health_check_interval)
     end)
     
     # Rollout completed successfully
-    send(AshDSPy.Deployment.HotSwap, {:rollout_complete, component_id})
+    send(DSPex.Deployment.HotSwap, {:rollout_complete, component_id})
   end
   
   defp monitor_step_health(component_id, total_duration, check_interval) do
@@ -2543,7 +2543,7 @@ defmodule AshDSPy.Deployment.HotSwap do
         
         {:unhealthy, reason} ->
           # Abort rollout
-          send(AshDSPy.Deployment.HotSwap, {:rollout_failed, component_id, reason})
+          send(DSPex.Deployment.HotSwap, {:rollout_failed, component_id, reason})
           exit(:rollout_failed)
       end
     end

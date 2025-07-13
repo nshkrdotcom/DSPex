@@ -1,4 +1,4 @@
-defmodule AshDSPex.UnifiedTestFoundation do
+defmodule DSPex.UnifiedTestFoundation do
   @moduledoc """
   Unified test foundation implementing isolation patterns from UNIFIED_TESTING_GUIDE.md
 
@@ -15,7 +15,7 @@ defmodule AshDSPex.UnifiedTestFoundation do
 
   require Logger
   import ExUnit.Callbacks, only: [on_exit: 1]
-  import AshDSPex.SupervisionTestHelpers, only: [graceful_supervisor_shutdown: 2, wait_for: 2]
+  import DSPex.SupervisionTestHelpers, only: [graceful_supervisor_shutdown: 2, wait_for: 2]
 
   @doc """
   Macro for using the unified test foundation with a specific isolation mode.
@@ -26,9 +26,9 @@ defmodule AshDSPex.UnifiedTestFoundation do
   defmacro __using__(isolation_type) do
     quote do
       use ExUnit.Case, async: unquote(__MODULE__).isolation_allows_async?(unquote(isolation_type))
-      import AshDSPex.SupervisionTestHelpers
-      import AshDSPex.BridgeTestHelpers
-      import AshDSPex.MonitorTestHelpers
+      import DSPex.SupervisionTestHelpers
+      import DSPex.BridgeTestHelpers
+      import DSPex.MonitorTestHelpers
 
       # Set appropriate timeouts based on isolation type
       @moduletag timeout: unquote(__MODULE__).isolation_timeout(unquote(isolation_type))
@@ -242,7 +242,7 @@ defmodule AshDSPex.UnifiedTestFoundation do
       monitor_name: monitor_name
     ]
 
-    case AshDSPex.PythonBridge.Supervisor.start_link(supervisor_opts) do
+    case DSPex.PythonBridge.Supervisor.start_link(supervisor_opts) do
       {:ok, pid} -> {:ok, pid}
       {:error, {:already_started, pid}} -> {:ok, pid}
       error -> error

@@ -51,7 +51,7 @@
 
   1.1 Core Mock Adapter
 
-  defmodule AshDSPy.Adapters.Mock do
+  defmodule DSPex.Adapters.Mock do
     @moduledoc """
     Pure Elixir mock adapter for fast unit testing without bridge dependencies.
 
@@ -65,7 +65,7 @@
     - Thread-safe concurrent operation support
     """
 
-    @behaviour AshDSPy.Adapters.Adapter
+    @behaviour DSPex.Adapters.Adapter
     use GenServer
 
     require Logger
@@ -517,7 +517,7 @@
 
   2.1 Mock Python Server
 
-  defmodule AshDSPy.PythonBridge.MockServer do
+  defmodule DSPex.PythonBridge.MockServer do
     @moduledoc """
     Mock Python server that implements the bridge wire protocol for testing
     bridge communication without requiring Python DSPy installation.
@@ -1027,7 +1027,7 @@
 
   3.1 Test Mode Manager
 
-  defmodule AshDSPy.Testing.ModeManager do
+  defmodule DSPex.Testing.ModeManager do
     @moduledoc """
     Manages different testing modes and configurations for the layered testing architecture.
 
@@ -1052,7 +1052,7 @@
     end
 
     def get_current_mode do
-      Application.get_env(:ash_dspy, :test_mode, :unit_mock)
+      Application.get_env(:dspex, :test_mode, :unit_mock)
     end
 
     def teardown_test_mode do
@@ -1068,17 +1068,17 @@
     # Unit Mock Mode Setup
     defp setup_unit_mock_mode do
       # Configure to use mock adapter directly
-      Application.put_env(:ash_dspy, :adapter, AshDSPy.Adapters.Mock)
-      Application.put_env(:ash_dspy, :test_mode, :unit_mock)
+      Application.put_env(:dspex, :adapter, DSPex.Adapters.Mock)
+      Application.put_env(:dspex, :test_mode, :unit_mock)
 
       # Start mock adapter with unit test configuration
-      case AshDSPy.Adapters.Mock.start_link(unit_test_config()) do
+      case DSPex.Adapters.Mock.start_link(unit_test_config()) do
         {:ok, _pid} ->
           :ok
 
         {:error, {:already_started, _pid}} ->
-          AshDSPy.Adapters.Mock.reset()
-          AshDSPy.Adapters.Mock.configure(unit_test_config())
+          DSPex.Adapters.Mock.reset()
+          DSPex.Adapters.Mock.configure(unit_test_config())
           :ok
 
         {:error, reason} ->
@@ -1088,12 +1088,12 @@
 
     # Integration Mock Mode Setup
     defp setup_integration_mock_mode do
-      Application.put_env(:ash_dspy, :adapter, AshDSPy.Adapters.PythonPort)
-      Application.put_env(:ash_dspy, :bridge_mode, :mock_server)
-      Application.put_env(:ash_dspy, :test_mode, :integration_mock)
+      Application.put_env(:dspex, :adapter, DSPex.Adapters.PythonPort)
+      Application.put_env(:dspex, :bridge_mode, :mock_server)
+      Application.put_env(:dspex, :test_mode, :integration_mock)
 
       # Start mock Python server
-      case AshDSPy.PythonBridge.MockServer.start_link(integration_test_config()) do
+      case DSPex.PythonBridge.MockServer.start_link(integration_test_config()) do
         {:ok, _pid} ->
           # Start bridge configured to use mock server
           case start_bridge_with_mock_server() do
@@ -1102,7 +1102,7 @@
           end
 
         {:error, {:already_started, _pid}} ->
-          AshDSPy.PythonBridge.MockServer.configure(integration_test_config())
+          DSPex.PythonBridge.MockServer.configure(integration_test_config())
           :ok
 
         {:error, reason} ->
@@ -1112,15 +1112,15 @@
 
     # E2E Real Mode Setup
     defp setup_e2e_real_mode do
-      Application.put_env(:ash_dspy, :adapter, AshDSPy.Adapters.PythonPort)
-      Application.put_env(:ash_dspy, :bridge_mode, :production)
-      Application.put_env(:ash_dspy, :test_mode, :e2e_real)
+      Application.put_env(:dspex, :adapter, DSPex.Adapters.PythonPort)
+      Application.put_env(:dspex, :bridge_mode, :production)
+      Application.put_env(:dspex, :test_mode, :e2e_real)
 
       # Verify Python DSPy is available
       case verify_python_dspy_available() do
         :ok ->
           # Start bridge with real Python process
-          case AshDSPy.PythonBridge.Bridge.start_link(production_config()) do
+          case DSPex.PythonBridge.Bridge.start_link(production_config()) do
             {:ok, _pid} -> :ok
             {:error, {:already_started, _pid}} -> :ok
             {:error, reason} -> {:error, "Failed to start bridge: #{reason}"}
@@ -1133,35 +1133,35 @@
 
     # Teardown Functions
     defp teardown_unit_mock_mode do
-      case Process.whereis(AshDSPy.Adapters.Mock) do
+      case Process.whereis(DSPex.Adapters.Mock) do
         nil -> :ok
         _pid ->
-          AshDSPy.Adapters.Mock.reset()
+          DSPex.Adapters.Mock.reset()
           :ok
       end
     end
 
     defp teardown_integration_mock_mode do
-      case Process.whereis(AshDSPy.PythonBridge.MockServer) do
+      case Process.whereis(DSPex.PythonBridge.MockServer) do
         nil -> :ok
         _pid ->
-          AshDSPy.PythonBridge.MockServer.stop()
+          DSPex.PythonBridge.MockServer.stop()
           :ok
       end
 
-      case Process.whereis(AshDSPy.PythonBridge.Bridge) do
+      case Process.whereis(DSPex.PythonBridge.Bridge) do
         nil -> :ok
         _pid ->
-          GenServer.stop(AshDSPy.PythonBridge.Bridge)
+          GenServer.stop(DSPex.PythonBridge.Bridge)
           :ok
       end
     end
 
     defp teardown_e2e_real_mode do
-      case Process.whereis(AshDSPy.PythonBridge.Bridge) do
+      case Process.whereis(DSPex.PythonBridge.Bridge) do
         nil -> :ok
         _pid ->
-          GenServer.stop(AshDSPy.PythonBridge.Bridge)
+          GenServer.stop(DSPex.PythonBridge.Bridge)
           :ok
       end
     end
@@ -1207,7 +1207,7 @@
     # Helper Functions
     defp start_bridge_with_mock_server do
       # Get mock server port
-      {:ok, stats} = AshDSPy.PythonBridge.MockServer.get_stats()
+      {:ok, stats} = DSPex.PythonBridge.MockServer.get_stats()
       mock_port = stats[:port] || 12345
 
       # Configure bridge to connect to mock server instead of spawning Python
@@ -1217,7 +1217,7 @@
         timeout: 10_000
       }
 
-      AshDSPy.PythonBridge.Bridge.start_link(bridge_config)
+      DSPex.PythonBridge.Bridge.start_link(bridge_config)
     end
 
     defp verify_python_dspy_available do
@@ -1237,14 +1237,14 @@
 
   3.2 Test Helpers
 
-  defmodule AshDSPy.Testing.Helpers do
+  defmodule DSPex.Testing.Helpers do
     @moduledoc """
     Comprehensive test helpers for all testing modes and common testing patterns.
     """
 
-    alias AshDSPy.Testing.ModeManager
-    alias AshDSPy.Adapters.Mock
-    alias AshDSPy.PythonBridge.MockServer
+    alias DSPex.Testing.ModeManager
+    alias DSPex.Adapters.Mock
+    alias DSPex.PythonBridge.MockServer
 
     @doc """
     Setup test environment with specified mode.
@@ -1426,9 +1426,9 @@
 
     defp get_current_adapter do
       case ModeManager.get_current_mode() do
-        :unit_mock -> AshDSPy.Adapters.Mock
-        :integration_mock -> AshDSPy.Adapters.PythonPort
-        :e2e_real -> AshDSPy.Adapters.PythonPort
+        :unit_mock -> DSPex.Adapters.Mock
+        :integration_mock -> DSPex.Adapters.PythonPort
+        :e2e_real -> DSPex.Adapters.PythonPort
       end
     end
 
@@ -1481,13 +1481,13 @@
 
   3.3 ExUnit Integration
 
-  defmodule AshDSPy.Testing.ExUnitCase do
+  defmodule DSPex.Testing.ExUnitCase do
     @moduledoc """
     ExUnit case template for DSPy testing with automatic mode setup.
 
     Usage:
       defmodule MyTest do
-        use AshDSPy.Testing.ExUnitCase, mode: :unit_mock
+        use DSPex.Testing.ExUnitCase, mode: :unit_mock
 
         test "my test" do
           # Test code here - mode is automatically configured
@@ -1501,7 +1501,7 @@
       quote do
         use ExUnit.Case
 
-        alias AshDSPy.Testing.Helpers
+        alias DSPex.Testing.Helpers
 
         setup do
           case Helpers.setup_test_env(unquote(mode)) do
@@ -1526,7 +1526,7 @@
   Enhanced Bridge Configuration
 
   # Modify your existing bridge to support test modes
-  defmodule AshDSPy.PythonBridge.Bridge do
+  defmodule DSPex.PythonBridge.Bridge do
     # ... existing implementation ...
 
     def start_link(opts \\ []) do
@@ -1661,14 +1661,14 @@
 
   Example Test Files
 
-  # test/ash_dspy/unit_test_example.exs
-  defmodule AshDSPy.UnitTestExample do
-    use AshDSPy.Testing.ExUnitCase, mode: :unit_mock
+  # test/dspex/unit_test_example.exs
+  defmodule DSPex.UnitTestExample do
+    use DSPex.Testing.ExUnitCase, mode: :unit_mock
 
-    alias AshDSPy.Testing.Helpers
+    alias DSPex.Testing.Helpers
 
     defmodule TestSignature do
-      use AshDSPy.Signature
+      use DSPex.Signature
       signature question: :string -> answer: :string
     end
 
@@ -1692,14 +1692,14 @@
     end
   end
 
-  # test/ash_dspy/integration_test_example.exs
-  defmodule AshDSPy.IntegrationTestExample do
-    use AshDSPy.Testing.ExUnitCase, mode: :integration_mock
+  # test/dspex/integration_test_example.exs
+  defmodule DSPex.IntegrationTestExample do
+    use DSPex.Testing.ExUnitCase, mode: :integration_mock
 
-    alias AshDSPy.Testing.Helpers
+    alias DSPex.Testing.Helpers
 
     defmodule TestSignature do
-      use AshDSPy.Signature
+      use DSPex.Signature
       signature question: :string -> answer: :string
     end
 
@@ -1716,17 +1716,17 @@
     end
   end
 
-  # test/ash_dspy/e2e_test_example.exs
-  defmodule AshDSPy.E2ETestExample do
-    use AshDSPy.Testing.ExUnitCase, mode: :e2e_real
+  # test/dspex/e2e_test_example.exs
+  defmodule DSPex.E2ETestExample do
+    use DSPex.Testing.ExUnitCase, mode: :e2e_real
 
-    alias AshDSPy.Testing.Helpers
+    alias DSPex.Testing.Helpers
 
     @moduletag :e2e
     @moduletag timeout: 30_000  # Longer timeout for E2E tests
 
     defmodule TestSignature do
-      use AshDSPy.Signature
+      use DSPex.Signature
       signature question: :string -> answer: :string
     end
 
@@ -1744,7 +1744,7 @@
 
   File Structure to Create:
 
-  lib/ash_dspy/
+  lib/dspex/
   ├── adapters/
   │   └── mock.ex                     # Layer 1: Pure mock adapter
   ├── python_bridge/
@@ -1754,7 +1754,7 @@
       ├── helpers.ex                  # Test helper functions
       └── ex_unit_case.ex             # ExUnit integration
 
-  test/ash_dspy/
+  test/dspex/
   ├── unit_test_example.exs           # Unit test examples
   ├── integration_test_example.exs    # Integration test examples
   └── e2e_test_example.exs            # E2E test examples
@@ -1769,31 +1769,31 @@
   import Config
 
   # Default to unit mock mode for fast testing
-  config :ash_dspy,
+  config :dspex,
     test_mode: :unit_mock,
-    adapter: AshDSPy.Adapters.Mock
+    adapter: DSPex.Adapters.Mock
 
   # config/test_modes.exs
   import Config
 
   case System.get_env("TEST_MODE") do
     "integration" ->
-      config :ash_dspy,
+      config :dspex,
         test_mode: :integration_mock,
-        adapter: AshDSPy.Adapters.PythonPort,
+        adapter: DSPex.Adapters.PythonPort,
         bridge_mode: :mock_server
 
     "e2e" ->
-      config :ash_dspy,
+      config :dspex,
         test_mode: :e2e_real,
-        adapter: AshDSPy.Adapters.PythonPort,
+        adapter: DSPex.Adapters.PythonPort,
         bridge_mode: :production
 
     _ ->
       # Default to unit mock
-      config :ash_dspy,
+      config :dspex,
         test_mode: :unit_mock,
-        adapter: AshDSPy.Adapters.Mock
+        adapter: DSPex.Adapters.Mock
   end
 
   USAGE SCENARIOS
@@ -1810,9 +1810,9 @@
   TEST_MODE=e2e mix test --include e2e
 
   # Run specific test layer
-  mix test test/ash_dspy/unit_test_example.exs      # Unit only
-  mix test test/ash_dspy/integration_test_example.exs  # Integration only
-  mix test test/ash_dspy/e2e_test_example.exs      # E2E only
+  mix test test/dspex/unit_test_example.exs      # Unit only
+  mix test test/dspex/integration_test_example.exs  # Integration only
+  mix test test/dspex/e2e_test_example.exs      # E2E only
 
   CI/CD Pipeline:
 

@@ -5,7 +5,7 @@ Looking at the comprehensive analysis and requirements, I'll create the next ser
 ## Document 1: Ash DSPy Core Architecture
 
 ```elixir
-# File: docs/ash_dspy_core_architecture.md
+# File: docs/dspex_core_architecture.md
 
 # Ash DSPy Core Architecture
 
@@ -204,7 +204,7 @@ end
 ## Document 2: DSPy Signature Implementation in Ash
 
 ```elixir
-# File: docs/ash_dspy_signature_implementation.md
+# File: docs/dspex_signature_implementation.md
 
 # DSPy Signature Implementation in Ash
 
@@ -412,7 +412,7 @@ end
 ## Document 3: DSPy Module System in Ash
 
 ```elixir
-# File: docs/ash_dspy_module_system.md
+# File: docs/dspex_module_system.md
 
 # DSPy Module System in Ash
 
@@ -765,7 +765,7 @@ end
 ## Document 4: DSPy LM Integration with Ash
 
 ```elixir
-# File: docs/ash_dspy_lm_integration.md
+# File: docs/dspex_lm_integration.md
 
 # DSPy LM (Language Model) Integration with Ash
 
@@ -1164,7 +1164,7 @@ config :dspy_ash, :lm,
 ## Document 5: DSPy Optimizer Implementation in Ash
 
 ```elixir
-# File: docs/ash_dspy_optimizer_implementation.md
+# File: docs/dspex_optimizer_implementation.md
 
 # DSPy Optimizer Implementation in Ash
 
@@ -1621,7 +1621,7 @@ end
 ## Document 6: DSPy Python Bridge for Ash
 
 ```elixir
-# File: docs/ash_dspy_python_bridge.md
+# File: docs/dspex_python_bridge.md
 
 # DSPy Python Bridge for Ash
 
@@ -2120,7 +2120,7 @@ if __name__ == '__main__':
 ## Document 7: Complete DSPy Example in Ash
 
 ```elixir
-# File: docs/ash_dspy_complete_example.md
+# File: docs/dspex_complete_example.md
 
 # Complete DSPy Example in Ash
 

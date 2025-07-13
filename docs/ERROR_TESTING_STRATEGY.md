@@ -15,7 +15,7 @@ Our tests generate numerous warnings but still pass. This happens because:
 ### Example: Configuration Validation
 
 ```elixir
-# In lib/ash_dspex/config.ex
+# In lib/dspex/config.ex
 defp parse_integer(value, key, default) when is_binary(value) do
   case Integer.parse(value) do
     {int, ""} -> int
@@ -25,9 +25,9 @@ defp parse_integer(value, key, default) when is_binary(value) do
   end
 end
 
-# In test/ash_dspex/config_test.exs
+# In test/dspex/config_test.exs
 test "handles invalid environment variable values" do
-  System.put_env("ASH_DSPEX_BRIDGE_TIMEOUT", "invalid_number")
+  System.put_env("DSPEX_BRIDGE_TIMEOUT", "invalid_number")
   config = Config.get(:python_bridge)
   assert Map.has_key?(config, :default_timeout)  # Test passes! No failure!
 end
@@ -44,7 +44,7 @@ import ExUnit.CaptureLog
 
 test "logs warning and uses default for invalid timeout" do
   log = capture_log(fn ->
-    System.put_env("ASH_DSPEX_BRIDGE_TIMEOUT", "not_a_number")
+    System.put_env("DSPEX_BRIDGE_TIMEOUT", "not_a_number")
     config = Config.get(:python_bridge)
     assert config[:default_timeout] == 30_000  # Verify behavior
   end)
@@ -83,11 +83,11 @@ Ensure errors propagate correctly through the system:
 ```elixir
 test "adapter returns error when bridge is not available" do
   # Stop the bridge to simulate failure
-  GenServer.stop(AshDSPex.PythonBridge.Bridge)
+  GenServer.stop(DSPex.PythonBridge.Bridge)
   
   # Verify adapter handles missing bridge
   assert {:error, :bridge_not_running} = 
-    AshDSPex.Adapters.PythonPort.create_program(%{signature: %{}})
+    DSPex.Adapters.PythonPort.create_program(%{signature: %{}})
 end
 ```
 
@@ -97,11 +97,11 @@ Add configuration option for strict error handling in tests:
 
 ```elixir
 # In config/test.exs
-config :ash_dspex, :strict_errors, true
+config :dspex, :strict_errors, true
 
 # In source code
 defp handle_invalid_config(key, value) do
-  if Application.get_env(:ash_dspex, :strict_errors, false) do
+  if Application.get_env(:dspex, :strict_errors, false) do
     raise ArgumentError, "Invalid value for #{key}: #{value}"
   else
     Logger.warning("Invalid value for #{key}: #{value}")
@@ -128,9 +128,9 @@ Use ExUnit's parameterized testing for comprehensive coverage:
 ```elixir
 describe "handles various invalid inputs" do
   @invalid_configs [
-    {"ASH_DSPEX_BRIDGE_TIMEOUT", "not_a_number", :default_timeout, 30_000},
-    {"ASH_DSPEX_MAX_RETRIES", "invalid", :max_retries, 3},
-    {"ASH_DSPEX_BRIDGE_TIMEOUT", "-1", :default_timeout, 30_000}  # Negative number
+    {"DSPEX_BRIDGE_TIMEOUT", "not_a_number", :default_timeout, 30_000},
+    {"DSPEX_MAX_RETRIES", "invalid", :max_retries, 3},
+    {"DSPEX_BRIDGE_TIMEOUT", "-1", :default_timeout, 30_000}  # Negative number
   ]
   
   for {env_var, invalid_value, config_key, expected} <- @invalid_configs do
@@ -155,18 +155,18 @@ Create a test helper for injecting errors:
 defmodule ErrorInjection do
   def with_failing_bridge(fun) do
     # Temporarily replace bridge with failing version
-    original = Process.whereis(AshDSPex.PythonBridge.Bridge)
+    original = Process.whereis(DSPex.PythonBridge.Bridge)
     if original, do: GenServer.stop(original)
     
     # Start a bridge that always fails
-    {:ok, _} = GenServer.start_link(FailingBridge, [], name: AshDSPex.PythonBridge.Bridge)
+    {:ok, _} = GenServer.start_link(FailingBridge, [], name: DSPex.PythonBridge.Bridge)
     
     try do
       fun.()
     after
       # Restore original
-      GenServer.stop(AshDSPex.PythonBridge.Bridge)
-      if original, do: AshDSPex.PythonBridge.Bridge.start_link()
+      GenServer.stop(DSPex.PythonBridge.Bridge)
+      if original, do: DSPex.PythonBridge.Bridge.start_link()
     end
   end
 end

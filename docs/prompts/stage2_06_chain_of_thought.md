@@ -242,7 +242,7 @@ class ReasoningValidator:
 ### CORE CHAIN-OF-THOUGHT ENGINE
 
 ```elixir
-defmodule AshDSPy.ChainOfThought.Engine do
+defmodule DSPex.ChainOfThought.Engine do
   @moduledoc """
   Core Chain-of-Thought reasoning engine with step validation and quality assessment.
   
@@ -258,8 +258,8 @@ defmodule AshDSPy.ChainOfThought.Engine do
   use GenServer
   require Logger
   
-  alias AshDSPy.{Signature, Prediction}
-  alias AshDSPy.ChainOfThought.{
+  alias DSPex.{Signature, Prediction}
+  alias DSPex.ChainOfThought.{
     SignatureEnhancer,
     StepValidator,
     QualityAssessor,
@@ -677,15 +677,15 @@ end
 ### SIGNATURE ENHANCEMENT FOR COT
 
 ```elixir
-defmodule AshDSPy.ChainOfThought.SignatureEnhancer do
+defmodule DSPex.ChainOfThought.SignatureEnhancer do
   @moduledoc """
   Enhances signatures with reasoning fields for Chain-of-Thought.
   """
   
   use GenServer
   
-  alias AshDSPy.Signature
-  alias AshDSPy.Types.Field
+  alias DSPex.Signature
+  alias DSPex.Types.Field
   
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -803,7 +803,7 @@ end
 ### STEP VALIDATION SYSTEM
 
 ```elixir
-defmodule AshDSPy.ChainOfThought.StepValidator do
+defmodule DSPex.ChainOfThought.StepValidator do
   @moduledoc """
   Validates reasoning steps for logical consistency and coherence.
   """
@@ -1221,7 +1221,7 @@ end
 ### QUALITY ASSESSMENT ENGINE
 
 ```elixir
-defmodule AshDSPy.ChainOfThought.QualityAssessor do
+defmodule DSPex.ChainOfThought.QualityAssessor do
   @moduledoc """
   Assesses the quality of chain-of-thought reasoning.
   """
@@ -1602,7 +1602,7 @@ end
 ### CONFIDENCE CALIBRATION
 
 ```elixir
-defmodule AshDSPy.ChainOfThought.ConfidenceCalibrator do
+defmodule DSPex.ChainOfThought.ConfidenceCalibrator do
   @moduledoc """
   Calibrates confidence scores for chain-of-thought reasoning.
   """
@@ -1725,7 +1725,7 @@ end
 ### STEP PARSER
 
 ```elixir
-defmodule AshDSPy.ChainOfThought.StepParser do
+defmodule DSPex.ChainOfThought.StepParser do
   @moduledoc """
   Parses reasoning text into structured steps.
   """
@@ -1875,7 +1875,7 @@ end
 ### REASONING OPTIMIZATION
 
 ```elixir
-defmodule AshDSPy.ChainOfThought.ReasoningOptimizer do
+defmodule DSPex.ChainOfThought.ReasoningOptimizer do
   @moduledoc """
   Learns from execution history to optimize reasoning generation.
   """
@@ -2099,14 +2099,14 @@ end
 ### ASH FRAMEWORK INTEGRATION
 
 ```elixir
-defmodule AshDSPy.ChainOfThought.AshIntegration do
+defmodule DSPex.ChainOfThought.AshIntegration do
   @moduledoc """
   Ash framework integration for Chain-of-Thought reasoning.
   """
   
   use Ash.Resource.Change
   
-  alias AshDSPy.ChainOfThought.Engine
+  alias DSPex.ChainOfThought.Engine
   
   @doc """
   Ash change for Chain-of-Thought reasoning.
@@ -2167,11 +2167,11 @@ end
 ### COMPREHENSIVE TESTING
 
 ```elixir
-defmodule AshDSPy.ChainOfThought.EngineTest do
+defmodule DSPex.ChainOfThought.EngineTest do
   use ExUnit.Case, async: true
   
-  alias AshDSPy.ChainOfThought.Engine
-  alias AshDSPy.Signature
+  alias DSPex.ChainOfThought.Engine
+  alias DSPex.Signature
   
   setup do
     {:ok, engine} = Engine.start_link(test_mode: true)
@@ -2334,7 +2334,7 @@ defmodule AshDSPy.ChainOfThought.EngineTest do
   
   describe "step parsing" do
     test "parses various step formats" do
-      alias AshDSPy.ChainOfThought.StepParser
+      alias DSPex.ChainOfThought.StepParser
       
       reasoning = """
       First, let's identify what we know.
@@ -2382,7 +2382,7 @@ end
 
 ```elixir
 # config/config.exs
-config :ash_dspy, :chain_of_thought,
+config :dspex, :chain_of_thought,
   # Engine configuration
   default_rationale_type: :simple,
   max_reasoning_length: 2000,

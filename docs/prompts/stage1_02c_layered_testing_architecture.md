@@ -15,21 +15,21 @@
   Option: Layered Mock Strategy 🎯
 
   # Layer 1: Adapter Interface Mock (Bypass everything)
-  defmodule AshDSPy.Adapters.Mock do
-    @behaviour AshDSPy.Adapters.Adapter
+  defmodule DSPex.Adapters.Mock do
+    @behaviour DSPex.Adapters.Adapter
     # Pure Elixir responses, no bridge communication
     # 99% of your unit tests will use this
   end
 
   # Layer 2: Bridge Mock Server (Test bridge communication)
-  defmodule AshDSPy.PythonBridge.MockPythonServer do
+  defmodule DSPex.PythonBridge.MockPythonServer do
     # Simulates Python DSPy process over wire protocol
     # Tests serialization, timeouts, error handling
     # Integration tests use this
   end
 
   # Layer 3: Real Python Bridge (Full integration)
-  defmodule AshDSPy.Adapters.PythonPort do
+  defmodule DSPex.Adapters.PythonPort do
     # Uses real Python DSPy process
     # End-to-end tests use this
   end
@@ -61,16 +61,16 @@
   Phase 1: Build Both Mocks Now (Stage 1)
 
   1. Adapter-Level Mock (from my original proposal)
-  # lib/ash_dspy/adapters/mock.ex
-  defmodule AshDSPy.Adapters.Mock do
-    @behaviour AshDSPy.Adapters.Adapter
+  # lib/dspex/adapters/mock.ex
+  defmodule DSPex.Adapters.Mock do
+    @behaviour DSPex.Adapters.Adapter
     # Complete standalone implementation
     # No bridge dependencies
   end
 
   2. Bridge Mock Server (new addition)
-  # lib/ash_dspy/python_bridge/mock_server.ex
-  defmodule AshDSPy.PythonBridge.MockServer do
+  # lib/dspex/python_bridge/mock_server.ex
+  defmodule DSPex.PythonBridge.MockServer do
     @moduledoc """
     Mock Python server that speaks the bridge wire protocol.
     Allows testing bridge communication without Python DSPy.
@@ -163,7 +163,7 @@
 
   3. Enhanced Bridge for Test Mode
   # Enhance your existing bridge
-  defmodule AshDSPy.PythonBridge.Bridge do
+  defmodule DSPex.PythonBridge.Bridge do
     def start_link(opts \\ []) do
       case Keyword.get(opts, :mode, :production) do
         :test_mock_server ->
@@ -175,7 +175,7 @@
 
     defp start_with_mock_server(opts) do
       # Start mock server
-      {:ok, _} = AshDSPy.PythonBridge.MockServer.start_link()
+      {:ok, _} = DSPex.PythonBridge.MockServer.start_link()
 
       # Connect to mock server instead of Python process
       # Everything else works exactly the same
@@ -187,28 +187,28 @@
   # config/test.exs
 
   # Unit tests: Use adapter mock
-  config :ash_dspy, :adapter, AshDSPy.Adapters.Mock
+  config :dspex, :adapter, DSPex.Adapters.Mock
 
   # Integration tests: Use bridge with mock server
-  config :ash_dspy, :bridge_mode, :test_mock_server
+  config :dspex, :bridge_mode, :test_mock_server
 
   # E2E tests: Use real Python
-  config :ash_dspy, :bridge_mode, :production
+  config :dspex, :bridge_mode, :production
 
   Test Configuration:
-  defmodule AshDSPy.TestHelpers do
+  defmodule DSPex.TestHelpers do
     def setup_unit_testing do
-      Application.put_env(:ash_dspy, :adapter, AshDSPy.Adapters.Mock)
-      AshDSPy.Adapters.Mock.start_link()
+      Application.put_env(:dspex, :adapter, DSPex.Adapters.Mock)
+      DSPex.Adapters.Mock.start_link()
     end
 
     def setup_integration_testing do
-      Application.put_env(:ash_dspy, :bridge_mode, :test_mock_server)
-      AshDSPy.PythonBridge.Bridge.start_link(mode: :test_mock_server)
+      Application.put_env(:dspex, :bridge_mode, :test_mock_server)
+      DSPex.PythonBridge.Bridge.start_link(mode: :test_mock_server)
     end
 
     def setup_e2e_testing do
-      Application.put_env(:ash_dspy, :bridge_mode, :production)
+      Application.put_env(:dspex, :bridge_mode, :production)
       # Requires Python DSPy installation
     end
   end
@@ -216,11 +216,11 @@
   Usage in Tests
 
   # Fast unit tests (99% of tests)
-  defmodule AshDSPy.ML.ProgramTest do
+  defmodule DSPex.ML.ProgramTest do
     use ExUnit.Case
 
     setup do
-      AshDSPy.TestHelpers.setup_unit_testing()
+      DSPex.TestHelpers.setup_unit_testing()
       :ok
     end
 
@@ -231,11 +231,11 @@
   end
 
   # Integration tests (critical path testing)
-  defmodule AshDSPy.BridgeIntegrationTest do
+  defmodule DSPex.BridgeIntegrationTest do
     use ExUnit.Case
 
     setup do
-      AshDSPy.TestHelpers.setup_integration_testing()
+      DSPex.TestHelpers.setup_integration_testing()
       :ok
     end
 
@@ -246,11 +246,11 @@
   end
 
   # E2E tests (smoke tests)
-  defmodule AshDSPy.E2ETest do
+  defmodule DSPex.E2ETest do
     use ExUnit.Case
 
     setup do
-      AshDSPy.TestHelpers.setup_e2e_testing()
+      DSPex.TestHelpers.setup_e2e_testing()
       :ok
     end
 

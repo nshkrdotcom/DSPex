@@ -19,7 +19,7 @@ Our signature syntax from the 1100-1102 docs becomes the foundation for Ash reso
 ```elixir
 # Native signature syntax (from our innovation)
 defmodule QASignature do
-  use AshDSPy.Signature
+  use DSPex.Signature
   
   @doc "Answer questions with detailed reasoning"
   signature question: :string, context: :string -> answer: :string, confidence: :float
@@ -27,7 +27,7 @@ end
 
 # Automatically becomes an Ash resource
 defmodule QAProgram do
-  use AshDSPy.Program
+  use DSPex.Program
   
   signature QASignature
   
@@ -40,14 +40,14 @@ defmodule QAProgram do
       argument :question, :string, allow_nil?: false
       argument :context, :string, allow_nil?: false
       
-      run AshDSPy.Actions.ExecuteProgram
+      run DSPex.Actions.ExecuteProgram
     end
     
     action :optimize, :struct do
       argument :dataset, {:array, :map}, allow_nil?: false
       argument :metric, :string, allow_nil?: false
       
-      run AshDSPy.Actions.OptimizeProgram
+      run DSPex.Actions.OptimizeProgram
     end
   end
 end
@@ -59,7 +59,7 @@ Using ExDantic for runtime validation that matches our signature definitions:
 
 ```elixir
 defmodule QASignature do
-  use AshDSPy.Signature
+  use DSPex.Signature
   
   # Native signature syntax
   signature question: :string, context: :string -> answer: :string, confidence: :float
@@ -126,7 +126,7 @@ defmodule MyApp.ML.Signature do
   use Ash.Resource,
     domain: MyApp.ML,
     data_layer: AshPostgres.DataLayer,
-    extensions: [AshDSPy.Resource]
+    extensions: [DSPex.Resource]
     
   attributes do
     uuid_primary_key :id
@@ -173,7 +173,7 @@ end
 defmodule MyApp.ML.Program do
   use Ash.Resource,
     domain: MyApp.ML,
-    data_layer: AshDSPy.DataLayer,  # Custom data layer!
+    data_layer: DSPex.DataLayer,  # Custom data layer!
     extensions: [AshStateMachine, AshPaperTrail.Resource]
     
   attributes do
@@ -221,8 +221,8 @@ defmodule MyApp.ML.Program do
     action :execute, :map do
       argument :inputs, :map, allow_nil?: false
       
-      # This will be handled by our custom AshDSPy.DataLayer
-      run AshDSPy.Actions.ExecuteProgram
+      # This will be handled by our custom DSPex.DataLayer
+      run DSPex.Actions.ExecuteProgram
     end
     
     action :optimize, :struct do
@@ -232,14 +232,14 @@ defmodule MyApp.ML.Program do
       argument :config, :map, default: %{}
       
       # Background job via AshOban
-      run AshDSPy.Actions.OptimizeProgram
+      run DSPex.Actions.OptimizeProgram
     end
     
     update :deploy do
       accept []
       require_atomic? false
       change transition_state(:deployed)
-      change AshDSPy.Changes.DeployProgram
+      change DSPex.Changes.DeployProgram
     end
   end
   
@@ -254,7 +254,7 @@ end
 ### 4. Custom Data Layer (The Bridge)
 
 ```elixir
-defmodule AshDSPy.DataLayer do
+defmodule DSPex.DataLayer do
   @behaviour Ash.DataLayer
   
   # This is where the magic happens - we bridge Ash with DSPy
@@ -300,7 +300,7 @@ defmodule AshDSPy.DataLayer do
   
   defp execute_via_adapter(program, inputs) do
     # Use our adapter pattern to call DSPy
-    adapter = Application.get_env(:ash_dspy, :adapter, AshDSPy.Adapters.PythonPort)
+    adapter = Application.get_env(:dspex, :adapter, DSPex.Adapters.PythonPort)
     adapter.execute(program.id, inputs)
   end
 end
@@ -309,7 +309,7 @@ end
 ### 5. Adapter Pattern (Pluggable Backends)
 
 ```elixir
-defmodule AshDSPy.Adapter do
+defmodule DSPex.Adapter do
   @callback execute(program_id :: String.t(), inputs :: map()) ::
     {:ok, outputs :: map()} | {:error, term()}
     
@@ -318,13 +318,13 @@ defmodule AshDSPy.Adapter do
 end
 
 # Python implementation for MVP
-defmodule AshDSPy.Adapters.PythonPort do
-  @behaviour AshDSPy.Adapter
+defmodule DSPex.Adapters.PythonPort do
+  @behaviour DSPex.Adapter
   
   # Uses Erlang ports to communicate with Python DSPy
   @impl true
   def execute(program_id, inputs) do
-    AshDSPy.PythonBridge.call(:execute, %{
+    DSPex.PythonBridge.call(:execute, %{
       program_id: program_id,
       inputs: inputs
     })
@@ -332,7 +332,7 @@ defmodule AshDSPy.Adapters.PythonPort do
   
   @impl true
   def optimize(program_id, dataset, config) do
-    AshDSPy.PythonBridge.call(:optimize, %{
+    DSPex.PythonBridge.call(:optimize, %{
       program_id: program_id,
       dataset: dataset,
       optimizer: config[:optimizer] || "BootstrapFewShot",
@@ -342,8 +342,8 @@ defmodule AshDSPy.Adapters.PythonPort do
 end
 
 # Future native implementation
-defmodule AshDSPy.Adapters.Native do
-  @behaviour AshDSPy.Adapter
+defmodule DSPex.Adapters.Native do
+  @behaviour DSPex.Adapter
   
   # Pure Elixir implementation (future)
   @impl true
@@ -356,7 +356,7 @@ end
 ### 6. Python Bridge (Port-Based Communication)
 
 ```elixir
-defmodule AshDSPy.PythonBridge do
+defmodule DSPex.PythonBridge do
   use GenServer
   
   # Port-based communication with Python DSPy
@@ -372,7 +372,7 @@ defmodule AshDSPy.PythonBridge do
   
   @impl true
   def init(_opts) do
-    python_script = Path.join(:code.priv_dir(:ash_dspy), "python/dspy_bridge.py")
+    python_script = Path.join(:code.priv_dir(:dspex), "python/dspy_bridge.py")
     
     port = Port.open({:spawn_executable, python_executable()}, [
       {:args, [python_script]},
@@ -396,14 +396,14 @@ end
 ```elixir
 # Step 1: Define signature with our native syntax
 defmodule QASignature do
-  use AshDSPy.Signature
+  use DSPex.Signature
   
   # Beautiful native syntax from our innovation
   signature question: :string, context: :string -> answer: :string, confidence: :float
 end
 
 # Step 2: Compile-time processing
-defmodule AshDSPy.Signature.Compiler do
+defmodule DSPex.Signature.Compiler do
   def __before_compile__(env) do
     signature_ast = Module.get_attribute(env.module, :signature_ast)
     
@@ -439,7 +439,7 @@ end
 
 ```elixir
 # ExDantic schemas generated from our signature syntax
-defmodule AshDSPy.Signature.ExDanticCompiler do
+defmodule DSPex.Signature.ExDanticCompiler do
   def compile_schema(fields) do
     Enum.map(fields, fn {name, type, constraints} ->
       {name, convert_type(type), convert_constraints(constraints)}
@@ -500,13 +500,13 @@ type ExecuteProgramResult {
 ## MVP Implementation Plan
 
 ### Phase 1: Foundation (Weeks 1-2)
-1. **AshDSPy.Signature resource** with native syntax compilation
+1. **DSPex.Signature resource** with native syntax compilation
 2. **ExDantic integration** for validation schemas
 3. **Basic Python bridge** with port communication
 4. **Program resource** with simple execute action
 
 ### Phase 2: Core Operations (Weeks 3-4)
-1. **AshDSPy.DataLayer** custom data layer implementation
+1. **DSPex.DataLayer** custom data layer implementation
 2. **Adapter pattern** with Python port adapter
 3. **Execution tracking** and metrics collection
 4. **Basic optimization** via Python bridge
@@ -530,7 +530,7 @@ type ExecuteProgramResult {
 ```elixir
 # Define signature
 defmodule QASignature do
-  use AshDSPy.Signature
+  use DSPex.Signature
   signature question: :string -> answer: :string, confidence: :float
 end
 
@@ -553,7 +553,7 @@ end
 ```elixir
 # Multi-step signature
 defmodule RAGSignature do
-  use AshDSPy.Signature
+  use DSPex.Signature
   
   signature query: :string, 
            documents: list[:string] ->

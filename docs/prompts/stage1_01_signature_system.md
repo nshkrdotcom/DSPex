@@ -21,7 +21,7 @@ class QA(dspy.Signature):
 **Native Elixir Signature Syntax (Target):**
 ```elixir
 defmodule QA do
-  use AshDSPy.Signature
+  use DSPex.Signature
   
   signature question: :string -> answer: :string
 end
@@ -29,7 +29,7 @@ end
 
 ### COMPLETE ASH DSPY INTEGRATION ARCHITECTURE
 
-From ASH_DSPY_INTEGRATION_ARCHITECTURE.md:
+From DSPEX_INTEGRATION_ARCHITECTURE.md:
 
 **Core Integration Philosophy:**
 - Ash framework serves as domain modeling infrastructure for ML operations
@@ -149,7 +149,7 @@ From STAGE_1_FOUNDATION_IMPLEMENTATION.md:
 **Project Structure:**
 ```
 lib/
-├── ash_dspy/
+├── dspex/
 │   ├── signature/
 │   │   ├── signature.ex          # Core signature behavior
 │   │   ├── compiler.ex           # Compile-time signature processing
@@ -200,13 +200,13 @@ lib/
 
 **DSL Requirements:**
 ```elixir
-defmodule AshDSPy.Signature do
+defmodule DSPex.Signature do
   defmacro __using__(_opts) do
     quote do
-      import AshDSPy.Signature.DSL
+      import DSPex.Signature.DSL
       Module.register_attribute(__MODULE__, :signature_ast, accumulate: false)
       Module.register_attribute(__MODULE__, :signature_compiled, accumulate: false)
-      @before_compile AshDSPy.Signature.Compiler
+      @before_compile DSPex.Signature.Compiler
     end
   end
   
@@ -243,15 +243,15 @@ def input_fields, do: @signature_compiled.inputs
 def output_fields, do: @signature_compiled.outputs
 
 def validate_inputs(data) do
-  AshDSPy.Signature.Validator.validate_fields(data, input_fields())
+  DSPex.Signature.Validator.validate_fields(data, input_fields())
 end
 
 def validate_outputs(data) do
-  AshDSPy.Signature.Validator.validate_fields(data, output_fields())
+  DSPex.Signature.Validator.validate_fields(data, output_fields())
 end
 
 def to_json_schema(provider \\ :openai) do
-  AshDSPy.Signature.JsonSchema.generate(__signature__, provider)
+  DSPex.Signature.JsonSchema.generate(__signature__, provider)
 end
 ```
 
@@ -298,7 +298,7 @@ end
 
 **OpenAI Function Calling Schema:**
 ```elixir
-defmodule AshDSPy.Signature.JsonSchema do
+defmodule DSPex.Signature.JsonSchema do
   def generate(signature, :openai) do
     %{
       type: "object",
@@ -329,9 +329,9 @@ end
 
 **Resource Generation from Signature:**
 ```elixir
-defmodule AshDSPy.ML.Signature do
+defmodule DSPex.ML.Signature do
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer
   
   attributes do
@@ -373,13 +373,13 @@ defmodule Stage1FoundationTest do
   use ExUnit.Case
   
   defmodule TestSignature do
-    use AshDSPy.Signature
+    use DSPex.Signature
     
     signature question: :string -> answer: :string
   end
   
   defmodule ComplexSignature do
-    use AshDSPy.Signature
+    use DSPex.Signature
     
     signature query: :string, context: {:list, :string} -> 
              answer: :string, confidence: :float, reasoning: {:list, :string}
@@ -462,34 +462,34 @@ end
 # config/config.exs
 import Config
 
-config :ash_dspy, :adapter, AshDSPy.Adapters.PythonPort
+config :dspex, :adapter, DSPex.Adapters.PythonPort
 
-config :ash_dspy, AshDSPy.Repo,
+config :dspex, DSPex.Repo,
   username: "postgres",
   password: "postgres", 
   hostname: "localhost",
-  database: "ash_dspy_dev",
+  database: "dspex_dev",
   pool_size: 10
 
-config :ash_dspy,
-  ecto_repos: [AshDSPy.Repo]
+config :dspex,
+  ecto_repos: [DSPex.Repo]
 ```
 
 **Application Supervision:**
 ```elixir
-defmodule AshDSPy.Application do
+defmodule DSPex.Application do
   use Application
   
   def start(_type, _args) do
     children = [
       # Signature registry for runtime lookup
-      {Registry, keys: :unique, name: AshDSPy.SignatureRegistry},
+      {Registry, keys: :unique, name: DSPex.SignatureRegistry},
       
       # Ash resources if using Postgres
-      {AshPostgres.Repo, Application.get_env(:ash_dspy, AshDSPy.Repo)}
+      {AshPostgres.Repo, Application.get_env(:dspex, DSPex.Repo)}
     ]
     
-    opts = [strategy: :one_for_one, name: AshDSPy.Supervisor]
+    opts = [strategy: :one_for_one, name: DSPex.Supervisor]
     Supervisor.start_link(children, opts)
   end
 end
@@ -501,7 +501,7 @@ Based on the complete context above, implement the core signature system with th
 
 ### FILE STRUCTURE TO CREATE:
 ```
-lib/ash_dspy/signature/
+lib/dspex/signature/
 ├── signature.ex          # Core behavior and DSL
 ├── compiler.ex           # Compile-time processing
 ├── type_parser.ex        # Type system parser
@@ -511,30 +511,30 @@ lib/ash_dspy/signature/
 
 ### SPECIFIC IMPLEMENTATION REQUIREMENTS:
 
-1. **Signature Behavior (`lib/ash_dspy/signature/signature.ex`)**:
+1. **Signature Behavior (`lib/dspex/signature/signature.ex`)**:
    - Implement `__using__` macro with proper module attributes
    - Create DSL module with `signature` macro for native syntax
    - Set up compile-time hooks with `@before_compile`
 
-2. **Signature Compiler (`lib/ash_dspy/signature/compiler.ex`)**:
+2. **Signature Compiler (`lib/dspex/signature/compiler.ex`)**:
    - Implement `__before_compile__` callback
    - Parse signature AST for various syntax patterns
    - Generate signature metadata and validation functions
    - Handle error cases with helpful messages
 
-3. **Type Parser (`lib/ash_dspy/signature/type_parser.ex`)**:
+3. **Type Parser (`lib/dspex/signature/type_parser.ex`)**:
    - Support all basic types (:string, :integer, :float, :boolean, :atom, :any, :map)
    - Support ML-specific types (:embedding, :probability, :confidence_score, :reasoning_chain)
    - Support composite types ({:list, inner}, {:dict, key, value}, {:union, types})
    - Provide clear error messages for unsupported types
 
-4. **Runtime Validator (`lib/ash_dspy/signature/validator.ex`)**:
+4. **Runtime Validator (`lib/dspex/signature/validator.ex`)**:
    - Implement field validation with proper error handling
    - Support nested validation for composite types
    - Return validated data or descriptive errors
    - Handle edge cases (nil values, type mismatches)
 
-5. **JSON Schema Generator (`lib/ash_dspy/signature/json_schema.ex`)**:
+5. **JSON Schema Generator (`lib/dspex/signature/json_schema.ex`)**:
    - Generate OpenAI-compatible function calling schemas
    - Support all signature types with proper JSON Schema mappings
    - Handle required fields and optional constraints

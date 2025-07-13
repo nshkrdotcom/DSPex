@@ -28,23 +28,23 @@ The first round of critical fixes successfully resolved **protocol validation is
 
 **Pattern**: `** (EXIT) already started: #PID<0.174.0>`
 
-**Root Cause**: The application supervision tree starts a global `AshDSPex.PythonBridge.Supervisor` that registers children with fixed names:
-- `AshDSPex.PythonBridge.Bridge` 
-- `AshDSPex.PythonBridge.Monitor`
+**Root Cause**: The application supervision tree starts a global `DSPex.PythonBridge.Supervisor` that registers children with fixed names:
+- `DSPex.PythonBridge.Bridge` 
+- `DSPex.PythonBridge.Monitor`
 
 When tests create their own supervisor instances, they attempt to register children with the same names, causing conflicts.
 
 **Affected Tests**: 
-- All 14 `AshDSPex.PythonBridge.IntegrationTest` tests
-- 7 `AshDSPex.PythonBridge.SupervisorTest` tests
+- All 14 `DSPex.PythonBridge.IntegrationTest` tests
+- 7 `DSPex.PythonBridge.SupervisorTest` tests
 
 **Current Failing Code**:
 ```elixir
 # In supervisor.ex - children have fixed names
 def init(_init_arg) do
   children = [
-    {AshDSPex.PythonBridge.Bridge, [name: AshDSPex.PythonBridge.Bridge]},
-    {AshDSPex.PythonBridge.Monitor, [name: AshDSPex.PythonBridge.Monitor]}
+    {DSPex.PythonBridge.Bridge, [name: DSPex.PythonBridge.Bridge]},
+    {DSPex.PythonBridge.Monitor, [name: DSPex.PythonBridge.Monitor]}
   ]
 ```
 
@@ -57,8 +57,8 @@ def init(init_arg) do
   monitor_name = :"#{supervisor_name}_Monitor"
   
   children = [
-    {AshDSPex.PythonBridge.Bridge, [name: bridge_name]},
-    {AshDSPex.PythonBridge.Monitor, [name: monitor_name, bridge_name: bridge_name]}
+    {DSPex.PythonBridge.Bridge, [name: bridge_name]},
+    {DSPex.PythonBridge.Monitor, [name: monitor_name, bridge_name: bridge_name]}
   ]
   
   Supervisor.init(children, strategy: :one_for_one)
@@ -257,7 +257,7 @@ invalid_config = Map.put(original_config, :default_timeout, -1000)  # FAILS
 ```elixir
 # Ensure config functions return maps
 def get_bridge_config do
-  config = Application.get_env(:ash_dspex, :python_bridge, [])
+  config = Application.get_env(:dspex, :python_bridge, [])
   Map.new(config)  # Convert to map
 end
 

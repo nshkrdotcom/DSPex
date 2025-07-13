@@ -81,7 +81,7 @@ From DSPY_ADAPTER_LAYER_ARCHITECTURE.md with testing integration:
 ### ENHANCED ADAPTER BEHAVIOR DEFINITION
 
 ```elixir
-defmodule AshDSPy.Adapters.Adapter do
+defmodule DSPex.Adapters.Adapter do
   @moduledoc """
   Behavior for DSPy adapters with 3-layer testing support.
   """
@@ -144,18 +144,18 @@ end
 
 **Registry with Test Mode Integration:**
 ```elixir
-defmodule AshDSPy.Adapters.Registry do
+defmodule DSPex.Adapters.Registry do
   @moduledoc """
   Registry for managing available adapters with 3-layer test integration.
   """
   
-  @default_adapter AshDSPy.Adapters.PythonPort
+  @default_adapter DSPex.Adapters.PythonPort
   
   @adapters %{
-    python_port: AshDSPy.Adapters.PythonPort,
-    bridge_mock: AshDSPy.Adapters.BridgeMock,  # New for Layer 2
-    mock: AshDSPy.Adapters.Mock,
-    native: AshDSPy.Adapters.Native  # Future implementation
+    python_port: DSPex.Adapters.PythonPort,
+    bridge_mock: DSPex.Adapters.BridgeMock,  # New for Layer 2
+    mock: DSPex.Adapters.Mock,
+    native: DSPex.Adapters.Native  # Future implementation
   }
   
   @test_layer_adapters %{
@@ -169,7 +169,7 @@ defmodule AshDSPy.Adapters.Registry do
     resolved_adapter = 
       adapter_name || 
       get_test_mode_adapter() || 
-      Application.get_env(:ash_dspy, :adapter) ||
+      Application.get_env(:dspex, :adapter) ||
       @default_adapter
     
     case resolved_adapter do
@@ -186,7 +186,7 @@ defmodule AshDSPy.Adapters.Registry do
   
   defp get_test_mode_adapter do
     if Mix.env() == :test do
-      case AshDSPy.Testing.TestMode.current_test_mode() do
+      case DSPex.Testing.TestMode.current_test_mode() do
         test_mode when is_map_key(@test_layer_adapters, test_mode) ->
           Map.get(@test_layer_adapters, test_mode)
         _ -> 
@@ -245,7 +245,7 @@ end
 
 **New Adapter for Protocol Testing:**
 ```elixir
-defmodule AshDSPy.Adapters.BridgeMock do
+defmodule DSPex.Adapters.BridgeMock do
   @moduledoc """
   Bridge mock adapter for Layer 2 protocol testing.
   
@@ -254,10 +254,10 @@ defmodule AshDSPy.Adapters.BridgeMock do
   to simulate the Python bridge communication layer.
   """
   
-  @behaviour AshDSPy.Adapters.Adapter
+  @behaviour DSPex.Adapters.Adapter
   
-  alias AshDSPy.Testing.BridgeMockServer
-  alias AshDSPy.PythonBridge.Protocol
+  alias DSPex.Testing.BridgeMockServer
+  alias DSPex.PythonBridge.Protocol
   
   @impl true
   def create_program(config) do
@@ -395,14 +395,14 @@ end
 
 **Enhanced Mock Implementation:**
 ```elixir
-defmodule AshDSPy.Adapters.Mock do
+defmodule DSPex.Adapters.Mock do
   @moduledoc """
   Mock adapter for Layer 1 fast testing.
   
   Enhanced with test capabilities and integration with 3-layer architecture.
   """
   
-  @behaviour AshDSPy.Adapters.Adapter
+  @behaviour DSPex.Adapters.Adapter
   
   use GenServer
   
@@ -462,17 +462,17 @@ end
 
 **Enhanced for Integration Testing:**
 ```elixir
-defmodule AshDSPy.Adapters.PythonPort do
+defmodule DSPex.Adapters.PythonPort do
   @moduledoc """
   Python port adapter for Layer 3 full integration testing.
   
   Enhanced with test capabilities and robust error handling.
   """
   
-  @behaviour AshDSPy.Adapters.Adapter
+  @behaviour DSPex.Adapters.Adapter
   
-  alias AshDSPy.PythonBridge.Bridge
-  alias AshDSPy.Adapters.TypeConverter
+  alias DSPex.PythonBridge.Bridge
+  alias DSPex.Adapters.TypeConverter
   
   # ... existing core implementations ...
   
@@ -509,7 +509,7 @@ end
 
 **Updated TestMode Module:**
 ```elixir
-defmodule AshDSPy.Testing.TestMode do
+defmodule DSPex.Testing.TestMode do
   # ... existing functions ...
   
   @doc """
@@ -517,16 +517,16 @@ defmodule AshDSPy.Testing.TestMode do
   Now uses the Registry system for consistency.
   """
   @spec get_adapter_module() :: 
-    AshDSPy.Adapters.Mock | AshDSPy.Adapters.BridgeMock | AshDSPy.Adapters.PythonPort
+    DSPex.Adapters.Mock | DSPex.Adapters.BridgeMock | DSPex.Adapters.PythonPort
   def get_adapter_module do
-    AshDSPy.Adapters.Registry.get_adapter()
+    DSPex.Adapters.Registry.get_adapter()
   end
   
   def get_adapter_for_current_layer do
     case effective_test_mode() do
-      :mock_adapter -> AshDSPy.Adapters.Registry.get_adapter_for_test_layer(:layer_1)
-      :bridge_mock -> AshDSPy.Adapters.Registry.get_adapter_for_test_layer(:layer_2)
-      :full_integration -> AshDSPy.Adapters.Registry.get_adapter_for_test_layer(:layer_3)
+      :mock_adapter -> DSPex.Adapters.Registry.get_adapter_for_test_layer(:layer_1)
+      :bridge_mock -> DSPex.Adapters.Registry.get_adapter_for_test_layer(:layer_2)
+      :full_integration -> DSPex.Adapters.Registry.get_adapter_for_test_layer(:layer_3)
     end
   end
   
@@ -579,7 +579,7 @@ Based on the complete context above, implement the adapter pattern system with *
 
 ### FILE STRUCTURE TO CREATE:
 ```
-lib/ash_dspy/adapters/
+lib/dspex/adapters/
 ├── adapter.ex             # Core behavior definition with test layer support
 ├── python_port.ex         # Python bridge adapter (Layer 3)
 ├── bridge_mock.ex         # NEW: Bridge mock adapter (Layer 2)
@@ -590,7 +590,7 @@ lib/ash_dspy/adapters/
 ├── error_handler.ex      # Error handling and context
 └── supervisor.ex         # Adapter supervision
 
-test/ash_dspy/adapters/
+test/dspex/adapters/
 ├── behavior_test.exs     # Adapter behavior compliance tests
 ├── python_port_test.exs  # Python port adapter tests (Layer 3 tagged)
 ├── bridge_mock_test.exs  # NEW: Bridge mock adapter tests (Layer 2 tagged)
@@ -601,32 +601,32 @@ test/ash_dspy/adapters/
 
 ### SPECIFIC IMPLEMENTATION REQUIREMENTS:
 
-1. **Enhanced Adapter Behavior** (`lib/ash_dspy/adapters/adapter.ex`):
+1. **Enhanced Adapter Behavior** (`lib/dspex/adapters/adapter.ex`):
    - Core behavior with test layer support callbacks
    - Test capability introspection
    - Layer compatibility validation
    - Performance characteristics metadata
 
-2. **BridgeMock Adapter** (`lib/ash_dspy/adapters/bridge_mock.ex`) **[NEW]**:
+2. **BridgeMock Adapter** (`lib/dspex/adapters/bridge_mock.ex`) **[NEW]**:
    - Layer 2 protocol testing without Python
    - Integration with existing BridgeMockServer
    - Wire protocol format validation
    - Deterministic mock responses for protocol testing
 
-3. **Test-Integrated Registry** (`lib/ash_dspy/adapters/registry.ex`):
+3. **Test-Integrated Registry** (`lib/dspex/adapters/registry.ex`):
    - Automatic adapter selection based on TEST_MODE
    - Test layer compatibility validation
    - Integration with existing TestMode module
    - Environment-aware adapter selection
 
-4. **Enhanced Mock Adapter** (`lib/ash_dspy/adapters/mock.ex`):
+4. **Enhanced Mock Adapter** (`lib/dspex/adapters/mock.ex`):
    - Test capability metadata
    - Configurable behavior for test scenarios
    - Integration with Layer 1 requirements
    - Call logging and state inspection
 
 5. **Updated TestMode Integration**:
-   - Update `AshDSPy.Testing.TestMode.get_adapter_module()` to use Registry
+   - Update `DSPex.Testing.TestMode.get_adapter_module()` to use Registry
    - Add adapter validation for test layers
    - Maintain backwards compatibility with existing test helpers
 

@@ -271,7 +271,7 @@ class ToolExecutor:
 ### CORE REACT ENGINE
 
 ```elixir
-defmodule AshDSPy.React.Engine do
+defmodule DSPex.React.Engine do
   @moduledoc """
   Core React pattern engine with tool integration and workflow orchestration.
   
@@ -287,8 +287,8 @@ defmodule AshDSPy.React.Engine do
   use GenServer
   require Logger
   
-  alias AshDSPy.{Signature, Prediction}
-  alias AshDSPy.React.{
+  alias DSPex.{Signature, Prediction}
+  alias DSPex.React.{
     ToolRegistry,
     ActionParser,
     ContextManager,
@@ -848,7 +848,7 @@ end
 ### TOOL REGISTRY SYSTEM
 
 ```elixir
-defmodule AshDSPy.React.ToolRegistry do
+defmodule DSPex.React.ToolRegistry do
   @moduledoc """
   Registry for React tools with schema validation and discovery.
   """
@@ -1078,7 +1078,7 @@ end
 ### ACTION PARSER
 
 ```elixir
-defmodule AshDSPy.React.ActionParser do
+defmodule DSPex.React.ActionParser do
   @moduledoc """
   Parses React action strings into structured format.
   """
@@ -1238,7 +1238,7 @@ end
 ### CONTEXT MANAGER
 
 ```elixir
-defmodule AshDSPy.React.ContextManager do
+defmodule DSPex.React.ContextManager do
   @moduledoc """
   Manages execution context for React workflows.
   """
@@ -1442,7 +1442,7 @@ end
 ### WORKFLOW ORCHESTRATOR
 
 ```elixir
-defmodule AshDSPy.React.WorkflowOrchestrator do
+defmodule DSPex.React.WorkflowOrchestrator do
   @moduledoc """
   Orchestrates complex multi-step React workflows.
   """
@@ -1588,7 +1588,7 @@ defmodule AshDSPy.React.WorkflowOrchestrator do
     signature = step.config.signature
     react_opts = Map.get(step.config, :options, [])
     
-    case AshDSPy.React.Engine.react(signature, inputs, react_opts) do
+    case DSPex.React.Engine.react(signature, inputs, react_opts) do
       {:ok, result} -> {:ok, result}
       error -> error
     end
@@ -1763,7 +1763,7 @@ end
 ### ERROR RECOVERY
 
 ```elixir
-defmodule AshDSPy.React.ErrorRecovery do
+defmodule DSPex.React.ErrorRecovery do
   @moduledoc """
   Error recovery strategies for React workflows.
   """
@@ -1983,7 +1983,7 @@ end
 ### BUILT-IN TOOLS
 
 ```elixir
-defmodule AshDSPy.React.Tools.Builtin do
+defmodule DSPex.React.Tools.Builtin do
   @moduledoc """
   Built-in tools for React workflows.
   """
@@ -2150,14 +2150,14 @@ end
 ### ASH FRAMEWORK INTEGRATION
 
 ```elixir
-defmodule AshDSPy.React.AshIntegration do
+defmodule DSPex.React.AshIntegration do
   @moduledoc """
   Ash framework integration for React workflows.
   """
   
   use Ash.Resource.Change
   
-  alias AshDSPy.React.Engine
+  alias DSPex.React.Engine
   
   @doc """
   Ash change for React workflow execution.
@@ -2220,11 +2220,11 @@ end
 ### COMPREHENSIVE TESTING
 
 ```elixir
-defmodule AshDSPy.React.EngineTest do
+defmodule DSPex.React.EngineTest do
   use ExUnit.Case, async: true
   
-  alias AshDSPy.React.Engine
-  alias AshDSPy.Signature
+  alias DSPex.React.Engine
+  alias DSPex.Signature
   
   setup do
     {:ok, engine} = Engine.start_link(test_mode: true)
@@ -2406,10 +2406,10 @@ defmodule AshDSPy.React.EngineTest do
       
       inputs = %{problem: "Calculate 2+2"}
       
-      {:ok, orchestrator} = AshDSPy.React.WorkflowOrchestrator.start_link()
+      {:ok, orchestrator} = DSPex.React.WorkflowOrchestrator.start_link()
       
       assert {:ok, result} = 
-        AshDSPy.React.WorkflowOrchestrator.execute_workflow(
+        DSPex.React.WorkflowOrchestrator.execute_workflow(
           orchestrator,
           workflow_def,
           inputs
@@ -2422,7 +2422,7 @@ defmodule AshDSPy.React.EngineTest do
   
   describe "action parsing" do
     test "parses various action formats" do
-      alias AshDSPy.React.ActionParser
+      alias DSPex.React.ActionParser
       
       # Tool action
       assert {:ok, action} = ActionParser.parse(~s|Action[tool](param: "value")|)
@@ -2445,7 +2445,7 @@ defmodule AshDSPy.React.EngineTest do
   
   describe "context management" do
     test "maintains context across iterations" do
-      alias AshDSPy.React.ContextManager
+      alias DSPex.React.ContextManager
       
       {:ok, manager} = ContextManager.start_link()
       
@@ -2508,7 +2508,7 @@ end
 
 ```elixir
 # config/config.exs
-config :ash_dspy, :react,
+config :dspex, :react,
   # Engine configuration
   max_iterations: 5,
   timeout_per_action: 30_000,

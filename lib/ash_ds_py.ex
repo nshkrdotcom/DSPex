@@ -1,8 +1,8 @@
-defmodule AshDSPex do
+defmodule DSPex do
   @moduledoc """
-  AshDSPex: Native Elixir DSPy integration with the Ash framework.
+  DSPex: Native Elixir DSPy integration with the Ash framework.
 
-  AshDSPex provides a signature system that enables native Elixir syntax for
+  DSPex provides a signature system that enables native Elixir syntax for
   defining DSPy programs, with seamless integration into the Ash framework
   for domain modeling and resource management.
 
@@ -18,7 +18,7 @@ defmodule AshDSPex do
   ## Quick Start
 
       defmodule QA do
-        use AshDSPex.Signature
+        use DSPex.Signature
         
         signature question: :string -> answer: :string
       end
@@ -31,20 +31,20 @@ defmodule AshDSPex do
 
   ## Architecture
 
-  AshDSPex follows a modular architecture:
+  DSPex follows a modular architecture:
 
-  - `AshDSPex.Signature` - Core signature behavior and DSL
-  - `AshDSPex.Signature.Compiler` - Compile-time processing
-  - `AshDSPex.Signature.TypeParser` - Type system parser
-  - `AshDSPex.Signature.Validator` - Runtime validation
-  - `AshDSPex.Signature.JsonSchema` - Provider schema generation
+  - `DSPex.Signature` - Core signature behavior and DSL
+  - `DSPex.Signature.Compiler` - Compile-time processing
+  - `DSPex.Signature.TypeParser` - Type system parser
+  - `DSPex.Signature.Validator` - Runtime validation
+  - `DSPex.Signature.JsonSchema` - Provider schema generation
   """
 
   @doc """
-  Returns the version of AshDSPex.
+  Returns the version of DSPex.
   """
   @spec version() :: String.t()
   def version do
-    Application.spec(:ash_dspex, :vsn) |> to_string()
+    Application.spec(:dspex, :vsn) |> to_string()
   end
 end

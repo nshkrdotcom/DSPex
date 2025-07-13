@@ -10,11 +10,11 @@ Stage 1 implements the foundational components for DSPy-Ash integration. Each pr
 **File**: `prompts/stage1_01_signature_system.md`
 **Focus**: Implement the core signature behavior, DSL, and compile-time processing
 **Key Components**:
-- `AshDSPy.Signature` behavior module
-- `AshDSPy.Signature.DSL` macro system  
-- `AshDSPy.Signature.Compiler` compile-time processing
-- `AshDSPy.Signature.TypeParser` type system
-- `AshDSPy.Signature.Validator` runtime validation
+- `DSPex.Signature` behavior module
+- `DSPex.Signature.DSL` macro system  
+- `DSPex.Signature.Compiler` compile-time processing
+- `DSPex.Signature.TypeParser` type system
+- `DSPex.Signature.Validator` runtime validation
 
 **Required Context**:
 - Complete signature syntax from 1100-1102 docs
@@ -43,8 +43,8 @@ Stage 1 implements the foundational components for DSPy-Ash integration. Each pr
 **File**: `prompts/stage1_03_python_bridge.md`
 **Focus**: Implement port-based communication with Python DSPy
 **Key Components**:
-- `AshDSPy.PythonBridge.Bridge` GenServer
-- `AshDSPy.PythonBridge.Protocol` wire protocol
+- `DSPex.PythonBridge.Bridge` GenServer
+- `DSPex.PythonBridge.Protocol` wire protocol
 - Port management and supervision
 - Request/response handling with timeouts
 
@@ -59,9 +59,9 @@ Stage 1 implements the foundational components for DSPy-Ash integration. Each pr
 **File**: `prompts/stage1_04_adapter_pattern.md`
 **Focus**: Create pluggable adapter system for multiple DSPy backends
 **Key Components**:
-- `AshDSPy.Adapters.Adapter` behavior definition
-- `AshDSPy.Adapters.PythonPort` implementation
-- `AshDSPy.Adapters.Native` stub for future
+- `DSPex.Adapters.Adapter` behavior definition
+- `DSPex.Adapters.PythonPort` implementation
+- `DSPex.Adapters.Native` stub for future
 - Configuration and registry system
 
 **Required Context**:
@@ -75,10 +75,10 @@ Stage 1 implements the foundational components for DSPy-Ash integration. Each pr
 **File**: `prompts/stage1_05_ash_resources.md`
 **Focus**: Create foundational Ash resources for ML operations
 **Key Components**:
-- `AshDSPy.ML.Domain` domain definition
-- `AshDSPy.ML.Signature` resource
-- `AshDSPy.ML.Program` resource
-- `AshDSPy.ML.Execution` resource (basic)
+- `DSPex.ML.Domain` domain definition
+- `DSPex.ML.Signature` resource
+- `DSPex.ML.Program` resource
+- `DSPex.ML.Execution` resource (basic)
 
 **Required Context**:
 - Complete Ash resource documentation
@@ -107,7 +107,7 @@ Stage 1 implements the foundational components for DSPy-Ash integration. Each pr
 **File**: `prompts/stage1_07_application_setup.md`
 **Focus**: Set up the complete application structure and supervision
 **Key Components**:
-- `AshDSPy.Application` with proper supervision
+- `DSPex.Application` with proper supervision
 - Configuration management
 - Database setup and migrations
 - Development/test environment setup

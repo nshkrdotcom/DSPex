@@ -9,7 +9,7 @@
 
   MOCK ADAPTER ARCHITECTURE OVERVIEW
 
-  From ASH_DSPY_INTEGRATION_ARCHITECTURE.md and stage1_03_adapter_pattern.md:
+  From DSPEX_INTEGRATION_ARCHITECTURE.md and stage1_03_adapter_pattern.md:
 
   Mock Adapter Philosophy:
   - Complete implementation of adapter behavior without external dependencies
@@ -21,7 +21,7 @@
 
   Mock Adapter Requirements:
   ┌─────────────────────────────────────────────────────────────┐
-  │                 AshDSPy.Adapters.Mock                      │
+  │                 DSPex.Adapters.Mock                      │
   ├─────────────────────────────────────────────────────────────┤
   │                                                             │
   │  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐│
@@ -38,7 +38,7 @@
 
   From stage1_03_adapter_pattern.md:
 
-  @behaviour AshDSPy.Adapters.Adapter
+  @behaviour DSPex.Adapters.Adapter
 
   @callback create_program(program_config()) :: {:ok, String.t()} | {:error, term()}
   @callback execute_program(String.t(), map()) :: {:ok, map()} | {:error, term()}
@@ -51,7 +51,7 @@
 
   1. Core Mock Adapter GenServer
 
-  defmodule AshDSPy.Adapters.Mock do
+  defmodule DSPex.Adapters.Mock do
     @moduledoc """
     Mock adapter for DSPy operations providing deterministic responses
     for testing and development without external dependencies.
@@ -65,7 +65,7 @@
     - Thread-safe concurrent operation support
     """
 
-    @behaviour AshDSPy.Adapters.Adapter
+    @behaviour DSPex.Adapters.Adapter
     use GenServer
 
     require Logger
@@ -860,12 +860,12 @@
 
   2. Mock Adapter Test Helpers
 
-  defmodule AshDSPy.Adapters.Mock.TestHelpers do
+  defmodule DSPex.Adapters.Mock.TestHelpers do
     @moduledoc """
     Test helpers for configuring and using the mock adapter in tests.
     """
 
-    alias AshDSPy.Adapters.Mock
+    alias DSPex.Adapters.Mock
 
     @doc """
     Set up mock adapter for testing with default configuration.
@@ -992,7 +992,7 @@
 
   3. Mock Adapter Configuration
 
-  defmodule AshDSPy.Adapters.Mock.Config do
+  defmodule DSPex.Adapters.Mock.Config do
     @moduledoc """
     Configuration management for mock adapter scenarios and behaviors.
     """
@@ -1081,11 +1081,11 @@
 
   Test Usage Examples
 
-  defmodule AshDSPy.MockAdapterTest do
+  defmodule DSPex.MockAdapterTest do
     use ExUnit.Case
 
-    alias AshDSPy.Adapters.Mock
-    alias AshDSPy.Adapters.Mock.{TestHelpers, Config}
+    alias DSPex.Adapters.Mock
+    alias DSPex.Adapters.Mock.{TestHelpers, Config}
 
     setup do
       TestHelpers.setup_mock_adapter()
@@ -1096,7 +1096,7 @@
     test "basic program creation and execution" do
       # Create test signature
       defmodule TestSignature do
-        use AshDSPy.Signature
+        use DSPex.Signature
         signature question: :string -> answer: :string
       end
 
@@ -1151,17 +1151,17 @@
   INTEGRATION WITH ADAPTER REGISTRY
 
   # config/test.exs
-  config :ash_dspy, :adapter, AshDSPy.Adapters.Mock
+  config :dspex, :adapter, DSPex.Adapters.Mock
 
   # In your adapter registry
-  defmodule AshDSPy.Adapters.Registry do
-    def get_adapter(:mock), do: AshDSPy.Adapters.Mock
-    def get_adapter(:python_port), do: AshDSPy.Adapters.PythonPort
+  defmodule DSPex.Adapters.Registry do
+    def get_adapter(:mock), do: DSPex.Adapters.Mock
+    def get_adapter(:python_port), do: DSPex.Adapters.PythonPort
     def get_adapter(atom) when is_atom(atom), do: get_adapter_module(atom)
 
-    defp get_adapter_module(:mock), do: AshDSPy.Adapters.Mock
+    defp get_adapter_module(:mock), do: DSPex.Adapters.Mock
     defp get_adapter_module(type) do
-      Application.get_env(:ash_dspy, :adapter, AshDSPy.Adapters.Mock)
+      Application.get_env(:dspex, :adapter, DSPex.Adapters.Mock)
     end
   end
 
@@ -1169,13 +1169,13 @@
 
   File Structure to Create:
 
-  lib/ash_dspy/adapters/
+  lib/dspex/adapters/
   ├── mock.ex                    # Main mock adapter implementation
   ├── mock/
   │   ├── test_helpers.ex        # Test helper functions
   │   └── config.ex              # Scenario and configuration management
 
-  test/ash_dspy/adapters/
+  test/dspex/adapters/
   ├── mock_test.ex               # Comprehensive mock adapter tests
   ├── mock_integration_test.exs  # Integration tests with other components
   └── mock_scenarios_test.exs    # Scenario-based testing

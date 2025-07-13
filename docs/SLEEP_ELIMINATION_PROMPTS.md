@@ -13,13 +13,13 @@ Before implementing any fixes, you MUST thoroughly read and understand these fil
 ### 1. Testing Standards Reference
 ```bash
 # Read the comprehensive testing guide that defines all patterns
-cat /home/home/p/g/n/ashframework/ash_dspex/code-standards/UNIFIED_TESTING_GUIDE.md
+cat /home/home/p/g/n/ashframework/dspex/code-standards/UNIFIED_TESTING_GUIDE.md
 ```
 
 ### 2. Implementation Plan Overview
 ```bash
 # Read the complete fix plan with detailed analysis
-cat /home/home/p/g/n/ashframework/ash_dspex/ash_dspex/TESTING_INFRASTRUCTURE_FIX_PLAN.md
+cat /home/home/p/g/n/ashframework/dspex/dspex/TESTING_INFRASTRUCTURE_FIX_PLAN.md
 ```
 
 ### 3. Current Sleep Usage Analysis
@@ -31,7 +31,7 @@ rg "Process\.sleep" --type elixir -n
 ### 4. Test Failure Context
 ```bash
 # Understand the broader test failure context
-cat /home/home/p/g/n/ashframework/ash_dspex/ash_dspex/STAGE1_02_PYTHON_BRIDGE_FIXES_ROUND2.md
+cat /home/home/p/g/n/ashframework/dspex/dspex/STAGE1_02_PYTHON_BRIDGE_FIXES_ROUND2.md
 ```
 
 **⚠️ CRITICAL**: Do not proceed with any implementation until you have read and understood all four references above. The patterns in UNIFIED_TESTING_GUIDE.md are mandatory and must be followed exactly.
@@ -45,9 +45,9 @@ cat /home/home/p/g/n/ashframework/ash_dspex/ash_dspex/STAGE1_02_PYTHON_BRIDGE_FI
 **Task**: Fix the 3 critical Process.sleep() instances in production code that are causing reliability issues.
 
 **Files to Fix**:
-- `lib/ash_dspex/python_bridge/bridge.ex:393`
-- `lib/ash_dspex/python_bridge/supervisor.ex:299` 
-- `lib/ash_dspex/python_bridge/supervisor.ex:330`
+- `lib/dspex/python_bridge/bridge.ex:393`
+- `lib/dspex/python_bridge/supervisor.ex:299` 
+- `lib/dspex/python_bridge/supervisor.ex:330`
 
 **Implementation Requirements**:
 1. Replace all Process.sleep() with event-driven coordination
@@ -103,7 +103,7 @@ cat /home/home/p/g/n/ashframework/ash_dspex/ash_dspex/STAGE1_02_PYTHON_BRIDGE_FI
 
 **Task**: Replace all 10 Process.sleep() instances in integration tests with event-driven patterns.
 
-**File to Fix**: `test/ash_dspex/python_bridge/integration_test.exs`
+**File to Fix**: `test/dspex/python_bridge/integration_test.exs`
 
 **Sleep Instances to Replace**:
 - Line 21: `Process.sleep(500)` - Bridge startup wait
@@ -118,7 +118,7 @@ cat /home/home/p/g/n/ashframework/ash_dspex/ash_dspex/STAGE1_02_PYTHON_BRIDGE_FI
 - Line 342: `Process.sleep(1000)` - Bridge startup wait
 
 **Implementation Requirements**:
-1. Use `AshDSPex.UnifiedTestFoundation` with `:supervision_testing` mode
+1. Use `DSPex.UnifiedTestFoundation` with `:supervision_testing` mode
 2. Replace all sleeps with `wait_for_bridge_ready/3` calls
 3. Use `bridge_call_with_retry/5` for all bridge communications
 4. Implement proper test isolation with unique process names
@@ -136,7 +136,7 @@ cat /home/home/p/g/n/ashframework/ash_dspex/ash_dspex/STAGE1_02_PYTHON_BRIDGE_FI
 
 **Task**: Replace all 8 Process.sleep() instances in monitor tests with event-driven health coordination.
 
-**File to Fix**: `test/ash_dspex/python_bridge/monitor_test.exs`
+**File to Fix**: `test/dspex/python_bridge/monitor_test.exs`
 
 **Sleep Instances to Replace**:
 - Line 93: `Process.sleep(100)` - Health check wait
@@ -167,7 +167,7 @@ cat /home/home/p/g/n/ashframework/ash_dspex/ash_dspex/STAGE1_02_PYTHON_BRIDGE_FI
 
 **Task**: Replace all 7 Process.sleep() instances in supervisor tests with process lifecycle coordination.
 
-**File to Fix**: `test/ash_dspex/python_bridge/supervisor_test.exs`
+**File to Fix**: `test/dspex/python_bridge/supervisor_test.exs`
 
 **Sleep Instances to Replace**:
 - Line 129: `Process.sleep(100)` - Child restart wait
@@ -198,8 +198,8 @@ cat /home/home/p/g/n/ashframework/ash_dspex/ash_dspex/STAGE1_02_PYTHON_BRIDGE_FI
 **Task**: Fix the remaining Process.sleep() instances in bridge tests and gemini integration test.
 
 **Files to Fix**:
-- `test/ash_dspex/python_bridge/bridge_test.exs` (2 instances)
-- `test/ash_dspex/gemini_integration_test.exs` (1 instance)
+- `test/dspex/python_bridge/bridge_test.exs` (2 instances)
+- `test/dspex/gemini_integration_test.exs` (1 instance)
 
 **Sleep Instances**:
 - `bridge_test.exs:80`: `Process.sleep(100)` - Initialization wait
@@ -226,8 +226,8 @@ cat /home/home/p/g/n/ashframework/ash_dspex/ash_dspex/STAGE1_02_PYTHON_BRIDGE_FI
 **Task**: Implement chaos testing and performance benchmarking to validate the robustness of the event-driven approach.
 
 **Files to Create**:
-- `test/ash_dspex/python_bridge/chaos_test.exs`
-- `test/ash_dspex/python_bridge/performance_test.exs`
+- `test/dspex/python_bridge/chaos_test.exs`
+- `test/dspex/python_bridge/performance_test.exs`
 
 **Implementation Requirements**:
 1. Create chaos testing that randomly kills processes and verifies recovery
@@ -284,7 +284,7 @@ rg "name: :[a-z_]+\b" --type elixir | grep -v "unique_integer" && exit 1
 for i in {1..5}; do mix test --seed $RANDOM || exit 1; done
 
 # Performance benchmarks
-mix test test/ash_dspex/python_bridge/performance_test.exs
+mix test test/dspex/python_bridge/performance_test.exs
 ```
 
 **Success Criteria**:

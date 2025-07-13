@@ -10,10 +10,10 @@ All warnings observed during test execution are **intentional** and result from 
 
 ### 1. "Received Erlang term data instead of JSON: 79 bytes"
 
-**Source:** `lib/ash_dspex/python_bridge/protocol.ex:120`
+**Source:** `lib/dspex/python_bridge/protocol.ex:120`
 
 **Root Cause:**
-- Test case `test/ash_dspex/python_bridge/protocol_test.exs:103` intentionally sends Erlang binary term format data
+- Test case `test/dspex/python_bridge/protocol_test.exs:103` intentionally sends Erlang binary term format data
 - The test sends data starting with byte 131 (Erlang term format marker) to verify protocol robustness
 
 **Resolution:** No action needed - working as designed
@@ -28,10 +28,10 @@ end
 
 ### 2. "Malformed response structure for request 1: missing required fields"
 
-**Source:** `lib/ash_dspex/python_bridge/protocol.ex:141`
+**Source:** `lib/dspex/python_bridge/protocol.ex:141`
 
 **Root Cause:**
-- Test case `test/ash_dspex/python_bridge/protocol_test.exs:87` sends incomplete JSON responses
+- Test case `test/dspex/python_bridge/protocol_test.exs:87` sends incomplete JSON responses
 - Tests protocol's handling of responses missing required fields like "success" or "result"
 
 **Resolution:** No action needed - validates error handling
@@ -46,10 +46,10 @@ end
 
 ### 3. "JSON decode failed at position 0, token: nil"
 
-**Source:** `lib/ash_dspex/python_bridge/protocol.ex:156`
+**Source:** `lib/dspex/python_bridge/protocol.ex:156`
 
 **Root Cause:**
-- Test case `test/ash_dspex/python_bridge/protocol_test.exs:81` sends invalid JSON string "not json"
+- Test case `test/dspex/python_bridge/protocol_test.exs:81` sends invalid JSON string "not json"
 - Verifies proper handling of malformed JSON input
 
 **Resolution:** No action needed - confirms JSON parsing error handling
@@ -63,10 +63,10 @@ end
 
 ### 4. "Invalid TEST_MODE: invalid_mode, using default: mock_adapter"
 
-**Source:** `lib/ash_dspex/testing/test_mode.ex:64,69`
+**Source:** `lib/dspex/testing/test_mode.ex:64,69`
 
 **Root Cause:**
-- Test case `test/ash_dspex/testing/test_mode_test.exs:72` sets TEST_MODE="invalid_mode"
+- Test case `test/dspex/testing/test_mode_test.exs:72` sets TEST_MODE="invalid_mode"
 - Verifies system falls back to default mode when given invalid configuration
 
 **Resolution:** No action needed - confirms configuration validation
@@ -81,24 +81,24 @@ end
 
 ### 5. "Configured Python 'nonexistent_python' not found, using '/home/home/.pyenv/shims/python3'"
 
-**Source:** `lib/ash_dspex/python_bridge/environment_check.ex:189`
+**Source:** `lib/dspex/python_bridge/environment_check.ex:189`
 
 **Root Cause:**
 - Multiple tests configure non-existent Python executable paths
 - Tests verify fallback to system Python when configured executable is missing
 
 **Test Locations:**
-- `test/ash_dspex/python_bridge/environment_check_test.exs:31`
-- `test/ash_dspex/python_bridge/bridge_test.exs:39`
+- `test/dspex/python_bridge/environment_check_test.exs:31`
+- `test/dspex/python_bridge/bridge_test.exs:39`
 
 **Resolution:** No action needed - validates Python path fallback logic
 
 ### 6. "Invalid integer value for default_timeout: invalid_number"
 
-**Source:** `lib/ash_dspex/config.ex:291`
+**Source:** `lib/dspex/config.ex:291`
 
 **Root Cause:**
-- Test case `test/ash_dspex/config_test.exs:183` sets ASH_DSPEX_BRIDGE_TIMEOUT="invalid_number"
+- Test case `test/dspex/config_test.exs:183` sets DSPEX_BRIDGE_TIMEOUT="invalid_number"
 - Verifies configuration system handles non-integer timeout values gracefully
 
 **Resolution:** No action needed - confirms configuration validation
@@ -106,7 +106,7 @@ end
 ```elixir
 # The test that triggers this warning:
 test "handles invalid environment variable values" do
-  System.put_env("ASH_DSPEX_BRIDGE_TIMEOUT", "invalid_number")
+  System.put_env("DSPEX_BRIDGE_TIMEOUT", "invalid_number")
   config = Config.load()
   assert config.python_bridge.default_timeout == 30_000  # Falls back to default
 end

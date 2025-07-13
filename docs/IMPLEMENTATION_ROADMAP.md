@@ -94,13 +94,13 @@ This roadmap provides a complete implementation plan for the minimum viable DSPy
 ```elixir
 # Simple Q&A
 defmodule QASignature do
-  use AshDSPy.Signature
+  use DSPex.Signature
   signature question: :string -> answer: :string, confidence: :float
 end
 
 # Complex RAG
 defmodule RAGSignature do  
-  use AshDSPy.Signature
+  use DSPex.Signature
   signature query: :string, documents: list[:string] ->
     answer: :string,
     sources: list[:string], 
@@ -109,7 +109,7 @@ end
 
 # Multi-input reasoning
 defmodule ReasoningSignature do
-  use AshDSPy.Signature
+  use DSPex.Signature
   signature problem: :string, context: :string ->
     reasoning: :reasoning_chain,
     answer: :string,
@@ -152,13 +152,13 @@ def validate_inputs(data), do: Exdantic.validate(input_schema, data)
 
 ```elixir
 # Ash Query -> Custom Data Layer -> DSPy Adapter -> Python/Native
-AshDSPy.ML.Program.execute(program, %{inputs: %{question: "What is AI?"}})
+DSPex.ML.Program.execute(program, %{inputs: %{question: "What is AI?"}})
   ↓ 
-AshDSPy.DataLayer.run_query(query, resource, context)
+DSPex.DataLayer.run_query(query, resource, context)
   ↓
-AshDSPy.Adapters.PythonPort.execute_program(program_id, inputs)
+DSPex.Adapters.PythonPort.execute_program(program_id, inputs)
   ↓  
-AshDSPy.PythonBridge.call(:execute, %{program_id: id, inputs: inputs})
+DSPex.PythonBridge.call(:execute, %{program_id: id, inputs: inputs})
   ↓
 Python DSPy execution via port communication
   ↓
@@ -174,7 +174,7 @@ Python DSPy execution via port communication
 # - Model availability and health
 # - Input characteristics
 
-case AshDSPy.ML.ModelRouter.select_model(program, inputs) do
+case DSPex.ML.ModelRouter.select_model(program, inputs) do
   {:ok, program_model} ->
     # Route to optimal model (GPT-4, Claude, local, etc.)
     adapter = get_adapter_for_model(program_model.model)
@@ -302,7 +302,7 @@ end
 ```bash
 # 1. Clone and setup
 git clone <repository>
-cd ash_dspy
+cd dspex
 mix deps.get
 mix ecto.setup
 
@@ -311,7 +311,7 @@ mix phx.server
 
 # 3. Create your first signature
 defmodule MySignature do
-  use AshDSPy.Signature
+  use DSPex.Signature
   signature question: :string -> answer: :string
 end
 

@@ -14,7 +14,7 @@ Total Issues: 13
 ## Issue-by-Issue Analysis
 
 ### 1. Environment Check Contract Supertype
-**File**: `lib/ash_dspex/python_bridge/environment_check.ex:168`
+**File**: `lib/dspex/python_bridge/environment_check.ex:168`
 **Issue**: Type specification is too broad
 ```elixir
 # Current - Too broad
@@ -31,7 +31,7 @@ Total Issues: 13
 **Fix**: Tighten type specification to match actual return structure.
 
 ### 2. Monitor Unmatched Return
-**File**: `lib/ash_dspex/python_bridge/monitor.ex:271`
+**File**: `lib/dspex/python_bridge/monitor.ex:271`
 **Issue**: Expression returns unmatched value
 ```elixir
 # Problem: Return value not captured
@@ -45,7 +45,7 @@ _ = some_function_that_returns_value()
 **Fix**: Either capture the return value or explicitly ignore with `_`.
 
 ### 3-4. Protocol Contract Supertypes
-**File**: `lib/ash_dspex/python_bridge/protocol.ex:208,248`
+**File**: `lib/dspex/python_bridge/protocol.ex:208,248`
 **Issue**: Error type specifications too broad
 ```elixir
 # Current - Too broad
@@ -57,7 +57,7 @@ _ = some_function_that_returns_value()
 **Fix**: Enumerate specific error atoms instead of generic `atom()`.
 
 ### 5. Protocol Pattern Match Issue
-**File**: `lib/ash_dspex/python_bridge/protocol.ex:161`
+**File**: `lib/dspex/python_bridge/protocol.ex:161`
 **Issue**: Impossible pattern match
 ```elixir
 # Problem: Pattern can never match the success type
@@ -69,7 +69,7 @@ end
 **Fix**: Review the function's actual return types and adjust patterns.
 
 ### 6. Supervisor Contract Supertype
-**File**: `lib/ash_dspex/python_bridge/supervisor.ex:200`
+**File**: `lib/dspex/python_bridge/supervisor.ex:200`
 **Issue**: Return type specification too broad
 ```elixir
 # Current - Too broad
@@ -87,20 +87,20 @@ end
 **Fix**: Define precise return structure.
 
 ### 7. Supervisor Pattern Coverage
-**File**: `lib/ash_dspex/python_bridge/supervisor.ex:265`
+**File**: `lib/dspex/python_bridge/supervisor.ex:265`
 **Issue**: Unreachable pattern
 ```elixir
 # Problem: Pattern can never match
 case child_module do
-  AshDSPex.PythonBridge.Bridge -> :bridge
-  AshDSPex.PythonBridge.Monitor -> :monitor
+  DSPex.PythonBridge.Bridge -> :bridge
+  DSPex.PythonBridge.Monitor -> :monitor
   :variable_ -> :unknown  # This is unreachable
 end
 ```
 **Fix**: Remove unreachable pattern or adjust logic.
 
 ### 8-9. Bridge Mock Server Unmatched Returns
-**File**: `lib/ash_dspex/testing/bridge_mock_server.ex:189,239`
+**File**: `lib/dspex/testing/bridge_mock_server.ex:189,239`
 **Issue**: Return values not handled
 ```elixir
 # Problem: Return values ignored
@@ -117,7 +117,7 @@ end
 **Fix**: Capture and handle return values appropriately.
 
 ### 10-11. Test Mode Contract Issues
-**File**: `lib/ash_dspex/testing/test_mode.ex:109,169`
+**File**: `lib/dspex/testing/test_mode.ex:109,169`
 **Issue**: Type specifications too broad
 ```elixir
 # Current - Too broad  
@@ -126,7 +126,7 @@ end
 
 # Should be - More specific
 @spec get_adapter_module() :: 
-  AshDSPex.Adapters.Mock | AshDSPex.Adapters.BridgeMock | AshDSPex.Adapters.PythonBridge
+  DSPex.Adapters.Mock | DSPex.Adapters.BridgeMock | DSPex.Adapters.PythonBridge
 
 @spec get_test_config() :: %{
   async: boolean(),
@@ -139,7 +139,7 @@ end
 ```
 
 ### 12. Test Mode Missing Range
-**File**: `lib/ash_dspex/testing/test_mode.ex:123`
+**File**: `lib/dspex/testing/test_mode.ex:123`
 **Issue**: Type specification missing return types
 ```elixir
 # Current - Incomplete
@@ -151,7 +151,7 @@ end
 **Fix**: Include all possible return types from supervisor start functions.
 
 ### 13. Test Mode Pattern Match
-**File**: `lib/ash_dspex/testing/test_mode.ex:310`
+**File**: `lib/dspex/testing/test_mode.ex:310`
 **Issue**: Impossible pattern match
 ```elixir
 # Problem: Pattern doesn't match actual return type

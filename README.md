@@ -2,9 +2,9 @@
 
 > **Revolutionary ML Infrastructure**: Native Elixir syntax for DSPy programs with production-ready Ash framework integration.
 
-[![Build Status](https://github.com/ashframework/ash_dspex/workflows/CI/badge.svg)](https://github.com/ashframework/ash_dspex/actions)
-[![Coverage](https://coveralls.io/repos/github/ashframework/ash_dspex/badge.svg)](https://coveralls.io/github/ashframework/ash_dspex)
-[![Hex.pm](https://img.shields.io/hexpm/v/ash_dspy.svg)](https://hex.pm/packages/ash_dspy)
+[![Build Status](https://github.com/ashframework/dspex/workflows/CI/badge.svg)](https://github.com/ashframework/dspex/actions)
+[![Coverage](https://coveralls.io/repos/github/ashframework/dspex/badge.svg)](https://coveralls.io/github/ashframework/dspex)
+[![Hex.pm](https://img.shields.io/hexpm/v/dspex.svg)](https://hex.pm/packages/dspex)
 
 ## 🚀 Vision
 
@@ -102,7 +102,7 @@ Add to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:ash_dspy, "~> 0.1.0"}
+    {:dspex, "~> 0.0.1"}
   ]
 end
 ```
@@ -255,14 +255,14 @@ end
 
 ```elixir
 # config/config.exs
-config :ash_dspy,
+config :dspex,
   python_executable: "python3",
   bridge_timeout: 30_000,
   health_check_interval: 5_000,
   adapter: :python_port  # or :mock for testing
 
 # Test-specific
-config :ash_dspy,
+config :dspex,
   test_mode: :mock_adapter,
   bridge_enabled: false
 ```
@@ -345,8 +345,8 @@ We welcome contributions! The project follows a structured development approach:
 
 ```bash
 # Clone and setup
-git clone https://github.com/ashframework/ash_dspex.git
-cd ash_dspex/ash_dspy
+git clone https://github.com/ashframework/dspex.git
+cd dspex
 
 # Install dependencies
 mix deps.get

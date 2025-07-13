@@ -1,14 +1,14 @@
 #!/usr/bin/env elixir
 
-# Demo of the AshDSPex signature system
+# Demo of the DSPex signature system
 
 defmodule Demo.QASignature do
-  use AshDSPex.Signature
+  use DSPex.Signature
   @signature_ast {:->, [], [[{:question, :string}], [{:answer, :string}]]}
 end
 
 defmodule Demo.ComplexSignature do
-  use AshDSPex.Signature
+  use DSPex.Signature
   @signature_ast {:->, [], [
     [{:query, :string}, {:context, {:list, :string}}], 
     [{:answer, :string}, {:confidence, :probability}, {:reasoning, {:list, :string}}]
@@ -16,7 +16,7 @@ defmodule Demo.ComplexSignature do
 end
 
 # Demonstrate basic functionality
-IO.puts("=== AshDSPex Signature System Demo ===\n")
+IO.puts("=== DSPex Signature System Demo ===\n")
 
 # Show signature metadata
 IO.puts("Simple QA Signature:")
@@ -92,4 +92,4 @@ case Demo.ComplexSignature.validate_outputs(complex_output) do
 end
 
 IO.puts("\n=== Demo Complete ===")
-IO.puts("The AshDSPex signature system is working correctly!")
+IO.puts("The DSPex signature system is working correctly!")

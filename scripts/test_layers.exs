@@ -52,7 +52,7 @@ defmodule TestLayers do
       [layer | _] -> layer
     end
     
-    IO.puts("🧪 AshDSPex 3-Layer Testing Architecture")
+    IO.puts("🧪 DSPex 3-Layer Testing Architecture")
     IO.puts("═══════════════════════════════════════")
     
     if Keyword.get(opts, :timing, false) do

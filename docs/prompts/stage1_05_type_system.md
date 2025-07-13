@@ -90,7 +90,7 @@ From ../../exdantic/README.md analysis:
 
 **ExDantic Pattern Integration:**
 ```elixir
-defmodule AshDSPy.Types.ExDanticAdapter do
+defmodule DSPex.Types.ExDanticAdapter do
   @moduledoc """
   Integration adapter for ExDantic validation patterns.
   """
@@ -127,7 +127,7 @@ end
 
 **Core Type Registry Implementation:**
 ```elixir
-defmodule AshDSPy.Types.Registry do
+defmodule DSPex.Types.Registry do
   @moduledoc """
   Central registry for all type definitions and metadata.
   """
@@ -292,12 +292,12 @@ end
 
 **Core Validation Engine:**
 ```elixir
-defmodule AshDSPy.Types.Validator do
+defmodule DSPex.Types.Validator do
   @moduledoc """
   Core validation engine for type checking and constraint validation.
   """
   
-  alias AshDSPy.Types.Registry
+  alias DSPex.Types.Registry
   
   def validate_value(value, type, constraints \\ []) do
     case Registry.get_type_info(type) do
@@ -556,12 +556,12 @@ end
 
 **Multi-Target Serialization:**
 ```elixir
-defmodule AshDSPy.Types.Serializer do
+defmodule DSPex.Types.Serializer do
   @moduledoc """
   Serialization engine for converting types to various target formats.
   """
   
-  alias AshDSPy.Types.Registry
+  alias DSPex.Types.Registry
   
   def serialize(value, type, target_format, opts \\ []) do
     case Registry.get_type_info(type) do
@@ -742,7 +742,7 @@ defmodule AshDSPy.Types.Serializer do
   
   defp find_matching_union_type(value, []), do: {:error, "No matching union type for value"}
   defp find_matching_union_type(value, [type | rest]) do
-    case AshDSPy.Types.Validator.validate_value(value, type) do
+    case DSPex.Types.Validator.validate_value(value, type) do
       {:ok, _} -> serialize(value, type, :json)
       {:error, _} -> find_matching_union_type(value, rest)
     end
@@ -754,7 +754,7 @@ end
 
 **Ash Type Integration:**
 ```elixir
-defmodule AshDSPy.Types.AshIntegration do
+defmodule DSPex.Types.AshIntegration do
   @moduledoc """
   Integration layer for Ash resource attributes and types.
   """
@@ -777,7 +777,7 @@ defmodule AshDSPy.Types.AshIntegration do
   end
   
   defp convert_to_ash_type(dspy_type) do
-    case AshDSPy.Types.Registry.get_type_info(dspy_type) do
+    case DSPex.Types.Registry.get_type_info(dspy_type) do
       %{ash_type: ash_type} -> {:ok, ash_type}
       nil -> {:error, "Unknown DSPy type: #{inspect(dspy_type)}"}
     end
@@ -821,10 +821,10 @@ end
 
 **Type System Testing:**
 ```elixir
-defmodule AshDSPy.Types.ValidatorTest do
+defmodule DSPex.Types.ValidatorTest do
   use ExUnit.Case
   
-  alias AshDSPy.Types.Validator
+  alias DSPex.Types.Validator
   
   describe "basic type validation" do
     test "validates strings correctly" do
@@ -947,10 +947,10 @@ defmodule AshDSPy.Types.ValidatorTest do
   end
 end
 
-defmodule AshDSPy.Types.SerializerTest do
+defmodule DSPex.Types.SerializerTest do
   use ExUnit.Case
   
-  alias AshDSPy.Types.Serializer
+  alias DSPex.Types.Serializer
   
   describe "JSON schema generation" do
     test "generates basic type schemas" do
@@ -1024,7 +1024,7 @@ end
 
 **Caching and Optimization:**
 ```elixir
-defmodule AshDSPy.Types.Cache do
+defmodule DSPex.Types.Cache do
   @moduledoc """
   Caching layer for type validation and serialization performance.
   """
@@ -1086,13 +1086,13 @@ defmodule AshDSPy.Types.Cache do
   end
   
   defp validate_and_cache(value, type, constraints, key) do
-    result = AshDSPy.Types.Validator.validate_value(value, type, constraints)
+    result = DSPex.Types.Validator.validate_value(value, type, constraints)
     :ets.insert(:type_validation_cache, {key, result, System.monotonic_time()})
     result
   end
   
   defp serialize_and_cache(value, type, target_format, opts, key) do
-    result = AshDSPy.Types.Serializer.serialize(value, type, target_format, opts)
+    result = DSPex.Types.Serializer.serialize(value, type, target_format, opts)
     :ets.insert(:type_serialization_cache, {key, result, System.monotonic_time()})
     result
   end
@@ -1117,7 +1117,7 @@ Based on the complete context above, implement the comprehensive type system and
 
 ### FILE STRUCTURE TO CREATE:
 ```
-lib/ash_dspy/types/
+lib/dspex/types/
 ├── registry.ex              # Type definitions and metadata
 ├── validator.ex             # Core validation engine
 ├── serializer.ex            # Multi-target serialization
@@ -1126,7 +1126,7 @@ lib/ash_dspy/types/
 ├── cache.ex                 # Performance caching
 └── supervisor.ex            # Type system supervision
 
-test/ash_dspy/types/
+test/dspex/types/
 ├── registry_test.exs        # Type registry tests
 ├── validator_test.exs       # Validation engine tests
 ├── serializer_test.exs      # Serialization tests
@@ -1137,31 +1137,31 @@ test/ash_dspy/types/
 
 ### SPECIFIC IMPLEMENTATION REQUIREMENTS:
 
-1. **Type Registry (`lib/ash_dspy/types/registry.ex`)**:
+1. **Type Registry (`lib/dspex/types/registry.ex`)**:
    - Complete type definitions with metadata
    - Support for basic, ML-specific, and composite types
    - Type information lookup and validation
    - Extensible architecture for custom types
 
-2. **Validation Engine (`lib/ash_dspy/types/validator.ex`)**:
+2. **Validation Engine (`lib/dspex/types/validator.ex`)**:
    - Comprehensive validation with type coercion
    - Constraint validation for all type categories
    - Error handling with detailed error messages
    - Support for nested and composite type validation
 
-3. **Serialization Engine (`lib/ash_dspy/types/serializer.ex`)**:
+3. **Serialization Engine (`lib/dspex/types/serializer.ex`)**:
    - Multi-target serialization (JSON Schema, OpenAI, Anthropic)
    - Constraint application to target schemas
    - Provider-specific optimizations
    - Performance-optimized serialization paths
 
-4. **ExDantic Integration (`lib/ash_dspy/types/exdantic_adapter.ex`)**:
+4. **ExDantic Integration (`lib/dspex/types/exdantic_adapter.ex`)**:
    - Bridge to ExDantic validation patterns
    - Schema generation for complex validations
    - Runtime validation with ExDantic types
    - Integration with signature system
 
-5. **Ash Integration (`lib/ash_dspy/types/ash_integration.ex`)**:
+5. **Ash Integration (`lib/dspex/types/ash_integration.ex`)**:
    - Automatic Ash attribute generation
    - Constraint conversion between systems
    - Resource attribute macro support

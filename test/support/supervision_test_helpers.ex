@@ -1,4 +1,4 @@
-defmodule AshDSPex.SupervisionTestHelpers do
+defmodule DSPex.SupervisionTestHelpers do
   @moduledoc """
   Test helpers for supervision tree isolation and process lifecycle management.
   Uses event-driven coordination.
@@ -127,7 +127,7 @@ defmodule AshDSPex.SupervisionTestHelpers do
   def get_bridge_status(supervisor_pid, bridge_name) do
     try do
       # Look for the bridge child by module name, not the dynamic bridge_name
-      case get_child_pid(supervisor_pid, AshDSPex.PythonBridge.Bridge) do
+      case get_child_pid(supervisor_pid, DSPex.PythonBridge.Bridge) do
         {:ok, bridge_pid} ->
           case GenServer.call(bridge_pid, :get_status, 1000) do
             status when is_map(status) ->
@@ -223,8 +223,8 @@ defmodule AshDSPex.SupervisionTestHelpers do
             name_str = Atom.to_string(name)
 
             cond do
-              String.contains?(name_str, "monitor") -> AshDSPex.PythonBridge.Monitor
-              String.contains?(name_str, "bridge") -> AshDSPex.PythonBridge.Bridge
+              String.contains?(name_str, "monitor") -> DSPex.PythonBridge.Monitor
+              String.contains?(name_str, "bridge") -> DSPex.PythonBridge.Bridge
               true -> service_name
             end
 

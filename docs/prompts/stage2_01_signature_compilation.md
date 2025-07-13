@@ -154,7 +154,7 @@ anthropic_schema = Exdantic.JsonSchema.generate_anthropic_tool_schema(schema)
 **Core Signature Behavior with Native Compilation:**
 
 ```elixir
-defmodule AshDSPy.Signature.Native do
+defmodule DSPex.Signature.Native do
   @moduledoc """
   Native Elixir signature compilation system with ExDantic integration.
   Provides 100% DSPy compatibility with 10x performance improvements.
@@ -162,15 +162,15 @@ defmodule AshDSPy.Signature.Native do
   
   defmacro __using__(opts) do
     quote do
-      import AshDSPy.Signature.Native
-      import AshDSPy.Signature.DSL
+      import DSPex.Signature.Native
+      import DSPex.Signature.DSL
       
       # Module attributes for signature compilation
       Module.register_attribute(__MODULE__, :signature_fields, accumulate: true)
       Module.register_attribute(__MODULE__, :signature_config, accumulate: false)
       Module.register_attribute(__MODULE__, :signature_metadata, accumulate: false)
       
-      @before_compile AshDSPy.Signature.Native
+      @before_compile DSPex.Signature.Native
     end
   end
   
@@ -183,7 +183,7 @@ defmodule AshDSPy.Signature.Native do
   """
   defmacro signature(definition) do
     quote do
-      @signature_config AshDSPy.Signature.Parser.parse_signature_definition(
+      @signature_config DSPex.Signature.Parser.parse_signature_definition(
         unquote(Macro.escape(definition)),
         __MODULE__
       )
@@ -288,7 +288,7 @@ defmodule AshDSPy.Signature.Native do
         end
         
         def unquote(:"validate_#{field_name}")(value) do
-          AshDSPy.Signature.Validation.validate_field_value(
+          DSPex.Signature.Validation.validate_field_value(
             value, 
             unquote(Macro.escape(field))
           )
@@ -300,14 +300,14 @@ defmodule AshDSPy.Signature.Native do
   defp generate_validation_functions(input_fields, output_fields) do
     quote do
       def validate_inputs(inputs) when is_map(inputs) do
-        AshDSPy.Signature.Validation.validate_inputs(
+        DSPex.Signature.Validation.validate_inputs(
           inputs,
           unquote(Macro.escape(input_fields))
         )
       end
       
       def validate_outputs(outputs) when is_map(outputs) do
-        AshDSPy.Signature.Validation.validate_outputs(
+        DSPex.Signature.Validation.validate_outputs(
           outputs,
           unquote(Macro.escape(output_fields))
         )
@@ -327,7 +327,7 @@ defmodule AshDSPy.Signature.Native do
   defp generate_schema_functions(input_fields, output_fields) do
     quote do
       def generate_json_schema(provider \\ :generic) do
-        AshDSPy.Signature.SchemaGenerator.generate_schema(
+        DSPex.Signature.SchemaGenerator.generate_schema(
           unquote(Macro.escape(input_fields)),
           unquote(Macro.escape(output_fields)),
           provider
@@ -355,12 +355,12 @@ defmodule AshDSPy.Signature.Native do
   defp generate_exdantic_integration(input_fields, output_fields, config) do
     quote do
       def create_exdantic_schemas() do
-        input_schema = AshDSPy.Signature.ExDanticCompiler.create_input_schema(
+        input_schema = DSPex.Signature.ExDanticCompiler.create_input_schema(
           unquote(Macro.escape(input_fields)),
           unquote(Macro.escape(config))
         )
         
-        output_schema = AshDSPy.Signature.ExDanticCompiler.create_output_schema(
+        output_schema = DSPex.Signature.ExDanticCompiler.create_output_schema(
           unquote(Macro.escape(output_fields)),
           unquote(Macro.escape(config))
         )
@@ -388,12 +388,12 @@ end
 **Native Signature Parsing Engine:**
 
 ```elixir
-defmodule AshDSPy.Signature.Parser do
+defmodule DSPex.Signature.Parser do
   @moduledoc """
   Advanced signature parsing with AST analysis and type inference.
   """
   
-  alias AshDSPy.Types.Registry
+  alias DSPex.Types.Registry
   
   def parse_signature_definition(ast, module) do
     case ast do
@@ -636,13 +636,13 @@ end
 **Deep ExDantic Integration for Signature Compilation:**
 
 ```elixir
-defmodule AshDSPy.Signature.ExDanticCompiler do
+defmodule DSPex.Signature.ExDanticCompiler do
   @moduledoc """
   ExDantic integration for signature compilation with advanced validation.
   """
   
   alias Exdantic.{Schema, TypeAdapter, Config}
-  alias AshDSPy.Types.{MLTypes, Conversion, Validation}
+  alias DSPex.Types.{MLTypes, Conversion, Validation}
   
   def create_input_schema(input_fields, config \\ %{}) do
     # Build ExDantic field definitions
@@ -1057,7 +1057,7 @@ end
 **Intelligent Signature Caching with Performance Optimization:**
 
 ```elixir
-defmodule AshDSPy.Signature.Cache do
+defmodule DSPex.Signature.Cache do
   @moduledoc """
   High-performance ETS-based signature caching with intelligent eviction.
   """
@@ -1528,12 +1528,12 @@ end
 **Provider-Specific Schema Generation System:**
 
 ```elixir
-defmodule AshDSPy.Signature.SchemaGenerator do
+defmodule DSPex.Signature.SchemaGenerator do
   @moduledoc """
   Multi-provider JSON schema generation with optimization for different ML providers.
   """
   
-  alias AshDSPy.Types.Conversion
+  alias DSPex.Types.Conversion
   
   def generate_schema(input_fields, output_fields, provider \\ :generic) do
     case provider do
@@ -1844,8 +1844,8 @@ end
 
 ### PRIMARY DELIVERABLES
 
-1. **Native Signature Behavior** - Complete `AshDSPy.Signature.Native` module with DSL
-2. **Advanced Parser** - `AshDSPy.Signature.Parser` with AST analysis and type inference
+1. **Native Signature Behavior** - Complete `DSPex.Signature.Native` module with DSL
+2. **Advanced Parser** - `DSPex.Signature.Parser` with AST analysis and type inference
 3. **ExDantic Compiler** - Deep integration with advanced validation features
 4. **High-Performance Cache** - ETS-based caching with intelligent management
 5. **Schema Generator** - Multi-provider JSON schema generation system

@@ -1,4 +1,4 @@
-# AshDSPex 3-Layer Testing Architecture
+# DSPex 3-Layer Testing Architecture
 
 A comprehensive testing framework that provides fast development cycles while maintaining full system confidence through layered test execution.
 
@@ -102,17 +102,17 @@ export TEST_MODE=full_integration # Layer 3
 ### Application Configuration
 ```elixir
 # config/test_dspy.exs
-config :ash_dspex, :test_mode, :mock_adapter  # Default layer
+config :dspex, :test_mode, :mock_adapter  # Default layer
 
 # Layer 1: Mock Adapter
-config :ash_dspex, :mock_adapter,
+config :dspex, :mock_adapter,
   response_delay_ms: 0,        # No delay for speed
   error_rate: 0.0,             # No random errors
   deterministic: true,         # Consistent responses
   mock_responses: %{}          # Custom responses
 
 # Layer 2: Bridge Mock Server  
-config :ash_dspex, :bridge_mock_server,
+config :dspex, :bridge_mock_server,
   response_delay_ms: 10,       # Minimal protocol overhead
   error_probability: 0.0,      # No random errors
   max_programs: 100,           # Program limit
@@ -123,11 +123,11 @@ config :ash_dspex, :bridge_mock_server,
 
 ### Layer 1 Tests (Fast Unit Tests)
 ```elixir
-# test/ash_dspex/adapters/mock_test.exs
+# test/dspex/adapters/mock_test.exs
 defmodule MyBusinessLogicTest do
   use ExUnit.Case, async: true
   
-  alias AshDSPex.Adapters.Mock
+  alias DSPex.Adapters.Mock
   
   test "business logic works correctly" do
     {:ok, _} = Mock.start_link()
@@ -275,7 +275,7 @@ BridgeMockServer.add_error_scenario(:test_server, %{
 ```bash
 # Check current test mode
 iex -S mix
-iex> AshDSPex.Testing.TestMode.current_test_mode()
+iex> DSPex.Testing.TestMode.current_test_mode()
 :mock_adapter
 
 # Verify environment
@@ -297,16 +297,16 @@ TEST_MODE=full_integration mix test --trace --timeout=60000
 ### Mock Adapter State Inspection
 ```elixir
 # In tests or IEx
-{:ok, _} = AshDSPex.Adapters.Mock.start_link()
+{:ok, _} = DSPex.Adapters.Mock.start_link()
 
 # Check statistics
-AshDSPex.Adapters.Mock.get_stats()
+DSPex.Adapters.Mock.get_stats()
 
 # Inspect programs
-AshDSPex.Adapters.Mock.get_programs()
+DSPex.Adapters.Mock.get_programs()
 
 # Reset state
-AshDSPex.Adapters.Mock.reset()
+DSPex.Adapters.Mock.reset()
 ```
 
 ## 🔧 CI/CD Integration
@@ -360,37 +360,37 @@ echo "All tests passed!"
 ### Test Mode Functions
 ```elixir
 # Get current test mode
-AshDSPex.Testing.TestMode.current_test_mode()
+DSPex.Testing.TestMode.current_test_mode()
 
 # Set process-level override
-AshDSPex.Testing.TestMode.set_test_mode(:bridge_mock)
+DSPex.Testing.TestMode.set_test_mode(:bridge_mock)
 
 # Get effective mode (with overrides)
-AshDSPex.Testing.TestMode.effective_test_mode()
+DSPex.Testing.TestMode.effective_test_mode()
 
 # Get layer configuration
-AshDSPex.Testing.TestMode.get_test_config()
+DSPex.Testing.TestMode.get_test_config()
 
 # Check capabilities
-AshDSPex.Testing.TestMode.layer_supports_async?()
-AshDSPex.Testing.TestMode.get_isolation_level()
+DSPex.Testing.TestMode.layer_supports_async?()
+DSPex.Testing.TestMode.get_isolation_level()
 ```
 
 ### Mock Adapter API
 ```elixir
 # Start/stop
-{:ok, pid} = AshDSPex.Adapters.Mock.start_link()
+{:ok, pid} = DSPex.Adapters.Mock.start_link()
 
 # Bridge-compatible API
-{:ok, result} = AshDSPex.Adapters.Mock.ping()
-{:ok, result} = AshDSPex.Adapters.Mock.create_program(config)
-{:ok, result} = AshDSPex.Adapters.Mock.execute_program(id, inputs)
+{:ok, result} = DSPex.Adapters.Mock.ping()
+{:ok, result} = DSPex.Adapters.Mock.create_program(config)
+{:ok, result} = DSPex.Adapters.Mock.execute_program(id, inputs)
 
 # Test utilities
-AshDSPex.Adapters.Mock.reset()
-AshDSPex.Adapters.Mock.get_stats()
-AshDSPex.Adapters.Mock.set_scenario(name, config)
-AshDSPex.Adapters.Mock.inject_error(config)
+DSPex.Adapters.Mock.reset()
+DSPex.Adapters.Mock.get_stats()
+DSPex.Adapters.Mock.set_scenario(name, config)
+DSPex.Adapters.Mock.inject_error(config)
 ```
 
 ## 🤝 Contributing

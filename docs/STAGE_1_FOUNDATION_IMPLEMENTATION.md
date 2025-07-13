@@ -12,7 +12,7 @@ Stage 1 establishes the foundational components for DSPy-Ash integration. This s
 
 ```
 lib/
-├── ash_dspy/
+├── dspex/
 │   ├── application.ex
 │   ├── signature/
 │   │   ├── signature.ex          # Core signature behavior
@@ -38,18 +38,18 @@ priv/
 ### 2.1 Signature Behavior
 
 ```elixir
-# lib/ash_dspy/signature/signature.ex
-defmodule AshDSPy.Signature do
+# lib/dspex/signature/signature.ex
+defmodule DSPex.Signature do
   @moduledoc """
   Core signature behavior providing native syntax compilation.
   """
   
   defmacro __using__(_opts) do
     quote do
-      import AshDSPy.Signature.DSL
+      import DSPex.Signature.DSL
       Module.register_attribute(__MODULE__, :signature_ast, accumulate: false)
       Module.register_attribute(__MODULE__, :signature_compiled, accumulate: false)
-      @before_compile AshDSPy.Signature.Compiler
+      @before_compile DSPex.Signature.Compiler
     end
   end
   
@@ -73,8 +73,8 @@ end
 ### 2.2 Signature Compiler
 
 ```elixir
-# lib/ash_dspy/signature/compiler.ex
-defmodule AshDSPy.Signature.Compiler do
+# lib/dspex/signature/compiler.ex
+defmodule DSPex.Signature.Compiler do
   @moduledoc """
   Compile-time signature processing and code generation.
   """
@@ -106,15 +106,15 @@ defmodule AshDSPy.Signature.Compiler do
       def output_fields, do: @signature_compiled.outputs
       
       def validate_inputs(data) do
-        AshDSPy.Signature.Validator.validate_fields(data, input_fields())
+        DSPex.Signature.Validator.validate_fields(data, input_fields())
       end
       
       def validate_outputs(data) do
-        AshDSPy.Signature.Validator.validate_fields(data, output_fields())
+        DSPex.Signature.Validator.validate_fields(data, output_fields())
       end
       
       def to_json_schema(provider \\ :openai) do
-        AshDSPy.Signature.JsonSchema.generate(__signature__, provider)
+        DSPex.Signature.JsonSchema.generate(__signature__, provider)
       end
     end
   end
@@ -153,8 +153,8 @@ end
 ### 2.3 Type Parser
 
 ```elixir
-# lib/ash_dspy/signature/type_parser.ex
-defmodule AshDSPy.Signature.TypeParser do
+# lib/dspex/signature/type_parser.ex
+defmodule DSPex.Signature.TypeParser do
   @moduledoc """
   Parse and validate type definitions in signatures.
   """
@@ -210,8 +210,8 @@ end
 ### 2.4 Basic Validator
 
 ```elixir
-# lib/ash_dspy/signature/validator.ex
-defmodule AshDSPy.Signature.Validator do
+# lib/dspex/signature/validator.ex
+defmodule DSPex.Signature.Validator do
   @moduledoc """
   Runtime validation for signature fields.
   """
@@ -266,8 +266,8 @@ end
 ### 3.1 Bridge GenServer
 
 ```elixir
-# lib/ash_dspy/python_bridge/bridge.ex
-defmodule AshDSPy.PythonBridge.Bridge do
+# lib/dspex/python_bridge/bridge.ex
+defmodule DSPex.PythonBridge.Bridge do
   @moduledoc """
   GenServer managing Python DSPy process communication.
   """
@@ -275,7 +275,7 @@ defmodule AshDSPy.PythonBridge.Bridge do
   use GenServer
   require Logger
   
-  alias AshDSPy.PythonBridge.Protocol
+  alias DSPex.PythonBridge.Protocol
   
   defstruct [:port, :requests, :request_id]
   
@@ -289,7 +289,7 @@ defmodule AshDSPy.PythonBridge.Bridge do
   
   @impl true
   def init(_opts) do
-    python_script = Path.join(:code.priv_dir(:ash_dspy), "python/dspy_bridge.py")
+    python_script = Path.join(:code.priv_dir(:dspex), "python/dspy_bridge.py")
     
     case System.find_executable("python3") do
       nil -> 
@@ -365,8 +365,8 @@ end
 ### 3.2 Wire Protocol
 
 ```elixir
-# lib/ash_dspy/python_bridge/protocol.ex
-defmodule AshDSPy.PythonBridge.Protocol do
+# lib/dspex/python_bridge/protocol.ex
+defmodule DSPex.PythonBridge.Protocol do
   @moduledoc """
   Wire protocol for Python bridge communication.
   """
@@ -402,8 +402,8 @@ end
 ### 4.1 Adapter Behavior
 
 ```elixir
-# lib/ash_dspy/adapters/adapter.ex
-defmodule AshDSPy.Adapters.Adapter do
+# lib/dspex/adapters/adapter.ex
+defmodule DSPex.Adapters.Adapter do
   @moduledoc """
   Behavior for DSPy adapters.
   """
@@ -423,15 +423,15 @@ end
 ### 4.2 Python Port Adapter
 
 ```elixir
-# lib/ash_dspy/adapters/python_port.ex
-defmodule AshDSPy.Adapters.PythonPort do
+# lib/dspex/adapters/python_port.ex
+defmodule DSPex.Adapters.PythonPort do
   @moduledoc """
   Python port adapter for DSPy integration.
   """
   
-  @behaviour AshDSPy.Adapters.Adapter
+  @behaviour DSPex.Adapters.Adapter
   
-  alias AshDSPy.PythonBridge.Bridge
+  alias DSPex.PythonBridge.Bridge
   
   @impl true
   def create_program(config) do
@@ -490,8 +490,8 @@ end
 ### 5.1 ML Domain
 
 ```elixir
-# lib/ash_dspy/ml/domain.ex
-defmodule AshDSPy.ML.Domain do
+# lib/dspex/ml/domain.ex
+defmodule DSPex.ML.Domain do
   @moduledoc """
   ML domain for DSPy resources.
   """
@@ -499,8 +499,8 @@ defmodule AshDSPy.ML.Domain do
   use Ash.Domain
   
   resources do
-    resource AshDSPy.ML.Signature
-    resource AshDSPy.ML.Program
+    resource DSPex.ML.Signature
+    resource DSPex.ML.Program
   end
 end
 ```
@@ -508,14 +508,14 @@ end
 ### 5.2 Signature Resource
 
 ```elixir
-# lib/ash_dspy/ml/signature.ex
-defmodule AshDSPy.ML.Signature do
+# lib/dspex/ml/signature.ex
+defmodule DSPex.ML.Signature do
   @moduledoc """
   Ash resource for managing DSPy signatures.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer
   
   attributes do
@@ -556,14 +556,14 @@ end
 ### 5.3 Program Resource (Basic)
 
 ```elixir
-# lib/ash_dspy/ml/program.ex
-defmodule AshDSPy.ML.Program do
+# lib/dspex/ml/program.ex
+defmodule DSPex.ML.Program do
   @moduledoc """
   Ash resource for managing DSPy programs.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer
   
   attributes do
@@ -575,7 +575,7 @@ defmodule AshDSPy.ML.Program do
   end
   
   relationships do
-    belongs_to :signature, AshDSPy.ML.Signature
+    belongs_to :signature, DSPex.ML.Signature
   end
   
   actions do
@@ -588,11 +588,11 @@ defmodule AshDSPy.ML.Program do
         signature_module = Ash.Changeset.get_argument(changeset, :signature_module)
         
         # Create signature record
-        {:ok, signature} = AshDSPy.ML.Signature.from_module(%{
+        {:ok, signature} = DSPex.ML.Signature.from_module(%{
           signature_module: signature_module
         })
         
-        signature_record = AshDSPy.ML.Signature.create!(signature)
+        signature_record = DSPex.ML.Signature.create!(signature)
         
         changeset
         |> Ash.Changeset.manage_relationship(:signature, signature_record, type: :append)
@@ -608,7 +608,7 @@ defmodule AshDSPy.ML.Program do
         case program.dspy_program_id do
           nil -> {:error, "Program not initialized"}
           program_id ->
-            adapter = Application.get_env(:ash_dspy, :adapter, AshDSPy.Adapters.PythonPort)
+            adapter = Application.get_env(:dspex, :adapter, DSPex.Adapters.PythonPort)
             adapter.execute_program(program_id, input.arguments.inputs)
         end
       end
@@ -756,20 +756,20 @@ if __name__ == '__main__':
 ## 7. Application Setup
 
 ```elixir
-# lib/ash_dspy/application.ex
-defmodule AshDSPy.Application do
+# lib/dspex/application.ex
+defmodule DSPex.Application do
   use Application
   
   def start(_type, _args) do
     children = [
       # Start Python bridge
-      AshDSPy.PythonBridge.Bridge,
+      DSPex.PythonBridge.Bridge,
       
       # Start Ash resources if using Postgres
-      {AshPostgres.Repo, Application.get_env(:ash_dspy, AshDSPy.Repo)}
+      {AshPostgres.Repo, Application.get_env(:dspex, DSPex.Repo)}
     ]
     
-    opts = [strategy: :one_for_one, name: AshDSPy.Supervisor]
+    opts = [strategy: :one_for_one, name: DSPex.Supervisor]
     Supervisor.start_link(children, opts)
   end
 end
@@ -781,17 +781,17 @@ end
 # config/config.exs
 import Config
 
-config :ash_dspy, :adapter, AshDSPy.Adapters.PythonPort
+config :dspex, :adapter, DSPex.Adapters.PythonPort
 
-config :ash_dspy, AshDSPy.Repo,
+config :dspex, DSPex.Repo,
   username: "postgres",
   password: "postgres", 
   hostname: "localhost",
-  database: "ash_dspy_dev",
+  database: "dspex_dev",
   pool_size: 10
 
-config :ash_dspy,
-  ecto_repos: [AshDSPy.Repo]
+config :dspex,
+  ecto_repos: [DSPex.Repo]
 ```
 
 ## 9. Testing the Foundation
@@ -802,7 +802,7 @@ defmodule Stage1FoundationTest do
   use ExUnit.Case
   
   defmodule TestSignature do
-    use AshDSPy.Signature
+    use DSPex.Signature
     
     signature question: :string -> answer: :string
   end
@@ -823,20 +823,20 @@ defmodule Stage1FoundationTest do
   end
   
   test "program creation and execution" do
-    {:ok, signature} = AshDSPy.ML.Signature.from_module(%{
+    {:ok, signature} = DSPex.ML.Signature.from_module(%{
       signature_module: TestSignature
     })
     
-    signature_record = AshDSPy.ML.Signature.create!(signature)
+    signature_record = DSPex.ML.Signature.create!(signature)
     
-    {:ok, program} = AshDSPy.ML.Program.create_with_signature(%{
+    {:ok, program} = DSPex.ML.Program.create_with_signature(%{
       name: "Test Program",
       signature_module: TestSignature
     })
     
     # Note: This will fail until Python bridge is working
     # but it tests the interface
-    result = AshDSPy.ML.Program.execute(program, %{
+    result = DSPex.ML.Program.execute(program, %{
       question: "What is 2+2?"
     })
     

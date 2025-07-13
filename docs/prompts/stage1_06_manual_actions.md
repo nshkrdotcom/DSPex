@@ -63,7 +63,7 @@ From DSPy-Ash integration architecture:
 
 **Comprehensive Program Execution Implementation:**
 ```elixir
-defmodule AshDSPy.ML.Actions.ProgramExecution do
+defmodule DSPex.ML.Actions.ProgramExecution do
   @moduledoc """
   Manual action for executing ML programs with comprehensive lifecycle management,
   performance tracking, error handling, and resource cleanup.
@@ -71,9 +71,9 @@ defmodule AshDSPy.ML.Actions.ProgramExecution do
   
   use Ash.Resource.ManualCreate
   
-  alias AshDSPy.ML.{Program, Execution}
-  alias AshDSPy.Adapters.{Registry, Factory, ErrorHandler}
-  alias AshDSPy.Types.Validator
+  alias DSPex.ML.{Program, Execution}
+  alias DSPex.Adapters.{Registry, Factory, ErrorHandler}
+  alias DSPex.Types.Validator
   
   def create(changeset, _opts, context) do
     program_id = Ash.Changeset.get_argument(changeset, :program_id)
@@ -283,7 +283,7 @@ defmodule AshDSPy.ML.Actions.ProgramExecution do
   defp record_execution_metrics(program, duration, outcome) do
     # This could integrate with telemetry or metrics collection
     :telemetry.execute(
-      [:ash_dspy, :program, :execution],
+      [:dspex, :program, :execution],
       %{duration: duration},
       %{
         program_id: program.id,
@@ -296,7 +296,7 @@ defmodule AshDSPy.ML.Actions.ProgramExecution do
   
   defp format_execution_error(error) do
     case error do
-      %AshDSPy.Adapters.ErrorHandler{message: message} ->
+      %DSPex.Adapters.ErrorHandler{message: message} ->
         message
       
       {:timeout, _} ->
@@ -316,7 +316,7 @@ end
 
 **Deep Signature Validation Implementation:**
 ```elixir
-defmodule AshDSPy.ML.Actions.SignatureValidation do
+defmodule DSPex.ML.Actions.SignatureValidation do
   @moduledoc """
   Manual action for comprehensive signature validation including module loading,
   type checking, constraint validation, and compatibility verification.
@@ -324,7 +324,7 @@ defmodule AshDSPy.ML.Actions.SignatureValidation do
   
   use Ash.Resource.ManualRead
   
-  alias AshDSPy.Types.{Registry, Validator}
+  alias DSPex.Types.{Registry, Validator}
   
   def read(ash_query, _ecto_query, _opts, _context) do
     signature_module = Ash.Query.get_argument(ash_query, :signature_module)
@@ -635,7 +635,7 @@ defmodule AshDSPy.ML.Actions.SignatureValidation do
       all_fields = signature.inputs ++ signature.outputs
       
       serialization_results = Enum.map(all_fields, fn {name, type, constraints} ->
-        case AshDSPy.Types.Serializer.serialize(nil, type, target, constraints: constraints) do
+        case DSPex.Types.Serializer.serialize(nil, type, target, constraints: constraints) do
           {:ok, serialized} ->
             {name, {:ok, serialized}}
           
@@ -823,7 +823,7 @@ end
 
 **Efficient Batch Processing Implementation:**
 ```elixir
-defmodule AshDSPy.ML.Actions.BatchProcessing do
+defmodule DSPex.ML.Actions.BatchProcessing do
   @moduledoc """
   Manual action for efficient batch processing of ML operations with
   optimized resource usage, parallel execution, and progress tracking.
@@ -831,8 +831,8 @@ defmodule AshDSPy.ML.Actions.BatchProcessing do
   
   use Ash.Resource.ManualCreate
   
-  alias AshDSPy.ML.{Program, Execution}
-  alias AshDSPy.Adapters.Registry
+  alias DSPex.ML.{Program, Execution}
+  alias DSPex.Adapters.Registry
   
   def create(changeset, _opts, _context) do
     program_id = Ash.Changeset.get_argument(changeset, :program_id)
@@ -1118,7 +1118,7 @@ end
 
 **System Health Diagnostics:**
 ```elixir
-defmodule AshDSPy.ML.Actions.HealthMonitoring do
+defmodule DSPex.ML.Actions.HealthMonitoring do
   @moduledoc """
   Manual action for comprehensive system health monitoring including
   adapter status, resource availability, performance metrics, and diagnostics.
@@ -1126,9 +1126,9 @@ defmodule AshDSPy.ML.Actions.HealthMonitoring do
   
   use Ash.Resource.ManualRead
   
-  alias AshDSPy.ML.{Program, Signature, Execution}
-  alias AshDSPy.Adapters.Registry
-  alias AshDSPy.PythonBridge.Bridge
+  alias DSPex.ML.{Program, Signature, Execution}
+  alias DSPex.Adapters.Registry
+  alias DSPex.PythonBridge.Bridge
   
   def read(ash_query, _ecto_query, _opts, _context) do
     check_level = Ash.Query.get_argument(ash_query, :check_level) || :standard
@@ -1241,9 +1241,9 @@ defmodule AshDSPy.ML.Actions.HealthMonitoring do
   defp check_application_status do
     case Application.started_applications() do
       apps when is_list(apps) ->
-        ash_dspy_running = Enum.any?(apps, fn {app, _, _} -> app == :ash_dspy end)
+        dspex_running = Enum.any?(apps, fn {app, _, _} -> app == :dspex end)
         
-        if ash_dspy_running do
+        if dspex_running do
           {:ok, :running}
         else
           {:error, :not_running}
@@ -1256,7 +1256,7 @@ defmodule AshDSPy.ML.Actions.HealthMonitoring do
   
   defp check_supervision_tree do
     try do
-      case Supervisor.which_children(AshDSPy.Supervisor) do
+      case Supervisor.which_children(DSPex.Supervisor) do
         children when is_list(children) ->
           running_children = Enum.count(children, fn {_id, pid, _type, _modules} ->
             is_pid(pid) and Process.alive?(pid)
@@ -1346,17 +1346,17 @@ defmodule AshDSPy.ML.Actions.HealthMonitoring do
   
   defp test_adapter_health(:mock) do
     try do
-      case Process.whereis(AshDSPy.Adapters.Mock) do
+      case Process.whereis(DSPex.Adapters.Mock) do
         nil ->
           # Try to start mock adapter
-          case AshDSPy.Adapters.Mock.start_link() do
+          case DSPex.Adapters.Mock.start_link() do
             {:ok, _pid} -> {:ok, %{status: :healthy, started: true}}
             {:error, reason} -> {:error, "Failed to start: #{inspect(reason)}"}
           end
         
         _pid ->
           # Test basic functionality
-          case AshDSPy.Adapters.Mock.list_programs() do
+          case DSPex.Adapters.Mock.list_programs() do
             {:ok, _programs} -> {:ok, %{status: :healthy, started: false}}
             {:error, reason} -> {:error, "Health check failed: #{inspect(reason)}"}
           end
@@ -1369,7 +1369,7 @@ defmodule AshDSPy.ML.Actions.HealthMonitoring do
   
   defp test_adapter_health(:python_port) do
     try do
-      case Process.whereis(AshDSPy.PythonBridge.Bridge) do
+      case Process.whereis(DSPex.PythonBridge.Bridge) do
         nil ->
           {:error, "Python bridge not running"}
         
@@ -1478,7 +1478,7 @@ defmodule AshDSPy.ML.Actions.HealthMonitoring do
   defp check_database_connectivity do
     try do
       # Simple connectivity test
-      case AshDSPy.Repo.query("SELECT 1", []) do
+      case DSPex.Repo.query("SELECT 1", []) do
         {:ok, _result} ->
           {:ok, %{status: :connected, latency_ms: measure_db_latency()}}
         
@@ -1494,7 +1494,7 @@ defmodule AshDSPy.ML.Actions.HealthMonitoring do
   defp measure_db_latency do
     start_time = System.monotonic_time(:millisecond)
     
-    case AshDSPy.Repo.query("SELECT 1", []) do
+    case DSPex.Repo.query("SELECT 1", []) do
       {:ok, _} ->
         System.monotonic_time(:millisecond) - start_time
       
@@ -1780,7 +1780,7 @@ Based on the complete context above, implement the comprehensive manual actions 
 
 ### FILE STRUCTURE TO CREATE:
 ```
-lib/ash_dspy/ml/actions/
+lib/dspex/ml/actions/
 ├── program_execution.ex     # Complex program execution lifecycle
 ├── signature_validation.ex # Deep signature validation and compatibility
 ├── batch_processing.ex     # Efficient batch processing with concurrency
@@ -1788,7 +1788,7 @@ lib/ash_dspy/ml/actions/
 ├── resource_cleanup.ex     # Resource cleanup and maintenance
 └── adapter_coordination.ex # Multi-adapter coordination and failover
 
-test/ash_dspy/ml/actions/
+test/dspex/ml/actions/
 ├── program_execution_test.exs     # Program execution testing
 ├── signature_validation_test.exs  # Signature validation testing
 ├── batch_processing_test.exs      # Batch processing testing
@@ -1798,31 +1798,31 @@ test/ash_dspy/ml/actions/
 
 ### SPECIFIC IMPLEMENTATION REQUIREMENTS:
 
-1. **Program Execution (`lib/ash_dspy/ml/actions/program_execution.ex`)**:
+1. **Program Execution (`lib/dspex/ml/actions/program_execution.ex`)**:
    - Complete lifecycle management with validation and cleanup
    - Performance tracking and metrics collection
    - Robust error handling with retry mechanisms
    - Integration with execution tracking resources
 
-2. **Signature Validation (`lib/ash_dspy/ml/actions/signature_validation.ex`)**:
+2. **Signature Validation (`lib/dspex/ml/actions/signature_validation.ex`)**:
    - Comprehensive validation including module loading and structure
    - Type definition validation and constraint checking
    - Adapter compatibility and serialization testing
    - Performance characteristic analysis
 
-3. **Batch Processing (`lib/ash_dspy/ml/actions/batch_processing.ex`)**:
+3. **Batch Processing (`lib/dspex/ml/actions/batch_processing.ex`)**:
    - Efficient concurrent processing with resource management
    - Progress tracking and error recovery
    - Configurable batch sizes and concurrency levels
    - Comprehensive result compilation and statistics
 
-4. **Health Monitoring (`lib/ash_dspy/ml/actions/health_monitoring.ex`)**:
+4. **Health Monitoring (`lib/dspex/ml/actions/health_monitoring.ex`)**:
    - System-wide health diagnostics
    - Adapter status monitoring and testing
    - Performance metrics collection and analysis
    - Capacity analysis and scaling recommendations
 
-5. **Resource Cleanup (`lib/ash_dspy/ml/actions/resource_cleanup.ex`)**:
+5. **Resource Cleanup (`lib/dspex/ml/actions/resource_cleanup.ex`)**:
    - Comprehensive resource cleanup and maintenance
    - Orphaned resource detection and removal
    - Performance optimization through cleanup

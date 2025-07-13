@@ -80,7 +80,7 @@ Stage 2 focuses on implementing native Elixir DSPy functionality by deeply study
 ### 1.2 ExDantic Integration Deep Study
 
 **Research Sources:**
-- `/home/home/p/g/n/ashframework/ash_dspex/../../exdantic/` - Complete ExDantic codebase
+- `/home/home/p/g/n/ashframework/dspex/../../exdantic/` - Complete ExDantic codebase
 - Focus on understanding validation patterns, schema generation, and runtime capabilities
 
 **Research Process:**

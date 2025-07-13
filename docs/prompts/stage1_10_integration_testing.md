@@ -52,18 +52,18 @@ From all previous Stage 1 prompts:
 
 **Complete Integration Test Suite:**
 ```elixir
-defmodule AshDSPy.Integration.EndToEndTest do
+defmodule DSPex.Integration.EndToEndTest do
   @moduledoc """
   Comprehensive end-to-end integration tests for the complete DSPy-Ash system.
   Tests real workflows from signature definition through program execution.
   """
   
-  use AshDSPy.TestSupport
+  use DSPex.TestSupport
   
-  alias AshDSPy.ML.{Domain, Signature, Program, Execution}
-  alias AshDSPy.Adapters.{Registry, PythonPort}
-  alias AshDSPy.PythonBridge.{Bridge, Health}
-  alias AshDSPy.Types.Validator
+  alias DSPex.ML.{Domain, Signature, Program, Execution}
+  alias DSPex.Adapters.{Registry, PythonPort}
+  alias DSPex.PythonBridge.{Bridge, Health}
+  alias DSPex.Types.Validator
   
   @moduletag :integration
   @moduletag timeout: 60_000  # 1 minute timeout for integration tests
@@ -350,7 +350,7 @@ defmodule AshDSPy.Integration.EndToEndTest do
       
       # Test adapter registry
       assert Registry.list_adapters() |> Enum.member?(:python_port)
-      assert Registry.get_adapter(:python_port) == AshDSPy.Adapters.PythonPort
+      assert Registry.get_adapter(:python_port) == DSPex.Adapters.PythonPort
       
       # Test adapter capabilities
       capabilities = Registry.get_capabilities(:python_port)
@@ -459,7 +459,7 @@ defmodule AshDSPy.Integration.EndToEndTest do
   describe "deployment readiness validation" do
     test "configuration validation across environments" do
       # Test development configuration
-      dev_config = Application.get_env(:ash_dspy, :development)
+      dev_config = Application.get_env(:dspex, :development)
       assert validate_environment_config(:development, dev_config)
       
       # Test production configuration requirements
@@ -620,7 +620,7 @@ defmodule AshDSPy.Integration.EndToEndTest do
   end
   
   defp configuration_has_requirement?(requirement) do
-    config = Application.get_all_env(:ash_dspy)
+    config = Application.get_all_env(:dspex)
     
     case requirement do
       :secret_key_base -> 
@@ -673,14 +673,14 @@ defmodule AshDSPy.Integration.EndToEndTest do
     case check do
       :secret_management ->
         # Verify secrets are not hardcoded
-        config = Application.get_all_env(:ash_dspy)
+        config = Application.get_all_env(:dspex)
         not Enum.any?(config, fn {_key, value} ->
           is_binary(value) and String.contains?(value, "password")
         end)
       
       :input_validation ->
         # Verify input validation is enabled
-        Application.get_env(:ash_dspy, :validate_inputs, false)
+        Application.get_env(:dspex, :validate_inputs, false)
       
       :sql_injection_protection ->
         # Verify parameterized queries are used
@@ -696,7 +696,7 @@ defmodule AshDSPy.Integration.EndToEndTest do
       
       :rate_limiting ->
         # Verify rate limiting is configured
-        Application.get_env(:ash_dspy, :rate_limiting) != nil
+        Application.get_env(:dspex, :rate_limiting) != nil
     end
   end
 end
@@ -706,16 +706,16 @@ end
 
 **Comprehensive Performance Testing:**
 ```elixir
-defmodule AshDSPy.Integration.PerformanceBenchmarks do
+defmodule DSPex.Integration.PerformanceBenchmarks do
   @moduledoc """
   Performance benchmarking and load testing for the DSPy-Ash integration.
   Measures throughput, latency, memory usage, and scalability limits.
   """
   
-  use AshDSPy.TestSupport
+  use DSPex.TestSupport
   
-  alias AshDSPy.ML.{Signature, Program, Execution}
-  alias AshDSPy.Performance.{Metrics, Monitor}
+  alias DSPex.ML.{Signature, Program, Execution}
+  alias DSPex.Performance.{Metrics, Monitor}
   
   @benchmark_duration 60_000  # 1 minute
   @warmup_duration 10_000     # 10 seconds
@@ -1036,13 +1036,13 @@ end
 
 **Completion Criteria and Verification:**
 ```elixir
-defmodule AshDSPy.Integration.Stage1Completion do
+defmodule DSPex.Integration.Stage1Completion do
   @moduledoc """
   Stage 1 completion validation and verification system.
   Ensures all requirements are met before progressing to Stage 2.
   """
   
-  use AshDSPy.TestSupport
+  use DSPex.TestSupport
   
   @stage1_requirements [
     :signature_system_complete,
@@ -1110,7 +1110,7 @@ defmodule AshDSPy.Integration.Stage1Completion do
       assert bridge_status.performance_acceptable == true
       
       # Test bridge communication
-      {:ok, response} = AshDSPy.PythonBridge.Bridge.execute_command(:health_check, %{})
+      {:ok, response} = DSPex.PythonBridge.Bridge.execute_command(:health_check, %{})
       assert response.status == "healthy"
     end
     
@@ -1123,7 +1123,7 @@ defmodule AshDSPy.Integration.Stage1Completion do
       assert adapter_status.error_handling_comprehensive == true
       
       # Test adapter switching
-      adapters = AshDSPy.Adapters.Registry.list_adapters()
+      adapters = DSPex.Adapters.Registry.list_adapters()
       assert Enum.member?(adapters, :python_port)
     end
     
@@ -1137,7 +1137,7 @@ defmodule AshDSPy.Integration.Stage1Completion do
       assert resources_status.manual_actions_functional == true
       
       # Test resource operations
-      {:ok, signature} = AshDSPy.ML.Signature.create(%{
+      {:ok, signature} = DSPex.ML.Signature.create(%{
         name: "resource_test",
         definition: "signature test: :string input -> :string output"
       })
@@ -1295,18 +1295,18 @@ defmodule AshDSPy.Integration.Stage1Completion do
       signature workflow_test: :string input -> :string output
       """
       
-      {:ok, signature} = AshDSPy.ML.Signature.create(%{
+      {:ok, signature} = DSPex.ML.Signature.create(%{
         name: "workflow_test",
         definition: signature_def
       })
       
-      {:ok, program} = AshDSPy.ML.Program.create(%{
+      {:ok, program} = DSPex.ML.Program.create(%{
         name: "workflow_program",
         signature_id: signature.id,
         adapter: :python_port
       })
       
-      {:ok, execution} = AshDSPy.ML.Execution.create(%{
+      {:ok, execution} = DSPex.ML.Execution.create(%{
         program_id: program.id,
         inputs: %{input: "test workflow"}
       })

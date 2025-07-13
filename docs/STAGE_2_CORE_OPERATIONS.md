@@ -13,8 +13,8 @@ Stage 2 builds on the foundation to create a custom Ash data layer that seamless
 ### 1.1 Core Data Layer
 
 ```elixir
-# lib/ash_dspy/data_layer.ex
-defmodule AshDSPy.DataLayer do
+# lib/dspex/data_layer.ex
+defmodule DSPex.DataLayer do
   @moduledoc """
   Custom Ash data layer for DSPy operations.
   
@@ -26,7 +26,7 @@ defmodule AshDSPy.DataLayer do
   
   @behaviour Ash.DataLayer
   
-  alias AshDSPy.DataLayer.{QueryHandler, StateManager}
+  alias DSPex.DataLayer.{QueryHandler, StateManager}
   
   @impl true
   def can?(resource, feature) do
@@ -87,14 +87,14 @@ end
 ### 1.2 Query Handler
 
 ```elixir
-# lib/ash_dspy/data_layer/query_handler.ex
-defmodule AshDSPy.DataLayer.QueryHandler do
+# lib/dspex/data_layer/query_handler.ex
+defmodule DSPex.DataLayer.QueryHandler do
   @moduledoc """
   Handles DSPy-specific query operations.
   """
   
-  alias AshDSPy.DataLayer.StateManager
-  alias AshDSPy.Validation.SignatureValidator
+  alias DSPex.DataLayer.StateManager
+  alias DSPex.Validation.SignatureValidator
   
   def handle_action(query, resource, context) do
     action = query.action
@@ -174,7 +174,7 @@ defmodule AshDSPy.DataLayer.QueryHandler do
   end
   
   defp create_execution_record(program, inputs) do
-    AshDSPy.ML.Execution.create!(%{
+    DSPex.ML.Execution.create!(%{
       program_id: program.id,
       inputs: inputs,
       status: :running,
@@ -183,7 +183,7 @@ defmodule AshDSPy.DataLayer.QueryHandler do
   end
   
   defp update_execution_record(execution, result) do
-    AshDSPy.ML.Execution.update!(execution, %{
+    DSPex.ML.Execution.update!(execution, %{
       outputs: result,
       status: :completed,
       completed_at: DateTime.utc_now()
@@ -192,12 +192,12 @@ defmodule AshDSPy.DataLayer.QueryHandler do
   
   defp get_signature_module(program) do
     # Load signature module from program
-    signature = AshDSPy.ML.Signature.get!(program.signature_id)
+    signature = DSPex.ML.Signature.get!(program.signature_id)
     Module.safe_concat([signature.module])
   end
   
   defp get_adapter do
-    Application.get_env(:ash_dspy, :adapter, AshDSPy.Adapters.PythonPort)
+    Application.get_env(:dspex, :adapter, DSPex.Adapters.PythonPort)
   end
 end
 ```
@@ -205,8 +205,8 @@ end
 ### 1.3 State Manager
 
 ```elixir
-# lib/ash_dspy/data_layer/state_manager.ex
-defmodule AshDSPy.DataLayer.StateManager do
+# lib/dspex/data_layer/state_manager.ex
+defmodule DSPex.DataLayer.StateManager do
   @moduledoc """
   Manages state synchronization between Ash and DSPy.
   """
@@ -223,7 +223,7 @@ defmodule AshDSPy.DataLayer.StateManager do
   end
   
   defp create_program_in_adapter(program, adapter) do
-    signature = AshDSPy.ML.Signature.get!(program.signature_id)
+    signature = DSPex.ML.Signature.get!(program.signature_id)
     signature_module = Module.safe_concat([signature.module])
     
     config = %{
@@ -237,7 +237,7 @@ defmodule AshDSPy.DataLayer.StateManager do
         dspy_program_id = result["program_id"] || program.id
         
         # Update program with DSPy ID
-        {:ok, updated_program} = AshDSPy.ML.Program.update!(program, %{
+        {:ok, updated_program} = DSPex.ML.Program.update!(program, %{
           dspy_program_id: dspy_program_id,
           status: :ready
         })
@@ -252,7 +252,7 @@ defmodule AshDSPy.DataLayer.StateManager do
   Updates program state after optimization.
   """
   def update_program_state(program, optimized_state) do
-    AshDSPy.ML.Program.update!(program, %{
+    DSPex.ML.Program.update!(program, %{
       compiled_state: optimized_state,
       status: :optimized
     })
@@ -265,8 +265,8 @@ end
 ### 2.1 Signature Validator with ExDantic
 
 ```elixir
-# lib/ash_dspy/validation/signature_validator.ex
-defmodule AshDSPy.Validation.SignatureValidator do
+# lib/dspex/validation/signature_validator.ex
+defmodule DSPex.Validation.SignatureValidator do
   @moduledoc """
   Enhanced validation using ExDantic for Pydantic-like behavior.
   """
@@ -365,8 +365,8 @@ end
 ### 2.2 Schema Cache Setup
 
 ```elixir
-# lib/ash_dspy/validation/schema_cache.ex
-defmodule AshDSPy.Validation.SchemaCache do
+# lib/dspex/validation/schema_cache.ex
+defmodule DSPex.Validation.SchemaCache do
   @moduledoc """
   ETS-based cache for compiled ExDantic schemas.
   """
@@ -398,15 +398,15 @@ end
 ### 3.1 Program Resource with Custom Data Layer
 
 ```elixir
-# lib/ash_dspy/ml/program.ex
-defmodule AshDSPy.ML.Program do
+# lib/dspex/ml/program.ex
+defmodule DSPex.ML.Program do
   @moduledoc """
   Enhanced program resource using custom data layer.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
-    data_layer: AshDSPy.DataLayer,  # Use our custom data layer!
+    domain: DSPex.ML.Domain,
+    data_layer: DSPex.DataLayer,  # Use our custom data layer!
     extensions: [AshStateMachine]
   
   attributes do
@@ -426,8 +426,8 @@ defmodule AshDSPy.ML.Program do
   end
   
   relationships do
-    belongs_to :signature, AshDSPy.ML.Signature
-    has_many :executions, AshDSPy.ML.Execution
+    belongs_to :signature, DSPex.ML.Signature
+    has_many :executions, DSPex.ML.Execution
   end
   
   # State machine for program lifecycle
@@ -510,13 +510,13 @@ defmodule AshDSPy.ML.Program do
   defp get_or_create_signature(signature_module) do
     signature = signature_module.__signature__()
     
-    case AshDSPy.ML.Signature.get_by_module(to_string(signature_module)) do
+    case DSPex.ML.Signature.get_by_module(to_string(signature_module)) do
       {:ok, existing} -> existing
       {:error, _} ->
-        {:ok, signature_data} = AshDSPy.ML.Signature.from_module(%{
+        {:ok, signature_data} = DSPex.ML.Signature.from_module(%{
           signature_module: signature_module
         })
-        AshDSPy.ML.Signature.create!(signature_data)
+        DSPex.ML.Signature.create!(signature_data)
     end
   end
 end
@@ -525,14 +525,14 @@ end
 ### 3.2 Execution Resource
 
 ```elixir
-# lib/ash_dspy/ml/execution.ex
-defmodule AshDSPy.ML.Execution do
+# lib/dspex/ml/execution.ex
+defmodule DSPex.ML.Execution do
   @moduledoc """
   Resource for tracking program executions.
   """
   
   use Ash.Resource,
-    domain: AshDSPy.ML.Domain,
+    domain: DSPex.ML.Domain,
     data_layer: AshPostgres.DataLayer,
     extensions: [AshStateMachine]
   
@@ -557,7 +557,7 @@ defmodule AshDSPy.ML.Execution do
   end
   
   relationships do
-    belongs_to :program, AshDSPy.ML.Program
+    belongs_to :program, DSPex.ML.Program
   end
   
   state_machine do
@@ -644,15 +644,15 @@ end
 ### 4.1 Enhanced Python Port Adapter
 
 ```elixir
-# lib/ash_dspy/adapters/python_port.ex (enhanced)
-defmodule AshDSPy.Adapters.PythonPort do
+# lib/dspex/adapters/python_port.ex (enhanced)
+defmodule DSPex.Adapters.PythonPort do
   @moduledoc """
   Enhanced Python port adapter with better error handling and state management.
   """
   
-  @behaviour AshDSPy.Adapters.Adapter
+  @behaviour DSPex.Adapters.Adapter
   
-  alias AshDSPy.PythonBridge.Bridge
+  alias DSPex.PythonBridge.Bridge
   
   @impl true
   def create_program(config) do
@@ -1047,23 +1047,23 @@ if __name__ == '__main__':
 ### 6.1 Enhanced Application
 
 ```elixir
-# lib/ash_dspy/application.ex (enhanced)
-defmodule AshDSPy.Application do
+# lib/dspex/application.ex (enhanced)
+defmodule DSPex.Application do
   use Application
   
   def start(_type, _args) do
     children = [
       # Schema cache for ExDantic
-      AshDSPy.Validation.SchemaCache,
+      DSPex.Validation.SchemaCache,
       
       # Python bridge
-      AshDSPy.PythonBridge.Bridge,
+      DSPex.PythonBridge.Bridge,
       
       # Postgres repo for CRUD operations
-      AshDSPy.Repo
+      DSPex.Repo
     ]
     
-    opts = [strategy: :one_for_one, name: AshDSPy.Supervisor]
+    opts = [strategy: :one_for_one, name: DSPex.Supervisor]
     Supervisor.start_link(children, opts)
   end
 end
@@ -1076,18 +1076,18 @@ end
 import Config
 
 # Adapter configuration
-config :ash_dspy, :adapter, AshDSPy.Adapters.PythonPort
+config :dspex, :adapter, DSPex.Adapters.PythonPort
 
 # Database configuration
-config :ash_dspy, AshDSPy.Repo,
+config :dspex, DSPex.Repo,
   username: "postgres",
   password: "postgres",
   hostname: "localhost", 
-  database: "ash_dspy_dev",
+  database: "dspex_dev",
   pool_size: 10
 
-config :ash_dspy,
-  ecto_repos: [AshDSPy.Repo]
+config :dspex,
+  ecto_repos: [DSPex.Repo]
 
 # ExDantic configuration
 config :exdantic,
@@ -1098,7 +1098,7 @@ config :exdantic,
   }
 
 # Python bridge configuration
-config :ash_dspy, :python_bridge,
+config :dspex, :python_bridge,
   timeout: 30_000,
   python_executable: "python3",
   script_path: "priv/python/dspy_bridge.py"
@@ -1113,7 +1113,7 @@ defmodule Stage2CoreOperationsTest do
   
   # Test signature with multiple fields
   defmodule ComplexSignature do
-    use AshDSPy.Signature
+    use DSPex.Signature
     
     signature question: :string, context: :string -> 
       answer: :string, 
@@ -1122,7 +1122,7 @@ defmodule Stage2CoreOperationsTest do
   end
   
   test "program creation with custom data layer" do
-    {:ok, program} = AshDSPy.ML.Program.create_with_signature(%{
+    {:ok, program} = DSPex.ML.Program.create_with_signature(%{
       name: "Complex QA Program",
       signature_module: ComplexSignature
     })
@@ -1133,7 +1133,7 @@ defmodule Stage2CoreOperationsTest do
   end
   
   test "program execution through custom data layer" do
-    {:ok, program} = AshDSPy.ML.Program.create_with_signature(%{
+    {:ok, program} = DSPex.ML.Program.create_with_signature(%{
       name: "Test Program",
       signature_module: ComplexSignature
     })
@@ -1144,7 +1144,7 @@ defmodule Stage2CoreOperationsTest do
     }
     
     # This should work through the custom data layer
-    case AshDSPy.ML.Program.execute(program, %{inputs: inputs}) do
+    case DSPex.ML.Program.execute(program, %{inputs: inputs}) do
       {:ok, result} ->
         assert Map.has_key?(result, :answer)
         assert Map.has_key?(result, :confidence) 
@@ -1159,7 +1159,7 @@ defmodule Stage2CoreOperationsTest do
   test "signature validation with ExDantic" do
     inputs = %{question: "test", context: "test context"}
     
-    {:ok, validated} = AshDSPy.Validation.SignatureValidator.validate_inputs(
+    {:ok, validated} = DSPex.Validation.SignatureValidator.validate_inputs(
       ComplexSignature, 
       inputs
     )
@@ -1170,7 +1170,7 @@ defmodule Stage2CoreOperationsTest do
     # Test type coercion
     invalid_inputs = %{question: 123, context: "test"}
     
-    case AshDSPy.Validation.SignatureValidator.validate_inputs(ComplexSignature, invalid_inputs) do
+    case DSPex.Validation.SignatureValidator.validate_inputs(ComplexSignature, invalid_inputs) do
       {:ok, coerced} ->
         # ExDantic should coerce integer to string
         assert coerced.question == "123"
@@ -1181,12 +1181,12 @@ defmodule Stage2CoreOperationsTest do
   end
   
   test "execution tracking" do
-    {:ok, program} = AshDSPy.ML.Program.create_with_signature(%{
+    {:ok, program} = DSPex.ML.Program.create_with_signature(%{
       name: "Tracking Test",
       signature_module: ComplexSignature
     })
     
-    {:ok, execution} = AshDSPy.ML.Execution.start_execution(%{
+    {:ok, execution} = DSPex.ML.Execution.start_execution(%{
       program_id: program.id,
       inputs: %{question: "test", context: "test"}
     })
@@ -1196,7 +1196,7 @@ defmodule Stage2CoreOperationsTest do
     refute is_nil(execution.started_at)
     
     # Complete execution
-    {:ok, completed} = AshDSPy.ML.Execution.complete_execution(execution, %{
+    {:ok, completed} = DSPex.ML.Execution.complete_execution(execution, %{
       outputs: %{answer: "test answer", confidence: 0.8, sources: []},
       duration_ms: 150
     })

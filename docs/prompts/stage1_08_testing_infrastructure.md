@@ -73,7 +73,7 @@ end
 
 **Core Testing Framework Setup:**
 ```elixir
-defmodule AshDSPy.TestSupport do
+defmodule DSPex.TestSupport do
   @moduledoc """
   Shared testing utilities and helpers for the DSPy-Ash integration test suite.
   Provides factories, fixtures, mocks, and common test patterns.
@@ -83,19 +83,19 @@ defmodule AshDSPy.TestSupport do
     quote do
       use ExUnit.Case, unquote(opts)
       
-      import AshDSPy.TestSupport.{
+      import DSPex.TestSupport.{
         Factories,
         Fixtures,
         Assertions,
         Helpers
       }
       
-      alias AshDSPy.TestSupport.{MockAdapter, TestSignatures}
+      alias DSPex.TestSupport.{MockAdapter, TestSignatures}
       
       # Common setup for DSPy tests
       setup do
         # Reset global state
-        AshDSPy.TestSupport.reset_test_state()
+        DSPex.TestSupport.reset_test_state()
         
         # Start necessary services
         start_test_services()
@@ -107,8 +107,8 @@ defmodule AshDSPy.TestSupport do
   
   def reset_test_state do
     # Reset any global state between tests
-    if Process.whereis(AshDSPy.Adapters.Mock) do
-      AshDSPy.Adapters.Mock.reset()
+    if Process.whereis(DSPex.Adapters.Mock) do
+      DSPex.Adapters.Mock.reset()
     end
     
     # Clear ETS tables used for caching
@@ -121,9 +121,9 @@ defmodule AshDSPy.TestSupport do
   
   defp start_test_services do
     # Start mock adapter if not running
-    case Process.whereis(AshDSPy.Adapters.Mock) do
+    case Process.whereis(DSPex.Adapters.Mock) do
       nil -> 
-        {:ok, _} = AshDSPy.Adapters.Mock.start_link()
+        {:ok, _} = DSPex.Adapters.Mock.start_link()
       _ -> 
         :ok
     end
@@ -138,13 +138,13 @@ end
 
 **Comprehensive Signature Testing:**
 ```elixir
-defmodule AshDSPy.Signature.CompilerTest do
-  use AshDSPy.TestSupport, async: true
+defmodule DSPex.Signature.CompilerTest do
+  use DSPex.TestSupport, async: true
   
   describe "signature compilation" do
     test "compiles basic signatures correctly" do
       defmodule BasicSignature do
-        use AshDSPy.Signature
+        use DSPex.Signature
         
         signature question: :string -> answer: :string
       end
@@ -158,7 +158,7 @@ defmodule AshDSPy.Signature.CompilerTest do
     
     test "compiles complex signatures with multiple fields" do
       defmodule ComplexSignature do
-        use AshDSPy.Signature
+        use DSPex.Signature
         
         signature query: :string, context: {:list, :string}, max_tokens: :integer ->
                  answer: :string, confidence: :probability, reasoning: :reasoning_chain
@@ -183,7 +183,7 @@ defmodule AshDSPy.Signature.CompilerTest do
     
     test "handles signature constraints properly" do
       defmodule ConstrainedSignature do
-        use AshDSPy.Signature
+        use DSPex.Signature
         
         signature name: {:string, min_length: 2, max_length: 50}, 
                  age: {:integer, min: 0, max: 150} ->
@@ -204,7 +204,7 @@ defmodule AshDSPy.Signature.CompilerTest do
     
     test "validates inputs correctly" do
       defmodule ValidationSignature do
-        use AshDSPy.Signature
+        use DSPex.Signature
         
         signature question: :string, count: :integer -> answer: :string
       end
@@ -232,7 +232,7 @@ defmodule AshDSPy.Signature.CompilerTest do
     
     test "validates outputs correctly" do
       defmodule OutputValidationSignature do
-        use AshDSPy.Signature
+        use DSPex.Signature
         
         signature input: :string -> result: :string, score: :probability
       end
@@ -256,7 +256,7 @@ defmodule AshDSPy.Signature.CompilerTest do
     
     test "generates JSON schemas correctly" do
       defmodule JsonSchemaSignature do
-        use AshDSPy.Signature
+        use DSPex.Signature
         
         signature question: :string -> answer: :string, confidence: :probability
       end
@@ -278,7 +278,7 @@ defmodule AshDSPy.Signature.CompilerTest do
     test "rejects invalid signature syntax" do
       assert_raise RuntimeError, ~r/Invalid signature syntax/, fn ->
         defmodule InvalidSignature do
-          use AshDSPy.Signature
+          use DSPex.Signature
           
           signature invalid_syntax_here
         end
@@ -288,7 +288,7 @@ defmodule AshDSPy.Signature.CompilerTest do
     test "requires signature definition" do
       assert_raise RuntimeError, ~r/No signature defined/, fn ->
         defmodule NoSignature do
-          use AshDSPy.Signature
+          use DSPex.Signature
           # No signature defined
         end
         
@@ -299,7 +299,7 @@ defmodule AshDSPy.Signature.CompilerTest do
   
   describe "signature function generation" do
     defmodule FunctionTestSignature do
-      use AshDSPy.Signature
+      use DSPex.Signature
       
       signature input: :string -> output: :string
     end
@@ -331,10 +331,10 @@ end
 
 **Comprehensive Type System Testing:**
 ```elixir
-defmodule AshDSPy.Types.ValidatorTest do
-  use AshDSPy.TestSupport, async: true
+defmodule DSPex.Types.ValidatorTest do
+  use DSPex.TestSupport, async: true
   
-  alias AshDSPy.Types.Validator
+  alias DSPex.Types.Validator
   
   describe "basic type validation" do
     test "validates strings" do
@@ -570,10 +570,10 @@ end
 
 **Mock Adapter and Adapter Testing:**
 ```elixir
-defmodule AshDSPy.Adapters.MockTest do
-  use AshDSPy.TestSupport, async: false  # Mock adapter uses global state
+defmodule DSPex.Adapters.MockTest do
+  use DSPex.TestSupport, async: false  # Mock adapter uses global state
   
-  alias AshDSPy.Adapters.Mock
+  alias DSPex.Adapters.Mock
   
   setup do
     {:ok, _pid} = Mock.start_link()
@@ -682,7 +682,7 @@ defmodule AshDSPy.Adapters.MockTest do
   
   defp create_test_signature do
     defmodule TestSignature do
-      use AshDSPy.Signature
+      use DSPex.Signature
       
       signature question: :string -> answer: :string, confidence: :probability
     end
@@ -692,7 +692,7 @@ defmodule AshDSPy.Adapters.MockTest do
   
   defp create_signature_with_various_types do
     defmodule VariousTypesSignature do
-      use AshDSPy.Signature
+      use DSPex.Signature
       
       signature input: :string -> 
                text_output: :string,
@@ -706,10 +706,10 @@ defmodule AshDSPy.Adapters.MockTest do
   end
 end
 
-defmodule AshDSPy.Adapters.BehaviorTest do
-  use AshDSPy.TestSupport, async: false
+defmodule DSPex.Adapters.BehaviorTest do
+  use DSPex.TestSupport, async: false
   
-  alias AshDSPy.Adapters.{Mock, Registry, Factory}
+  alias DSPex.Adapters.{Mock, Registry, Factory}
   
   @adapters_to_test [Mock]  # Add more adapters as they become available
   
@@ -817,7 +817,7 @@ defmodule AshDSPy.Adapters.BehaviorTest do
   
   defp create_test_signature do
     defmodule AdapterTestSignature do
-      use AshDSPy.Signature
+      use DSPex.Signature
       
       signature question: :string -> answer: :string
     end
@@ -831,11 +831,11 @@ end
 
 **Property-Based Testing with StreamData:**
 ```elixir
-defmodule AshDSPy.PropertyTest do
-  use AshDSPy.TestSupport, async: true
+defmodule DSPex.PropertyTest do
+  use DSPex.TestSupport, async: true
   use ExUnitProperties
   
-  alias AshDSPy.Types.Validator
+  alias DSPex.Types.Validator
   
   describe "type system properties" do
     property "string validation always accepts valid strings" do
@@ -916,7 +916,7 @@ defmodule AshDSPy.PropertyTest do
         # Simplified test for now
         
         # Test that field parsing is consistent
-        parsed = AshDSPy.Signature.Compiler.parse_fields(fields)
+        parsed = DSPex.Signature.Compiler.parse_fields(fields)
         assert length(parsed) == length(fields)
       end
     end
@@ -950,12 +950,12 @@ end
 
 **Performance Benchmarks and Load Testing:**
 ```elixir
-defmodule AshDSPy.PerformanceTest do
-  use AshDSPy.TestSupport, async: false
+defmodule DSPex.PerformanceTest do
+  use DSPex.TestSupport, async: false
   
-  alias AshDSPy.Types.Validator
-  alias AshDSPy.Protocol.WireProtocol
-  alias AshDSPy.Adapters.Mock
+  alias DSPex.Types.Validator
+  alias DSPex.Protocol.WireProtocol
+  alias DSPex.Adapters.Mock
   
   describe "type validation performance" do
     test "string validation performance" do
@@ -1137,7 +1137,7 @@ defmodule AshDSPy.PerformanceTest do
   
   defp create_test_signature do
     defmodule PerfTestSignature do
-      use AshDSPy.Signature
+      use DSPex.Signature
       
       signature question: :string -> answer: :string, confidence: :probability
     end
@@ -1151,7 +1151,7 @@ end
 
 **Comprehensive Test Data Generation:**
 ```elixir
-defmodule AshDSPy.TestSupport.Factories do
+defmodule DSPex.TestSupport.Factories do
   @moduledoc """
   Factories for generating test data and fixtures.
   """
@@ -1279,7 +1279,7 @@ defmodule AshDSPy.TestSupport.Factories do
   
   defp default_signature do
     defmodule DefaultTestSignature do
-      use AshDSPy.Signature
+      use DSPex.Signature
       
       signature question: :string -> answer: :string, confidence: :probability
     end
@@ -1294,7 +1294,7 @@ defmodule AshDSPy.TestSupport.Factories do
   end
 end
 
-defmodule AshDSPy.TestSupport.Fixtures do
+defmodule DSPex.TestSupport.Fixtures do
   @moduledoc """
   Predefined test fixtures and scenarios.
   """
@@ -1362,7 +1362,7 @@ defmodule AshDSPy.TestSupport.Fixtures do
   end
 end
 
-defmodule AshDSPy.TestSupport.Assertions do
+defmodule DSPex.TestSupport.Assertions do
   @moduledoc """
   Custom assertions for DSPy-Ash testing.
   """
@@ -1455,7 +1455,7 @@ test/
 │   ├── assertions.ex            # Custom assertions
 │   ├── helpers.ex               # Testing helper functions
 │   └── mock_systems.ex          # Mock implementations
-├── ash_dspy/
+├── dspex/
 │   ├── signature/
 │   │   ├── compiler_test.exs    # Signature compilation tests
 │   │   ├── type_parser_test.exs # Type parsing tests
@@ -1498,13 +1498,13 @@ test/
    - Invariant testing for signatures
    - Edge case discovery through property testing
 
-4. **Performance Testing (`test/ash_dspy/integration/performance_test.exs`)**:
+4. **Performance Testing (`test/dspex/integration/performance_test.exs`)**:
    - Benchmark testing for all components
    - Memory usage validation
    - Concurrent execution testing
    - Performance regression detection
 
-5. **Integration Testing (`test/ash_dspy/integration/end_to_end_test.exs`)**:
+5. **Integration Testing (`test/dspex/integration/end_to_end_test.exs`)**:
    - Complete workflow testing
    - Cross-component integration validation
    - Real-world scenario simulation

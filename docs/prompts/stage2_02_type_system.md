@@ -151,7 +151,7 @@ schema = Exdantic.create_model([
 **Complete ML Type System Implementation:**
 
 ```elixir
-defmodule AshDSPy.Types.MLRegistry do
+defmodule DSPex.Types.MLRegistry do
   @moduledoc """
   Comprehensive ML type registry with ExDantic integration and performance optimization.
   """
@@ -159,7 +159,7 @@ defmodule AshDSPy.Types.MLRegistry do
   use GenServer
   
   alias Exdantic.{TypeAdapter, Validator, Config}
-  alias AshDSPy.Types.{Constraints, Coercion, Validation, Quality}
+  alias DSPex.Types.{Constraints, Coercion, Validation, Quality}
   
   # Core ML Types with comprehensive definitions
   @ml_types %{
@@ -1079,7 +1079,7 @@ end
 
 ### PRIMARY DELIVERABLES
 
-1. **ML Type Registry** - Complete `AshDSPy.Types.MLRegistry` with all ML-specific types
+1. **ML Type Registry** - Complete `DSPex.Types.MLRegistry` with all ML-specific types
 2. **ExDantic Integration** - Deep integration with advanced validation features
 3. **Quality Assessment** - Automated quality scoring and assessment system
 4. **Type Coercion** - Intelligent type conversion with ML-specific logic

@@ -29,14 +29,14 @@ The Python bridge implementation is **functionally working** with Gemini integra
 **Root Cause**: Tests are attempting to start globally registered GenServer processes that are already running from previous tests or the application startup.
 
 **Affected Tests**:
-- All `AshDSPex.PythonBridge.SupervisorTest` tests (20+ tests)
-- All `AshDSPex.PythonBridge.IntegrationTest` tests (15+ tests)
+- All `DSPex.PythonBridge.SupervisorTest` tests (20+ tests)
+- All `DSPex.PythonBridge.IntegrationTest` tests (15+ tests)
 - Bridge tests with process startup
 
 **Current Code Issue**:
 ```elixir
 # In supervisor tests - trying to start globally registered processes
-{:ok, pid} = AshDSPex.PythonBridge.Supervisor.start_link(name: BridgeSupervisorTest)
+{:ok, pid} = DSPex.PythonBridge.Supervisor.start_link(name: BridgeSupervisorTest)
 ```
 
 **Fix Required**:
@@ -44,7 +44,7 @@ The Python bridge implementation is **functionally working** with Gemini integra
 # Use unique process names per test
 defp start_test_supervisor(test_name) do
   unique_name = :"#{test_name}_#{System.unique_integer()}"
-  AshDSPex.PythonBridge.Supervisor.start_link(name: unique_name)
+  DSPex.PythonBridge.Supervisor.start_link(name: unique_name)
 end
 
 # In test setup
@@ -66,7 +66,7 @@ end
 
 ### 2. 🔴 CRITICAL: API Mismatch Issues (10+ warnings)
 
-**Pattern**: `AshDSPex.PythonBridge.Supervisor.stop/1 is undefined or private. Did you mean: * stop/0`
+**Pattern**: `DSPex.PythonBridge.Supervisor.stop/1 is undefined or private. Did you mean: * stop/0`
 
 **Root Cause**: Tests calling `Supervisor.stop(pid)` but the supervisor module only implements `stop/0`.
 
@@ -80,7 +80,7 @@ end
 
 **Fix Required - Option 1 (Add missing API)**:
 ```elixir
-# Add to AshDSPex.PythonBridge.Supervisor
+# Add to DSPex.PythonBridge.Supervisor
 def stop(pid) when is_pid(pid) do
   GenServer.stop(pid, :normal, 5000)
 end

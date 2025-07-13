@@ -7,7 +7,7 @@ Code.require_file("support/unified_test_foundation.ex", __DIR__)
 # Enable Python bridge for tests when GEMINI_API_KEY is available
 gemini_key = System.get_env("GEMINI_API_KEY")
 bridge_enabled = gemini_key != nil and gemini_key != ""
-Application.put_env(:ash_dspex, :python_bridge_enabled, bridge_enabled)
+Application.put_env(:dspex, :python_bridge_enabled, bridge_enabled)
 
 if bridge_enabled do
   IO.puts("🚀 Python bridge enabled for testing with Gemini")
