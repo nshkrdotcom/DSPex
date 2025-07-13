@@ -3,8 +3,8 @@ defmodule AshDSPex.BridgeTestHelpers do
   Test helpers for Python bridge communication.
   Provides event-driven coordination for bridge operations.
 
-  Eliminates Process.sleep() usage with proper synchronization patterns
-  following UNIFIED_TESTING_GUIDE.md principles.
+  Provides proper synchronization patterns following
+  UNIFIED_TESTING_GUIDE.md principles.
   """
 
   require Logger
@@ -13,8 +13,8 @@ defmodule AshDSPex.BridgeTestHelpers do
   @doc """
   Performs a bridge call with retry logic and proper timeout handling.
 
-  This replaces patterns where tests would sleep and hope the bridge
-  was ready. Instead, it actively retries on failure with backoff.
+  This replaces patterns where tests would wait for the bridge
+  to be ready. Instead, it actively retries on failure with backoff.
   """
   @spec bridge_call_with_retry(pid() | atom(), atom(), map(), integer(), timeout()) ::
           {:ok, term()} | {:error, term()}
@@ -74,7 +74,7 @@ defmodule AshDSPex.BridgeTestHelpers do
   @doc """
   Waits for a bridge to recover from an error state.
 
-  Uses status polling with exponential backoff instead of fixed sleeps.
+  Uses status polling with exponential backoff instead of fixed delays.
   """
   @spec wait_for_bridge_recovery(pid() | atom(), timeout()) :: :ok | {:error, term()}
   def wait_for_bridge_recovery(bridge_pid, timeout \\ 3000) do
@@ -124,7 +124,7 @@ defmodule AshDSPex.BridgeTestHelpers do
   Waits for a specific Python response by request ID.
 
   This is used when tests need to coordinate with asynchronous
-  Python operations without using sleep.
+  Python operations with proper coordination.
   """
   @spec wait_for_python_response(pid() | atom(), integer(), timeout()) ::
           {:ok, term()} | {:error, term()}
@@ -146,7 +146,7 @@ defmodule AshDSPex.BridgeTestHelpers do
   Waits for bridge startup to complete.
 
   Checks both the GenServer state and Python process readiness.
-  More reliable than arbitrary sleep durations.
+  More reliable than arbitrary wait durations.
   """
   @spec wait_for_bridge_startup(pid() | atom(), timeout()) :: :ok | {:error, term()}
   def wait_for_bridge_startup(bridge_pid, timeout \\ 10000) do

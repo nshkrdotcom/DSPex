@@ -448,10 +448,32 @@ defmodule AshDSPex.Testing.BridgeMockServer do
     response = %{
       programs_created: map_size(state.programs),
       server_type: "mock",
+      adapter_type: :bridge_mock,
+      layer: :layer_2,
+      protocol_validated: true,
       uptime_seconds: DateTime.diff(DateTime.utc_now(), state.stats.start_time, :second)
     }
 
     {:ok, response, state}
+  end
+
+  defp generate_mock_response("delete_program", args, state) do
+    program_id = Map.get(args, "program_id")
+
+    case Map.get(state.programs, program_id) do
+      nil ->
+        {:error, "Program not found: #{program_id}", state}
+
+      _program ->
+        new_programs = Map.delete(state.programs, program_id)
+
+        response = %{
+          status: "deleted",
+          program_id: program_id
+        }
+
+        {:ok, response, %{state | programs: new_programs}}
+    end
   end
 
   defp generate_mock_response(command, _args, state) do

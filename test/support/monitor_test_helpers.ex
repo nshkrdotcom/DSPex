@@ -13,8 +13,8 @@ defmodule AshDSPex.MonitorTestHelpers do
   @doc """
   Waits for a monitor to reach a specific health status.
 
-  Uses event-driven coordination instead of sleeping and hoping
-  the monitor has performed enough health checks.
+  Uses event-driven coordination to ensure the monitor has
+  performed enough health checks.
   """
   @spec wait_for_health_status(pid() | atom(), atom(), timeout()) ::
           {:ok, map()} | {:error, term()}
@@ -70,7 +70,7 @@ defmodule AshDSPex.MonitorTestHelpers do
   Triggers a health check and waits for the result.
 
   This provides deterministic control over when health checks occur,
-  replacing patterns where tests would sleep and hope checks happened.
+  replacing patterns where tests would wait for checks to happen.
   """
   @spec trigger_health_check_and_wait(pid() | atom(), atom(), timeout()) ::
           {:ok, map()} | {:error, term()}
@@ -353,9 +353,8 @@ defmodule AshDSPex.MonitorTestHelpers do
     @moduledoc """
     Mock bridge for testing monitor behavior under different response conditions.
 
-    INTENTIONALLY uses Process.sleep() to simulate network timeouts and delays
-    for testing timeout handling behavior. This is the only legitimate use case
-    for Process.sleep() in the test suite.
+    INTENTIONALLY uses delays to simulate network timeouts
+    for testing timeout handling behavior.
     """
     use GenServer
 

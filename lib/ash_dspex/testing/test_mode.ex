@@ -1,4 +1,6 @@
 defmodule AshDSPex.Testing.TestMode do
+  require Logger
+
   @moduledoc """
   Test mode configuration system for 3-layer testing architecture.
 
@@ -61,12 +63,12 @@ defmodule AshDSPex.Testing.TestMode do
               mode
 
             _ ->
-              IO.warn("Invalid TEST_MODE: #{env_mode}, using default: #{@default_mode}")
+              Logger.warning("Invalid TEST_MODE: #{env_mode}, using default: #{@default_mode}")
               @default_mode
           end
         rescue
           ArgumentError ->
-            IO.warn("Invalid TEST_MODE: #{env_mode}, using default: #{@default_mode}")
+            Logger.warning("Invalid TEST_MODE: #{env_mode}, using default: #{@default_mode}")
             @default_mode
         end
     end
@@ -106,9 +108,18 @@ defmodule AshDSPex.Testing.TestMode do
   @doc """
   Returns the appropriate adapter module for the current test mode.
   """
-  @spec get_adapter_module() :: module()
+  @spec get_adapter_module() ::
+          AshDSPex.Adapters.Mock | AshDSPex.Adapters.BridgeMock | AshDSPex.Adapters.PythonPort
   def get_adapter_module do
-    AshDSPex.Adapters.Registry.get_adapter()
+    # Get the effective test mode considering process overrides
+    mode = effective_test_mode()
+
+    # Map test mode to adapter
+    case mode do
+      :mock_adapter -> AshDSPex.Adapters.Mock
+      :bridge_mock -> AshDSPex.Adapters.BridgeMock
+      :full_integration -> AshDSPex.Adapters.PythonPort
+    end
   end
 
   @doc """

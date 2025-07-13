@@ -54,7 +54,7 @@ defmodule AshDSPex.ErrorHandlingTest do
         old_env = System.get_env("TEST_MODE")
 
         log =
-          capture_io(:stderr, fn ->
+          capture_log(fn ->
             System.put_env("TEST_MODE", unquote(invalid_mode))
 
             # Should fall back to default

@@ -1,27 +1,8 @@
 defmodule AshDSPex.Adapters.MockTest do
   use ExUnit.Case, async: true
+  use AshDSPex.Testing.MockIsolation
 
-  alias AshDSPex.Adapters.Mock
-
-  setup do
-    # Start the mock adapter for each test (handle already_started case)
-    case Mock.start_link() do
-      {:ok, _pid} -> :ok
-      {:error, {:already_started, _pid}} -> :ok
-    end
-
-    on_exit(fn ->
-      # Reset the mock state after each test
-      try do
-        Mock.reset()
-      catch
-        # Process might already be stopped
-        :exit, _ -> :ok
-      end
-    end)
-
-    :ok
-  end
+  # The Mock alias is now automatically set to IsolatedMock by MockIsolation
 
   test "ping returns successful response" do
     assert {:ok, result} = Mock.ping()
@@ -144,10 +125,12 @@ defmodule AshDSPex.Adapters.MockTest do
     # Run multiple concurrent executions
     tasks =
       Enum.map(1..10, fn i ->
-        Task.async(fn ->
-          inputs = %{"input" => "test_#{i}"}
-          Mock.execute_program("concurrent_test", inputs)
-        end)
+        Task.async(
+          with_mock_context(fn ->
+            inputs = %{"input" => "test_#{i}"}
+            Mock.execute_program("concurrent_test", inputs)
+          end)
+        )
       end)
 
     results = Task.await_many(tasks, 5000)

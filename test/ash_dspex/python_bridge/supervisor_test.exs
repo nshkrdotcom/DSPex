@@ -3,7 +3,7 @@ defmodule AshDSPex.PythonBridge.SupervisorTest do
   Tests for the Python bridge supervisor functionality.
 
   Uses event-driven coordination patterns from UNIFIED_TESTING_GUIDE.md
-  to eliminate Process.sleep() usage and provide deterministic testing.
+  to provide deterministic testing.
   """
 
   use AshDSPex.UnifiedTestFoundation, :supervision_testing
@@ -107,7 +107,7 @@ defmodule AshDSPex.PythonBridge.SupervisorTest do
 
   describe "get_system_status/0" do
     test "returns system status information", %{supervision_tree: sup_tree} do
-      # Wait for supervision tree to be fully ready instead of sleeping
+      # Wait for supervision tree to be fully ready
       assert {:ok, :ready} = wait_for_supervision_tree_ready(sup_tree, 5000)
 
       status = BridgeSupervisor.get_system_status()
@@ -136,7 +136,7 @@ defmodule AshDSPex.PythonBridge.SupervisorTest do
 
   describe "system_health_check/0" do
     test "performs comprehensive health check", %{supervision_tree: sup_tree} do
-      # Wait for supervision tree to be ready instead of sleeping
+      # Wait for supervision tree to be ready
       assert {:ok, :ready} = wait_for_supervision_tree_ready(sup_tree, 5000)
 
       result = BridgeSupervisor.system_health_check()
@@ -160,7 +160,7 @@ defmodule AshDSPex.PythonBridge.SupervisorTest do
 
   describe "restart_child/1" do
     test "can restart monitor child", %{supervision_tree: sup_tree, monitor_name: monitor_name} do
-      # Wait for supervision tree to be ready instead of sleeping
+      # Wait for supervision tree to be ready
       assert {:ok, :ready} = wait_for_supervision_tree_ready(sup_tree, 5000)
 
       # Try to restart the monitor
@@ -192,7 +192,7 @@ defmodule AshDSPex.PythonBridge.SupervisorTest do
 
   describe "graceful_shutdown/1" do
     test "performs graceful shutdown", %{supervision_tree: sup_tree} do
-      # Wait for supervision tree to be ready instead of sleeping
+      # Wait for supervision tree to be ready
       assert {:ok, :ready} = wait_for_supervision_tree_ready(sup_tree, 5000)
 
       # Should complete without error
@@ -234,7 +234,7 @@ defmodule AshDSPex.PythonBridge.SupervisorTest do
 
   describe "terminate_child/1" do
     test "can terminate monitor child", %{supervision_tree: sup_tree, monitor_name: monitor_name} do
-      # Wait for supervision tree to be ready instead of sleeping
+      # Wait for supervision tree to be ready
       assert {:ok, :ready} = wait_for_supervision_tree_ready(sup_tree, 5000)
 
       result = Supervisor.terminate_child(sup_tree, monitor_name)
@@ -256,7 +256,7 @@ defmodule AshDSPex.PythonBridge.SupervisorTest do
       supervision_tree: sup_tree,
       monitor_name: monitor_name
     } do
-      # Wait for supervision tree to be ready instead of sleeping
+      # Wait for supervision tree to be ready
       assert {:ok, :ready} = wait_for_supervision_tree_ready(sup_tree, 5000)
 
       # Get initial children count
@@ -268,7 +268,7 @@ defmodule AshDSPex.PythonBridge.SupervisorTest do
           # Kill the monitor process
           Process.exit(monitor_pid, :kill)
 
-          # Wait for supervisor to restart the monitor instead of sleeping
+          # Wait for supervisor to restart the monitor
           assert {:ok, new_pid} =
                    wait_for_process_restart(sup_tree, monitor_name, monitor_pid, 5000)
 

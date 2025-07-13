@@ -68,16 +68,38 @@ defmodule AshDSPex.Adapters.Registry do
       # Get specific adapter
       AshDSPex.Adapters.Registry.get_adapter(:mock)
   """
-  @spec get_adapter(atom() | nil) :: module()
-  def get_adapter(adapter_name \\ nil) do
-    resolved_name = resolve_adapter_name(adapter_name)
+  @spec get_adapter(atom() | String.t() | module() | nil) :: module()
+  def get_adapter(adapter_name \\ nil)
 
-    case Map.get(@adapters, resolved_name) do
+  def get_adapter(nil) do
+    resolved_name = resolve_adapter_name(nil)
+    Map.get(@adapters, resolved_name)
+  end
+
+  def get_adapter(adapter_name) when is_binary(adapter_name) do
+    get_adapter(String.to_existing_atom(adapter_name))
+  rescue
+    ArgumentError -> get_adapter(@default_adapter)
+  end
+
+  def get_adapter(adapter_name) when is_atom(adapter_name) do
+    # First check if it's an adapter name like :mock
+    case Map.get(@adapters, adapter_name) do
       nil ->
-        available = Map.keys(@adapters) |> Enum.join(", ")
-        raise ArgumentError, "Unknown adapter: #{resolved_name}. Available: #{available}"
+        # Not an adapter name, check if it's a module
+        # Ensure the module is loaded before checking
+        _ = Code.ensure_loaded(adapter_name)
+
+        # Check if this is one of our adapter modules
+        cond do
+          adapter_name == AshDSPex.Adapters.Mock -> adapter_name
+          adapter_name == AshDSPex.Adapters.BridgeMock -> adapter_name
+          adapter_name == AshDSPex.Adapters.PythonPort -> adapter_name
+          true -> Map.get(@adapters, @default_adapter)
+        end
 
       module ->
+        # It was an adapter name, return the module
         module
     end
   end
@@ -115,9 +137,96 @@ defmodule AshDSPex.Adapters.Registry do
         {:python_port, AshDSPex.Adapters.PythonPort}
       ] = AshDSPex.Adapters.Registry.list_adapters()
   """
-  @spec list_adapters() :: [{atom(), module()}]
+  @spec list_adapters() :: [atom()]
   def list_adapters do
-    Enum.to_list(@adapters)
+    Map.keys(@adapters)
+  end
+
+  @doc """
+  Gets the adapter module for a specific test layer.
+
+  ## Examples
+
+      AshDSPex.Adapters.Registry.get_adapter_for_test_layer(:layer_1)
+      # => AshDSPex.Adapters.Mock
+  """
+  @spec get_adapter_for_test_layer(atom()) :: module()
+  def get_adapter_for_test_layer(layer) do
+    case layer do
+      :layer_1 -> Map.get(@adapters, :mock)
+      :layer_2 -> Map.get(@adapters, :bridge_mock)
+      :layer_3 -> Map.get(@adapters, :python_port)
+      _ -> Map.get(@adapters, @default_adapter)
+    end
+  end
+
+  @doc """
+  Lists test layer to adapter mappings.
+
+  ## Examples
+
+      AshDSPex.Adapters.Registry.list_test_layer_adapters()
+      # => %{mock_adapter: :mock, bridge_mock: :bridge_mock, full_integration: :python_port}
+  """
+  @spec list_test_layer_adapters() :: %{
+          mock_adapter: :mock,
+          bridge_mock: :bridge_mock,
+          full_integration: :python_port
+        }
+  def list_test_layer_adapters do
+    @test_layer_adapters
+  end
+
+  @doc """
+  Validates that an adapter module implements required callbacks.
+
+  ## Examples
+
+      {:ok, AshDSPex.Adapters.Mock} = AshDSPex.Adapters.Registry.validate_adapter(AshDSPex.Adapters.Mock)
+      {:error, _} = AshDSPex.Adapters.Registry.validate_adapter(InvalidModule)
+  """
+  @spec validate_adapter(module()) :: {:ok, module()} | {:error, String.t()}
+  def validate_adapter(adapter_module) do
+    case Code.ensure_loaded(adapter_module) do
+      {:module, _} ->
+        if function_exported?(adapter_module, :create_program, 1) and
+             function_exported?(adapter_module, :execute_program, 2) and
+             function_exported?(adapter_module, :list_programs, 0) and
+             function_exported?(adapter_module, :delete_program, 1) do
+          {:ok, adapter_module}
+        else
+          {:error, "Adapter does not implement required callbacks: #{adapter_module}"}
+        end
+
+      {:error, reason} ->
+        {:error, "Failed to load adapter #{adapter_module}: #{reason}"}
+    end
+  end
+
+  @doc """
+  Validates test layer compatibility for an adapter.
+
+  ## Examples
+
+      {:ok, _} = AshDSPex.Adapters.Registry.validate_test_layer_compatibility(AshDSPex.Adapters.Mock, :layer_1)
+      {:error, _} = AshDSPex.Adapters.Registry.validate_test_layer_compatibility(AshDSPex.Adapters.Mock, :layer_3)
+  """
+  @spec validate_test_layer_compatibility(module(), atom()) ::
+          {:ok, module()} | {:error, String.t()}
+  def validate_test_layer_compatibility(adapter_module, test_layer) do
+    # Ensure module is loaded first
+    _ = Code.ensure_loaded(adapter_module)
+
+    # Always check if the module implements supports_test_layer? first
+    if function_exported?(adapter_module, :supports_test_layer?, 1) do
+      case adapter_module.supports_test_layer?(test_layer) do
+        true -> {:ok, adapter_module}
+        false -> {:error, "Adapter #{adapter_module} does not support test layer #{test_layer}"}
+      end
+    else
+      # Assume compatibility if not implemented
+      {:ok, adapter_module}
+    end
   end
 
   @doc """
@@ -221,22 +330,32 @@ defmodule AshDSPex.Adapters.Registry do
     resolved
   end
 
-  defp resolve_adapter_name(adapter_name) when is_atom(adapter_name) do
-    Logger.debug("Using explicit adapter: #{adapter_name}")
-    adapter_name
-  end
-
   defp get_test_mode_adapter do
     if Mix.env() == :test do
-      case AshDSPex.Testing.TestMode.effective_test_mode() do
-        test_mode when is_map_key(@test_layer_adapters, test_mode) ->
-          adapter = Map.get(@test_layer_adapters, test_mode)
-          Logger.debug("Test mode #{test_mode} maps to adapter #{adapter}")
-          adapter
-
-        test_mode ->
-          Logger.debug("Test mode #{test_mode} has no adapter mapping")
+      # Only check TEST_MODE env var directly, not TestMode module
+      # to avoid circular dependencies during tests
+      case System.get_env("TEST_MODE") do
+        nil ->
           nil
+
+        env_mode ->
+          test_mode =
+            try do
+              String.to_existing_atom(env_mode)
+            rescue
+              ArgumentError -> nil
+            end
+
+          case test_mode do
+            mode when is_map_key(@test_layer_adapters, mode) ->
+              adapter = Map.get(@test_layer_adapters, mode)
+              Logger.debug("Test mode #{mode} maps to adapter #{adapter}")
+              adapter
+
+            _ ->
+              Logger.debug("Test mode #{env_mode} has no adapter mapping")
+              nil
+          end
       end
     else
       nil

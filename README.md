@@ -25,13 +25,13 @@ schema = QA.to_json_schema(:openai)
 
 ```elixir
 defmodule QuestionAnswering do
-  use AshDSPy.Signature
+  use DSPex.Signature
   
   signature question: :string -> answer: :string
 end
 
 defmodule ComplexAnalysis do
-  use AshDSPy.Signature
+  use DSPex.Signature
   
   signature text: :string, context: {:list, :string} -> 
     analysis: :reasoning_chain, 
@@ -113,7 +113,7 @@ end
 
 ```elixir
 defmodule MyApp.QA do
-  use AshDSPy.Signature
+  use DSPex.Signature
   
   signature question: :string -> answer: :string
 end
@@ -130,7 +130,7 @@ openai_schema = MyApp.QA.to_json_schema(:openai)
 anthropic_schema = MyApp.QA.to_json_schema(:anthropic)
 
 # Execute with Python bridge (requires DSPy setup)
-{:ok, result} = AshDSPy.PythonBridge.Bridge.call(:execute_program, [program_id, validated])
+{:ok, result} = DSPex.PythonBridge.Bridge.call(:execute_program, [program_id, validated])
 ```
 
 3. **Run Tests at Different Layers**:
@@ -174,11 +174,11 @@ mix test.all
 
 ### **Core Components**
 
-- **`AshDSPy.Signature`**: Native Elixir signature behavior and DSL
-- **`AshDSPy.Signature.Compiler`**: Compile-time processing and code generation
-- **`AshDSPy.PythonBridge`**: Communication with Python DSPy processes
-- **`AshDSPy.Adapters`**: Pluggable adapter system (Mock, Python, Native)
-- **`AshDSPy.Testing`**: 3-layer testing infrastructure
+- **`DSPex.Signature`**: Native Elixir signature behavior and DSL
+- **`DSPex.Signature.Compiler`**: Compile-time processing and code generation
+- **`DSPex.PythonBridge`**: Communication with Python DSPy processes
+- **`DSPex.Adapters`**: Pluggable adapter system (Mock, Python, Native)
+- **`DSPex.Testing`**: 3-layer testing infrastructure
 
 ## 🧪 Testing Philosophy
 
@@ -237,7 +237,7 @@ mix test.all
 
 ```elixir
 defmodule AdvancedAnalysis do
-  use AshDSPy.Signature
+  use DSPex.Signature
   
   signature document: :string, 
            context: {:list, :string} ->

@@ -3,7 +3,7 @@ defmodule AshDSPex.PythonBridge.MonitorTest do
   Tests for the Python bridge health monitor.
 
   Uses event-driven coordination patterns from UNIFIED_TESTING_GUIDE.md
-  to eliminate Process.sleep() usage and provide deterministic testing.
+  to provide deterministic testing.
   """
 
   use AshDSPex.UnifiedTestFoundation, :basic

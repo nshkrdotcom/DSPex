@@ -4,7 +4,7 @@ defmodule AshDSPex.PythonBridge.IntegrationTest do
 
   Tests the full bridge functionality including supervisor, bridge, and monitor
   components working together. Uses event-driven coordination patterns from
-  UNIFIED_TESTING_GUIDE.md to eliminate Process.sleep() usage.
+  UNIFIED_TESTING_GUIDE.md.
   """
 
   use AshDSPex.UnifiedTestFoundation, :supervision_testing
@@ -22,7 +22,7 @@ defmodule AshDSPex.PythonBridge.IntegrationTest do
       supervision_tree: sup_tree,
       bridge_name: bridge_name
     } do
-      # Wait for bridge to be ready instead of sleeping
+      # Wait for bridge to be ready
       assert {:ok, :ready} = wait_for_bridge_ready(sup_tree, bridge_name)
 
       # Check system status
@@ -40,7 +40,7 @@ defmodule AshDSPex.PythonBridge.IntegrationTest do
       supervision_tree: sup_tree,
       bridge_name: bridge_name
     } do
-      # Wait for bridge readiness instead of sleeping  
+      # Wait for bridge readiness
       assert {:ok, :ready} = wait_for_bridge_ready(sup_tree, bridge_name)
 
       # Perform health check - function returns :ok or {:error, issues}
@@ -82,7 +82,7 @@ defmodule AshDSPex.PythonBridge.IntegrationTest do
       supervision_tree: sup_tree,
       bridge_name: bridge_name
     } do
-      # Wait for bridge readiness instead of sleeping
+      # Wait for bridge readiness
       assert {:ok, :ready} = wait_for_bridge_ready(sup_tree, bridge_name)
 
       # Test basic connectivity
@@ -142,7 +142,7 @@ defmodule AshDSPex.PythonBridge.IntegrationTest do
       supervision_tree: _sup_tree,
       bridge_name: bridge_name
     } do
-      # Wait for bridge startup instead of sleeping
+      # Wait for bridge startup
       assert {:ok, :ready} = wait_for_bridge_startup(bridge_name, 10_000)
 
       # Create a simple DSPy program
@@ -188,7 +188,7 @@ defmodule AshDSPex.PythonBridge.IntegrationTest do
       supervision_tree: _sup_tree,
       bridge_name: bridge_name
     } do
-      # Wait for bridge startup instead of sleeping
+      # Wait for bridge startup
       assert {:ok, :ready} = wait_for_bridge_startup(bridge_name, 10_000)
 
       # Get initial stats
@@ -217,7 +217,7 @@ defmodule AshDSPex.PythonBridge.IntegrationTest do
       supervision_tree: sup_tree,
       bridge_name: bridge_name
     } do
-      # Wait for bridge readiness instead of sleeping
+      # Wait for bridge readiness
       assert {:ok, :ready} = wait_for_bridge_ready(sup_tree, bridge_name)
 
       # Send invalid command
@@ -237,7 +237,7 @@ defmodule AshDSPex.PythonBridge.IntegrationTest do
     end
 
     test "handles timeout scenarios", %{supervision_tree: sup_tree, bridge_name: bridge_name} do
-      # Wait for bridge readiness instead of sleeping
+      # Wait for bridge readiness
       assert {:ok, :ready} = wait_for_bridge_ready(sup_tree, bridge_name)
 
       # Test with very short timeout

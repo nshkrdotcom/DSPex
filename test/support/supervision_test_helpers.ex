@@ -1,7 +1,7 @@
 defmodule AshDSPex.SupervisionTestHelpers do
   @moduledoc """
   Test helpers for supervision tree isolation and process lifecycle management.
-  Eliminates all Process.sleep() usage with event-driven coordination.
+  Uses event-driven coordination.
 
   Based on patterns from UNIFIED_TESTING_GUIDE.md for proper OTP testing.
   """
@@ -11,7 +11,7 @@ defmodule AshDSPex.SupervisionTestHelpers do
   @doc """
   Waits for a bridge to be ready for operations.
 
-  Uses event-driven coordination instead of Process.sleep().
+  Uses event-driven coordination.
   Checks bridge status and Python process readiness.
   """
   @spec wait_for_bridge_ready(pid(), atom(), timeout()) :: {:ok, :ready} | {:error, term()}
@@ -92,7 +92,7 @@ defmodule AshDSPex.SupervisionTestHelpers do
           {:ok, result}
 
         {:waiting, _} ->
-          # Brief wait before retry, but not a sleep
+          # Brief wait before retry
           receive do
           after
             50 -> wait_for(fun, start_time, timeout)

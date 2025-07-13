@@ -205,7 +205,11 @@ defmodule AshDSPex.Adapters.BridgeMock do
   """
   def add_error_scenario(scenario) do
     _ = ensure_server_started()
-    BridgeMockServer.add_error_scenario(scenario)
+
+    case BridgeMockServer.add_error_scenario(scenario) do
+      {:ok, _scenario_id} -> :ok
+      error -> error
+    end
   end
 
   @doc """

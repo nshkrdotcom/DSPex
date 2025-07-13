@@ -36,13 +36,15 @@ defmodule AshDSPex.Adapters.Mock do
 
   # Public API
   def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    name = Keyword.get(opts, :name)
+    genserver_opts = if name, do: [name: name], else: []
+    GenServer.start_link(__MODULE__, opts, genserver_opts)
   end
 
   defp ensure_started do
     case Process.whereis(__MODULE__) do
       nil ->
-        case start_link() do
+        case start_link(name: __MODULE__) do
           {:ok, _pid} -> :ok
           {:error, {:already_started, _pid}} -> :ok
           error -> error
@@ -53,28 +55,28 @@ defmodule AshDSPex.Adapters.Mock do
     end
   end
 
-  def reset do
-    GenServer.call(__MODULE__, :reset)
+  def reset(server \\ __MODULE__) do
+    GenServer.call(server, :reset)
   end
 
-  def configure(config) do
-    GenServer.call(__MODULE__, {:configure, config})
+  def configure(config, server \\ __MODULE__) do
+    GenServer.call(server, {:configure, config})
   end
 
-  def set_scenario(scenario_name, scenario_config) do
-    GenServer.call(__MODULE__, {:set_scenario, scenario_name, scenario_config})
+  def set_scenario(scenario_name, scenario_config, server \\ __MODULE__) do
+    GenServer.call(server, {:set_scenario, scenario_name, scenario_config})
   end
 
-  def inject_error(error_config) do
-    GenServer.call(__MODULE__, {:inject_error, error_config})
+  def inject_error(error_config, server \\ __MODULE__) do
+    GenServer.call(server, {:inject_error, error_config})
   end
 
-  def get_programs do
-    GenServer.call(__MODULE__, :get_programs)
+  def get_programs(server \\ __MODULE__) do
+    GenServer.call(server, :get_programs)
   end
 
-  def get_executions do
-    GenServer.call(__MODULE__, :get_executions)
+  def get_executions(server \\ __MODULE__) do
+    GenServer.call(server, :get_executions)
   end
 
   # Bridge-compatible API
