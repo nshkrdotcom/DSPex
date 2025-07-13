@@ -1,0 +1,102 @@
+# The directory Mix will write compiled artifacts to.
+/_build/
+
+# If you run "mix test --cover", coverage assets end up here.
+/cover/
+
+# The directory Mix downloads your dependencies sources to.
+/deps/
+
+# Where third-party dependencies like ExDoc output generated docs.
+/doc/
+
+# If the VM crashes, it generates a dump, let's ignore it too.
+erl_crash.dump
+
+# Also ignore archive artifacts (built via "mix archive.build").
+*.ez
+
+# Ignore package tarball (built via "mix hex.build").
+ash_dspex-*.tar
+*.tar
+
+# Temporary files, for example, from tests.
+/tmp/
+
+# Ignore dialyzer output and cache
+/priv/plts/
+.dialyzer/
+.dialyzer_plt
+.dialyzer_plt.hash
+
+# Ignore LSP cache and temp files
+.elixir_ls/
+.lexical/
+
+# Ignore Credo configuration cache
+.credo/
+
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+.env.test
+*.env
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Log files
+*.log
+logs/
+
+# Phoenix specific
+/priv/static/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Phoenix Live Dashboard local storage
+/priv/static/dashboard/
+
+# If using webpack or other asset builders
+/assets/node_modules/
+
+# Release artifacts
+rel/
+*.tar.gz
+
+# Hex docs
+hex_metadata.config
+
+# Ignore backup files
+*.bak
+*.backup
+*~
+
+# Ignore test artifacts and reports
+test-reports/
+*.junit.xml
+test_output/
+
+# Ignore coverage reports
+coverage/
+lcov.info
+
+docs/ashDocs/
