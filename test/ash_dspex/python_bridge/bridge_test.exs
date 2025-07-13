@@ -24,7 +24,8 @@ defmodule AshDSPex.PythonBridge.BridgeTest do
           assert Process.alive?(pid)
 
           # Clean up
-          GenServer.stop(pid)
+          # Use longer timeout for stop to account for graceful shutdown
+          GenServer.stop(pid, :normal, 10_000)
 
         {:error, reason} ->
           # Expected if Python/DSPy not available
@@ -42,7 +43,8 @@ defmodule AshDSPex.PythonBridge.BridgeTest do
 
         {:ok, pid} ->
           # Unexpected but clean up if somehow successful
-          GenServer.stop(pid)
+          # Use longer timeout for stop to account for graceful shutdown
+          GenServer.stop(pid, :normal, 10_000)
       end
     end
   end
@@ -126,6 +128,7 @@ defmodule AshDSPex.PythonBridge.BridgeTest do
       end
     end
 
+    @tag timeout: 20_000
     test "rejects calls when bridge not ready" do
       names = unique_process_names([:bridge])
 
@@ -157,7 +160,8 @@ defmodule AshDSPex.PythonBridge.BridgeTest do
               assert true
           end
 
-          GenServer.stop(pid)
+          # Use longer timeout for stop to account for graceful shutdown
+          GenServer.stop(pid, :normal, 10_000)
 
         {:error, _reason} ->
           # Expected if Python not available

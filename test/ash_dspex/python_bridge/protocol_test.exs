@@ -1,5 +1,6 @@
 defmodule AshDSPex.PythonBridge.ProtocolTest do
   use ExUnit.Case, async: true
+  import ExUnit.CaptureLog
 
   # Layer 1: Pure Elixir protocol testing, no Python dependencies
   @moduletag :layer_1
@@ -81,15 +82,31 @@ defmodule AshDSPex.PythonBridge.ProtocolTest do
     test "handles invalid JSON" do
       invalid_json = "not json"
 
-      assert {:error, :decode_error} = Protocol.decode_response(invalid_json)
+      log =
+        capture_log(fn ->
+          assert {:error, :decode_error} = Protocol.decode_response(invalid_json)
+        end)
+
+      # Verify warning was logged with details
+      assert log =~ "JSON decode failed at position 0"
+      assert log =~ "data preview: \"not json\""
+      assert log =~ "[warning]"
     end
 
     test "handles missing required fields" do
       incomplete_response = %{"id" => 1}
       json_data = Jason.encode!(incomplete_response)
 
-      # Our improved error handling now returns the request ID for better correlation
-      assert {:error, 1, "Malformed response structure"} = Protocol.decode_response(json_data)
+      log =
+        capture_log(fn ->
+          # Our improved error handling now returns the request ID for better correlation
+          assert {:error, 1, "Malformed response structure"} = Protocol.decode_response(json_data)
+        end)
+
+      # Verify appropriate warning was logged
+      assert log =~ "Malformed response structure for request 1"
+      assert log =~ "missing required fields"
+      assert log =~ "[warning]"
     end
 
     test "handles binary data" do
@@ -102,8 +119,15 @@ defmodule AshDSPex.PythonBridge.ProtocolTest do
 
       json_binary = Jason.encode!(response_data) |> :erlang.term_to_binary()
 
-      # Our improved error handling now decodes Erlang terms containing JSON
-      assert {:ok, 1, %{"status" => "ok"}} = Protocol.decode_response(json_binary)
+      log =
+        capture_log(fn ->
+          # Our improved error handling now decodes Erlang terms containing JSON
+          assert {:ok, 1, %{"status" => "ok"}} = Protocol.decode_response(json_binary)
+        end)
+
+      # Should log that it received Erlang term format but successfully decoded it
+      assert log =~ "Received Erlang term data instead of JSON"
+      assert log =~ "Decoded Erlang term containing JSON string"
     end
   end
 

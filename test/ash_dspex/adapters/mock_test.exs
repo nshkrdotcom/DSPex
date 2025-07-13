@@ -37,10 +37,8 @@ defmodule AshDSPex.Adapters.MockTest do
 
     program_config = %{id: "test_program", signature: signature}
 
-    assert {:ok, result} = Mock.create_program(program_config)
-    assert result.program_id == "test_program"
-    assert result.status == "created"
-    assert result.signature == signature
+    assert {:ok, program_id} = Mock.create_program(program_config)
+    assert program_id == "test_program"
 
     # Verify program was stored
     programs = Mock.get_programs()
@@ -84,13 +82,10 @@ defmodule AshDSPex.Adapters.MockTest do
     {:ok, _} = Mock.create_program(%{id: "prog1", signature: signature1})
     {:ok, _} = Mock.create_program(%{id: "prog2", signature: signature2})
 
-    assert {:ok, result} = Mock.list_programs()
-    assert %{programs: programs} = result
-    assert length(programs) == 2
-
-    prog_ids = Enum.map(programs, & &1.id)
-    assert "prog1" in prog_ids
-    assert "prog2" in prog_ids
+    assert {:ok, program_ids} = Mock.list_programs()
+    assert length(program_ids) == 2
+    assert "prog1" in program_ids
+    assert "prog2" in program_ids
   end
 
   test "get_program_info returns program details" do
@@ -111,16 +106,14 @@ defmodule AshDSPex.Adapters.MockTest do
     assert {:ok, _} = Mock.get_program_info("delete_test")
 
     # Delete program
-    assert {:ok, result} = Mock.delete_program("delete_test")
-    assert result.status == "deleted"
-    assert result.program_id == "delete_test"
+    assert :ok = Mock.delete_program("delete_test")
 
     # Verify program is gone
     assert {:error, _} = Mock.get_program_info("delete_test")
   end
 
   test "statistics tracking works correctly" do
-    initial_stats = Mock.get_stats()
+    {:ok, initial_stats} = Mock.get_stats()
     assert initial_stats.programs_created == 0
     assert initial_stats.executions_run == 0
 
@@ -128,14 +121,14 @@ defmodule AshDSPex.Adapters.MockTest do
     signature = %{"inputs" => [], "outputs" => [%{"name" => "result", "type" => "string"}]}
     {:ok, _} = Mock.create_program(%{id: "stats_test", signature: signature})
 
-    stats_after_create = Mock.get_stats()
+    {:ok, stats_after_create} = Mock.get_stats()
     assert stats_after_create.programs_created == 1
     assert stats_after_create.active_programs == 1
 
     # Execute the program
     {:ok, _} = Mock.execute_program("stats_test", %{})
 
-    stats_after_execution = Mock.get_stats()
+    {:ok, stats_after_execution} = Mock.get_stats()
     assert stats_after_execution.executions_run == 1
     assert stats_after_execution.total_executions == 1
   end
@@ -174,7 +167,7 @@ defmodule AshDSPex.Adapters.MockTest do
     {:ok, _} = Mock.execute_program("reset_test", %{})
 
     # Verify state exists
-    stats = Mock.get_stats()
+    {:ok, stats} = Mock.get_stats()
     assert stats.programs_created > 0
     assert stats.executions_run > 0
 
@@ -185,7 +178,7 @@ defmodule AshDSPex.Adapters.MockTest do
     Mock.reset()
 
     # Verify state is cleared
-    new_stats = Mock.get_stats()
+    {:ok, new_stats} = Mock.get_stats()
     assert new_stats.programs_created == 0
     assert new_stats.executions_run == 0
 

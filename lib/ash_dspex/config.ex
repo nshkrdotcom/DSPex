@@ -284,12 +284,14 @@ defmodule AshDSPex.Config do
               :max_seconds
             ] do
     case Integer.parse(value) do
-      {int_val, ""} when int_val > 0 ->
+      {int_val, ""} ->
+        # Accept any valid integer for now, validation happens separately
         int_val
 
       _ ->
         Logger.warning("Invalid integer value for #{key}: #{value}")
-        value
+        # Return appropriate default based on key
+        get_default_for_key(key)
     end
   end
 
@@ -301,7 +303,8 @@ defmodule AshDSPex.Config do
 
       _ ->
         Logger.warning("Invalid non-negative integer value for #{key}: #{value}")
-        value
+        # Return appropriate default based on key
+        get_default_for_key(key)
     end
   end
 
@@ -321,11 +324,57 @@ defmodule AshDSPex.Config do
 
       _ ->
         Logger.warning("Invalid boolean value for #{key}: #{value}")
-        value
+        # Return appropriate default based on key
+        get_default_for_key(key)
     end
   end
 
   defp parse_env_value(_key, value), do: value
+
+  defp get_default_for_key(key) do
+    # Search through all default config sections to find the key
+    default_value =
+      Enum.find_value(@default_configs, fn {_section, section_config} ->
+        Map.get(section_config, key)
+      end)
+
+    # Return the found default or a sensible fallback
+    case default_value do
+      nil ->
+        cond do
+          # Timeout/interval keys should default to a positive integer
+          key in [
+            :default_timeout,
+            :health_check_interval,
+            :response_timeout,
+            :restart_delay,
+            :restart_cooldown,
+            :max_seconds
+          ] ->
+            30_000
+
+          # Count/threshold keys should default to a reasonable positive integer
+          key in [:max_retries, :failure_threshold, :max_restart_attempts, :max_restarts] ->
+            3
+
+          # Boolean keys should default to true
+          key in [
+            :validation_enabled,
+            :compile_time_checks,
+            :type_validation_strict,
+            :cache_compiled_signatures
+          ] ->
+            true
+
+          # Unknown key, return nil
+          true ->
+            nil
+        end
+
+      value ->
+        value
+    end
+  end
 
   ## Validation Functions
 

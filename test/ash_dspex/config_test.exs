@@ -1,6 +1,7 @@
 defmodule AshDSPex.ConfigTest do
   # Not async due to environment variable changes
   use ExUnit.Case, async: false
+  import ExUnit.CaptureLog
 
   alias AshDSPex.Config
 
@@ -180,13 +181,67 @@ defmodule AshDSPex.ConfigTest do
     end
 
     test "handles invalid environment variable values" do
-      System.put_env("ASH_DSPEX_BRIDGE_TIMEOUT", "invalid_number")
+      # Capture logs to verify warning is generated
+      log =
+        capture_log(fn ->
+          System.put_env("ASH_DSPEX_BRIDGE_TIMEOUT", "invalid_number")
 
-      # Should not crash, might use default or log warning
-      config = Config.get(:python_bridge)
+          config = Config.get(:python_bridge)
 
-      # Should have some timeout value (either default or the invalid string)
-      assert Map.has_key?(config, :default_timeout)
+          # Should fall back to default value
+          assert config[:default_timeout] == 30_000
+
+          # Should not crash and config should be valid
+          assert is_map(config)
+          assert Map.has_key?(config, :python_executable)
+        end)
+
+      # Verify warning was logged with specific message
+      assert log =~ "Invalid integer value for default_timeout: invalid_number"
+      assert log =~ "[warning]"
+    end
+
+    test "handles multiple invalid values with appropriate warnings" do
+      log =
+        capture_log(fn ->
+          System.put_env("ASH_DSPEX_BRIDGE_TIMEOUT", "not_a_number")
+          System.put_env("ASH_DSPEX_HEALTH_CHECK_INTERVAL", "bad_value")
+          System.put_env("ASH_DSPEX_FAILURE_THRESHOLD", "xyz")
+
+          bridge_config = Config.get(:python_bridge)
+          monitor_config = Config.get(:python_bridge_monitor)
+
+          # All should fall back to defaults
+          assert bridge_config[:default_timeout] == 30_000
+          # This comes from defaults, not env var
+          assert bridge_config[:max_retries] == 3
+          assert monitor_config[:health_check_interval] == 30_000
+          assert monitor_config[:failure_threshold] == 3
+        end)
+
+      # Verify all warnings were logged
+      assert log =~ "Invalid integer value for default_timeout: not_a_number"
+      assert log =~ "Invalid integer value for health_check_interval: bad_value"
+      assert log =~ "Invalid non-negative integer value for failure_threshold: xyz"
+    end
+
+    test "handles negative numbers appropriately" do
+      # Clean up any previously set environment variables that might interfere
+      System.delete_env("ASH_DSPEX_HEALTH_CHECK_INTERVAL")
+      System.delete_env("ASH_DSPEX_FAILURE_THRESHOLD")
+
+      log =
+        capture_log(fn ->
+          System.put_env("ASH_DSPEX_BRIDGE_TIMEOUT", "-1000")
+
+          config = Config.get(:python_bridge)
+
+          # Should accept negative number (parse succeeds)
+          assert config[:default_timeout] == -1000
+        end)
+
+      # Should not log warning for BRIDGE_TIMEOUT specifically
+      refute log =~ "Invalid integer value for default_timeout"
     end
   end
 

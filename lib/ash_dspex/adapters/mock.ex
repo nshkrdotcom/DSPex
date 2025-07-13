@@ -12,6 +12,8 @@ defmodule AshDSPex.Adapters.Mock do
   - Thread-safe concurrent operation support
   """
 
+  @behaviour AshDSPex.Adapters.Adapter
+
   # Mock adapter - implements same interface as PythonBridge adapter
   use GenServer
 
@@ -37,6 +39,20 @@ defmodule AshDSPex.Adapters.Mock do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
+  defp ensure_started do
+    case Process.whereis(__MODULE__) do
+      nil ->
+        case start_link() do
+          {:ok, _pid} -> :ok
+          {:error, {:already_started, _pid}} -> :ok
+          error -> error
+        end
+
+      _pid ->
+        :ok
+    end
+  end
+
   def reset do
     GenServer.call(__MODULE__, :reset)
   end
@@ -53,10 +69,6 @@ defmodule AshDSPex.Adapters.Mock do
     GenServer.call(__MODULE__, {:inject_error, error_config})
   end
 
-  def get_stats do
-    GenServer.call(__MODULE__, :get_stats)
-  end
-
   def get_programs do
     GenServer.call(__MODULE__, :get_programs)
   end
@@ -70,31 +82,81 @@ defmodule AshDSPex.Adapters.Mock do
     GenServer.call(__MODULE__, {:command, :ping, %{}})
   end
 
+  @impl true
   def create_program(program_config) do
-    GenServer.call(__MODULE__, {:command, :create_program, program_config})
+    _ = ensure_started()
+
+    case GenServer.call(__MODULE__, {:command, :create_program, program_config}) do
+      {:ok, %{program_id: program_id}} ->
+        {:ok, program_id}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
+  @impl true
   def execute_program(program_id, inputs) do
+    _ = ensure_started()
+
     GenServer.call(
       __MODULE__,
       {:command, :execute_program, %{program_id: program_id, inputs: inputs}}
     )
   end
 
+  @impl true
   def list_programs do
-    GenServer.call(__MODULE__, {:command, :list_programs, %{}})
+    _ = ensure_started()
+
+    case GenServer.call(__MODULE__, {:command, :list_programs, %{}}) do
+      {:ok, %{programs: programs}} ->
+        program_ids = Enum.map(programs, fn p -> Map.get(p, :id) end)
+        {:ok, program_ids}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
+  @impl true
   def get_program_info(program_id) do
+    _ = ensure_started()
     GenServer.call(__MODULE__, {:command, :get_program_info, %{program_id: program_id}})
   end
 
+  @impl true
   def delete_program(program_id) do
-    GenServer.call(__MODULE__, {:command, :delete_program, %{program_id: program_id}})
+    _ = ensure_started()
+
+    case GenServer.call(__MODULE__, {:command, :delete_program, %{program_id: program_id}}) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   def get_stats_info do
     GenServer.call(__MODULE__, {:command, :get_stats, %{}})
+  end
+
+  @impl true
+  def health_check do
+    _ = ensure_started()
+
+    case ping() do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @impl true
+  def get_stats do
+    _ = ensure_started()
+
+    case get_stats_info() do
+      {:ok, stats} -> {:ok, stats}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   # GenServer Callbacks
@@ -436,5 +498,26 @@ defmodule AshDSPex.Adapters.Mock do
 
   defp generate_execution_id do
     "mock_execution_#{:erlang.unique_integer([:positive])}"
+  end
+
+  # Test layer support
+
+  @impl true
+  def supports_test_layer?(layer), do: layer == :layer_1
+
+  @impl true
+  def get_test_capabilities do
+    %{
+      deterministic_outputs: true,
+      call_logging: true,
+      fast_execution: true,
+      python_execution: false,
+      protocol_validation: false,
+      performance: :fastest,
+      error_injection: true,
+      scenario_testing: true,
+      state_management: true,
+      concurrent_safe: true
+    }
   end
 end

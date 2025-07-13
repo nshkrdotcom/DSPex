@@ -106,14 +106,9 @@ defmodule AshDSPex.Testing.TestMode do
   @doc """
   Returns the appropriate adapter module for the current test mode.
   """
-  @spec get_adapter_module() ::
-          AshDSPex.Adapters.Mock | AshDSPex.Adapters.BridgeMock | AshDSPex.Adapters.PythonBridge
+  @spec get_adapter_module() :: module()
   def get_adapter_module do
-    case effective_test_mode() do
-      :mock_adapter -> AshDSPex.Adapters.Mock
-      :bridge_mock -> AshDSPex.Adapters.BridgeMock
-      :full_integration -> AshDSPex.Adapters.PythonBridge
-    end
+    AshDSPex.Adapters.Registry.get_adapter()
   end
 
   @doc """

@@ -1,5 +1,6 @@
 defmodule AshDSPex.Testing.TestModeTest do
   use ExUnit.Case, async: true
+  import ExUnit.CaptureIO
 
   alias AshDSPex.Testing.TestMode
 
@@ -69,10 +70,22 @@ defmodule AshDSPex.Testing.TestModeTest do
     test "handles invalid environment variable gracefully" do
       old_env = System.get_env("TEST_MODE")
 
-      System.put_env("TEST_MODE", "invalid_mode")
+      # Capture the warning that should be logged
+      warning =
+        capture_io(:stderr, fn ->
+          System.put_env("TEST_MODE", "invalid_mode")
 
-      # Should fall back to default
-      assert TestMode.current_test_mode() == :mock_adapter
+          # Should fall back to default
+          assert TestMode.current_test_mode() == :mock_adapter
+
+          # Verify system still functional with default mode
+          assert TestMode.get_adapter_module() == AshDSPex.Adapters.Mock
+          assert TestMode.layer_supports_async?() == true
+        end)
+
+      # Verify warning was logged with expected message
+      assert warning =~ "Invalid TEST_MODE: invalid_mode"
+      assert warning =~ "using default: mock_adapter"
 
       # Restore
       if old_env do
@@ -127,7 +140,7 @@ defmodule AshDSPex.Testing.TestModeTest do
       assert TestMode.get_adapter_module() == AshDSPex.Adapters.BridgeMock
 
       TestMode.set_test_mode(:full_integration)
-      assert TestMode.get_adapter_module() == AshDSPex.Adapters.PythonBridge
+      assert TestMode.get_adapter_module() == AshDSPex.Adapters.PythonPort
 
       # Restore
       if old_mode do

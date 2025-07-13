@@ -134,6 +134,41 @@ defmodule AshDSPex.Testing.BridgeMockServer do
   end
 
   @impl true
+  def handle_call({:mock_request, request}, _from, state) do
+    # Handle direct requests from the BridgeMock adapter
+    _request_id = Map.get(request, "id")
+    command = Map.get(request, "command")
+    args = Map.get(request, "args")
+
+    # Simulate the same flow as port-based requests
+    new_stats = update_in(state.stats, [:requests_received], &(&1 + 1))
+
+    # Check for error scenarios
+    case should_trigger_error?(state.error_scenarios, command, args) do
+      {:error, _error_type, message} ->
+        error_stats = update_in(new_stats, [:errors_triggered], &(&1 + 1))
+        {:reply, {:error, message}, %{state | stats: error_stats}}
+
+      :ok ->
+        # Simulate processing delay
+        if state.config.response_delay_ms > 0 do
+          Process.sleep(state.config.response_delay_ms)
+        end
+
+        # Generate mock response
+        case generate_mock_response(command, args, state) do
+          {:ok, response, new_state} ->
+            response_stats = update_in(new_state.stats, [:responses_sent], &(&1 + 1))
+            {:reply, {:ok, response}, %{new_state | stats: response_stats}}
+
+          {:error, error_message, new_state} ->
+            error_stats = update_in(new_state.stats, [:errors_triggered], &(&1 + 1))
+            {:reply, {:error, error_message}, %{new_state | stats: error_stats}}
+        end
+    end
+  end
+
+  @impl true
   def handle_info({port, {:data, data}}, %{port: port} = state) do
     # Increment request counter
     new_stats = update_in(state.stats, [:requests_received], &(&1 + 1))
