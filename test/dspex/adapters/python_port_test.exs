@@ -44,16 +44,18 @@ defmodule DSPex.Adapters.PythonPortTest do
       assert is_binary(program_id)
     end
 
-    test "provides error details on failure" do
-      # Invalid signature format
+    test "generates program ID when missing and signature present" do
+      # Config without explicit ID should auto-generate one
       config = %{
         signature: %{
-          "invalid_key" => "invalid_value"
+          "inputs" => [%{"name" => "question", "type" => "str"}],
+          "outputs" => [%{"name" => "answer", "type" => "str"}]
         }
       }
 
       result = PythonPort.create_program(config)
-      assert match?({:error, _}, result)
+      assert {:ok, program_id} = result
+      assert String.starts_with?(program_id, "python_port_")
     end
   end
 

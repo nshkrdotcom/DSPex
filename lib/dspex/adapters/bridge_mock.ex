@@ -1,26 +1,18 @@
 defmodule DSPex.Adapters.BridgeMock do
   @moduledoc """
-  Bridge mock adapter for Layer 2 testing.
+  Bridge mock adapter for testing bridge protocol without Python.
 
-  This adapter wraps the existing `DSPex.Testing.BridgeMockServer` to provide
-  a standard adapter interface for the 3-layer testing architecture. It enables
-  protocol-level testing without requiring a real Python process.
+  This adapter simulates the Python bridge by providing deterministic mock responses
+  while validating the bridge protocol format. It's designed for Layer 2 testing
+  where you want to test wire protocol correctness without requiring Python.
 
   ## Features
 
-  - Protocol validation with accurate JSON communication
-  - Wire format testing for bridge compatibility
-  - Configurable response delays and error scenarios
+  - Protocol-accurate JSON communication simulation
   - Deterministic outputs for reliable testing
-  - Fast execution compared to full Python integration
-
-  ## Test Layer Support
-
-  This adapter supports **Layer 2** of the testing architecture, providing:
-  - Bridge protocol validation
-  - JSON serialization/deserialization testing
-  - Error scenario simulation
-  - No actual Python execution
+  - Configurable response delays and error scenarios
+  - Fast execution without Python overhead
+  - Memory-based program storage
 
   ## Usage
 
@@ -34,78 +26,97 @@ defmodule DSPex.Adapters.BridgeMock do
 
   @behaviour DSPex.Adapters.Adapter
 
-  alias DSPex.Testing.BridgeMockServer
-
+  use GenServer
   require Logger
+
+  # State structure
+  defstruct [
+    :programs,
+    :config,
+    :stats,
+    :error_scenarios
+  ]
+
+  # Client API
+
+  def start_link(opts \\ []) do
+    name = Keyword.get(opts, :name, __MODULE__)
+    GenServer.start_link(__MODULE__, opts, name: name)
+  end
 
   # Core adapter operations
 
   @impl true
   def create_program(config) do
-    _ = ensure_server_started()
+    with :ok <- ensure_server_started() do
+      program_id = Map.get(config, :id) || Map.get(config, "id") || generate_program_id()
+      signature = Map.get(config, :signature) || Map.get(config, "signature")
 
-    # Convert adapter format to bridge mock format
-    args = %{
-      "id" => Map.get(config, :id) || Map.get(config, "id") || generate_program_id(),
-      "signature" => Map.get(config, :signature) || Map.get(config, "signature")
-    }
+      request = %{
+        command: "create_program",
+        args: %{
+          id: program_id,
+          signature: signature
+        }
+      }
 
-    # Send through mock server to simulate bridge protocol
-    case send_command("create_program", args) do
-      {:ok, response} ->
-        program_id = Map.get(response, "program_id") || Map.get(response, :program_id)
-        {:ok, program_id}
+      case send_mock_command(request) do
+        {:ok, response} ->
+          {:ok, Map.get(response, "program_id") || Map.get(response, :program_id)}
 
-      {:error, reason} ->
-        {:error, reason}
+        {:error, reason} ->
+          {:error, reason}
+      end
     end
   end
 
   @impl true
   def execute_program(program_id, inputs) do
-    _ = ensure_server_started()
+    with :ok <- ensure_server_started() do
+      request = %{
+        command: "execute_program",
+        args: %{
+          program_id: program_id,
+          inputs: inputs
+        }
+      }
 
-    args = %{
-      "program_id" => program_id,
-      "inputs" => inputs
-    }
-
-    case send_command("execute_program", args) do
-      {:ok, response} ->
-        {:ok, response}
-
-      {:error, reason} ->
-        {:error, reason}
+      send_mock_command(request)
     end
   end
 
   @impl true
   def list_programs do
-    _ = ensure_server_started()
+    with :ok <- ensure_server_started() do
+      request = %{command: "list_programs", args: %{}}
 
-    case send_command("list_programs", %{}) do
-      {:ok, %{"programs" => programs}} ->
-        program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
-        {:ok, program_ids}
+      case send_mock_command(request) do
+        {:ok, %{"programs" => programs}} ->
+          program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
+          {:ok, program_ids}
 
-      {:ok, %{programs: programs}} ->
-        program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
-        {:ok, program_ids}
+        {:ok, %{programs: programs}} ->
+          program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
+          {:ok, program_ids}
 
-      {:error, reason} ->
-        {:error, reason}
+        {:error, reason} ->
+          {:error, reason}
+      end
     end
   end
 
   @impl true
   def delete_program(program_id) do
-    _ = ensure_server_started()
+    with :ok <- ensure_server_started() do
+      request = %{
+        command: "delete_program",
+        args: %{program_id: program_id}
+      }
 
-    args = %{"program_id" => program_id}
-
-    case send_command("delete_program", args) do
-      {:ok, _} -> :ok
-      {:error, reason} -> {:error, reason}
+      case send_mock_command(request) do
+        {:ok, _} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
     end
   end
 
@@ -113,32 +124,39 @@ defmodule DSPex.Adapters.BridgeMock do
 
   @impl true
   def get_program_info(program_id) do
-    _ = ensure_server_started()
+    with :ok <- ensure_server_started() do
+      request = %{
+        command: "get_program_info",
+        args: %{program_id: program_id}
+      }
 
-    args = %{"program_id" => program_id}
-
-    send_command("get_program_info", args)
+      send_mock_command(request)
+    end
   end
 
   @impl true
   def health_check do
-    _ = ensure_server_started()
+    with :ok <- ensure_server_started() do
+      request = %{command: "ping", args: %{}}
 
-    case send_command("ping", %{}) do
-      {:ok, %{"status" => "ok"}} -> :ok
-      {:ok, %{status: "ok"}} -> :ok
-      {:error, reason} -> {:error, reason}
-      _ -> {:error, :unhealthy}
+      case send_mock_command(request) do
+        {:ok, %{"status" => "ok"}} -> :ok
+        {:ok, %{status: "ok"}} -> :ok
+        {:error, reason} -> {:error, reason}
+        _ -> {:error, :unhealthy}
+      end
     end
   end
 
   @impl true
   def get_stats do
-    _ = ensure_server_started()
+    with :ok <- ensure_server_started() do
+      request = %{command: "get_stats", args: %{}}
 
-    case send_command("get_stats", %{}) do
-      {:ok, stats} -> {:ok, stats}
-      {:error, reason} -> {:error, reason}
+      case send_mock_command(request) do
+        {:ok, stats} -> {:ok, stats}
+        {:error, reason} -> {:error, reason}
+      end
     end
   end
 
@@ -150,86 +168,52 @@ defmodule DSPex.Adapters.BridgeMock do
   @impl true
   def get_test_capabilities do
     %{
+      layer: :layer_2,
+      protocol_testing: true,
       protocol_validation: true,
       wire_format_testing: true,
+      wire_format_validation: true,
       python_execution: false,
-      deterministic_outputs: true,
+      error_injection: true,
       performance: :fast,
-      error_simulation: true,
-      request_correlation: true,
-      json_serialization: true
+      deterministic: true,
+      deterministic_outputs: true,
+      scenario_testing: true,
+      concurrency_safe: true
     }
   end
 
-  # Configuration and management
+  # Configuration and error injection
 
-  @doc """
-  Configures the bridge mock server with specific settings.
-
-  ## Options
-
-  - `:response_delay_ms` - Delay before sending responses (default: 10)
-  - `:error_probability` - Probability of random errors (0.0-1.0)
-  - `:timeout_probability` - Probability of timeouts (0.0-1.0)
-
-  ## Examples
-
-      DSPex.Adapters.BridgeMock.configure(%{
-        response_delay_ms: 50,
-        error_probability: 0.1
-      })
-  """
   def configure(config) do
-    _ = ensure_server_started()
-    BridgeMockServer.configure(config)
-  end
-
-  @doc """
-  Adds an error scenario to simulate specific failure conditions.
-
-  ## Scenario Options
-
-  - `:command` - Command to trigger on (or `:any`)
-  - `:probability` - Probability of triggering (0.0-1.0)
-  - `:error_type` - Type of error to return
-  - `:message` - Error message
-
-  ## Examples
-
-      DSPex.Adapters.BridgeMock.add_error_scenario(%{
-        command: "execute_program",
-        probability: 0.5,
-        error_type: :timeout,
-        message: "Simulated timeout"
-      })
-  """
-  def add_error_scenario(scenario) do
-    _ = ensure_server_started()
-
-    case BridgeMockServer.add_error_scenario(scenario) do
-      {:ok, _scenario_id} -> :ok
-      error -> error
+    with :ok <- ensure_server_started() do
+      GenServer.call(__MODULE__, {:configure, config})
     end
   end
 
-  @doc """
-  Resets the bridge mock server state.
+  def add_error_scenario(scenario) do
+    with :ok <- ensure_server_started() do
+      case GenServer.call(__MODULE__, {:add_error_scenario, scenario}) do
+        {:ok, _scenario_id} -> :ok
+        error -> error
+      end
+    end
+  end
 
-  Clears all programs, scenarios, and statistics.
-  """
   def reset do
-    _ = ensure_server_started()
-    BridgeMockServer.reset()
+    with :ok <- ensure_server_started() do
+      GenServer.call(__MODULE__, :reset)
+    end
   end
 
   # Private functions
 
   defp ensure_server_started do
-    case Process.whereis(BridgeMockServer) do
+    case Process.whereis(__MODULE__) do
       nil ->
-        Logger.debug("Starting BridgeMockServer for BridgeMock adapter")
+        Logger.debug("Starting BridgeMock adapter")
 
-        case BridgeMockServer.start_link() do
+        case start_link() do
           {:ok, _pid} -> :ok
           {:error, {:already_started, _pid}} -> :ok
           error -> error
@@ -240,31 +224,256 @@ defmodule DSPex.Adapters.BridgeMock do
     end
   end
 
-  defp send_command(command, args) do
-    # Simulate sending through the bridge protocol
-    # The mock server handles this internally, but we simulate the flow
-    request_id = System.unique_integer([:positive])
-
-    # Create a mock port-like interface
-    mock_request = %{
-      "id" => request_id,
-      "command" => command,
-      "args" => args
-    }
-
-    # Send to the mock server's internal handling
-    # This simulates what would happen through the port
-    try do
-      case GenServer.call(BridgeMockServer, {:mock_request, mock_request}, 5000) do
-        {:ok, response} -> {:ok, response}
-        {:error, reason} -> {:error, reason}
-      end
-    catch
-      :exit, {:timeout, _} -> {:error, :timeout}
-    end
+  defp send_mock_command(request) do
+    GenServer.call(__MODULE__, {:mock_command, request})
   end
 
   defp generate_program_id do
-    "bridge_mock_program_#{System.unique_integer([:positive])}"
+    "bridge_mock_program_#{:erlang.unique_integer([:positive])}"
+  end
+
+  # GenServer implementation
+
+  @impl true
+  def init(opts) do
+    config = %{
+      response_delay_ms: Keyword.get(opts, :response_delay_ms, 0),
+      error_rate: Keyword.get(opts, :error_rate, 0.0),
+      deterministic: Keyword.get(opts, :deterministic, true)
+    }
+
+    state = %__MODULE__{
+      programs: %{},
+      config: config,
+      stats: %{
+        requests_received: 0,
+        responses_sent: 0,
+        errors_triggered: 0,
+        start_time: DateTime.utc_now()
+      },
+      error_scenarios: %{}
+    }
+
+    {:ok, state}
+  end
+
+  @impl true
+  def handle_call({:configure, new_config}, _from, state) do
+    updated_config = Map.merge(state.config, new_config)
+    {:reply, :ok, %{state | config: updated_config}}
+  end
+
+  @impl true
+  def handle_call({:add_error_scenario, scenario}, _from, state) do
+    scenario_id = Map.get(scenario, :id, :erlang.unique_integer([:positive]))
+    new_scenarios = Map.put(state.error_scenarios, scenario_id, scenario)
+    {:reply, {:ok, scenario_id}, %{state | error_scenarios: new_scenarios}}
+  end
+
+  @impl true
+  def handle_call(:reset, _from, state) do
+    new_state = %{
+      state
+      | programs: %{},
+        error_scenarios: %{},
+        stats: %{
+          requests_received: 0,
+          responses_sent: 0,
+          errors_triggered: 0,
+          start_time: DateTime.utc_now()
+        }
+    }
+
+    {:reply, :ok, new_state}
+  end
+
+  @impl true
+  def handle_call({:mock_command, request}, _from, state) do
+    command = Map.get(request, :command) || Map.get(request, "command")
+    args = Map.get(request, :args) || Map.get(request, "args", %{})
+
+    # Update stats
+    new_stats = update_in(state.stats, [:requests_received], &(&1 + 1))
+
+    # Check for error scenarios
+    case should_trigger_error?(state.error_scenarios, command, args) do
+      {:error, _error_type, message} ->
+        error_stats = update_in(new_stats, [:errors_triggered], &(&1 + 1))
+        {:reply, {:error, message}, %{state | stats: error_stats}}
+
+      :ok ->
+        # Simulate processing delay
+        if state.config.response_delay_ms > 0 do
+          Process.sleep(state.config.response_delay_ms)
+        end
+
+        # Generate mock response
+        case generate_mock_response(command, args, state) do
+          {:ok, response, new_state} ->
+            response_stats = update_in(new_state.stats, [:responses_sent], &(&1 + 1))
+            {:reply, {:ok, response}, %{new_state | stats: response_stats}}
+
+          {:error, error_message, new_state} ->
+            error_stats = update_in(new_state.stats, [:errors_triggered], &(&1 + 1))
+            {:reply, {:error, error_message}, %{new_state | stats: error_stats}}
+        end
+    end
+  end
+
+  # Mock response generation
+
+  defp generate_mock_response("ping", _args, state) do
+    response = %{
+      status: "ok",
+      server: "bridge_mock",
+      timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+
+    {:ok, response, state}
+  end
+
+  defp generate_mock_response("create_program", args, state) do
+    program_id = Map.get(args, "id") || Map.get(args, :id) || generate_program_id()
+    signature = Map.get(args, "signature") || Map.get(args, :signature)
+
+    if signature do
+      program = %{
+        id: program_id,
+        signature: signature,
+        created_at: DateTime.utc_now()
+      }
+
+      new_programs = Map.put(state.programs, program_id, program)
+
+      response = %{
+        program_id: program_id,
+        status: "created",
+        signature: signature
+      }
+
+      {:ok, response, %{state | programs: new_programs}}
+    else
+      {:error, "Program signature is required", state}
+    end
+  end
+
+  defp generate_mock_response("execute_program", args, state) do
+    program_id = Map.get(args, "program_id") || Map.get(args, :program_id)
+    inputs = Map.get(args, "inputs") || Map.get(args, :inputs, %{})
+
+    case Map.get(state.programs, program_id) do
+      nil ->
+        {:error, "Program not found: #{program_id}", state}
+
+      program ->
+        # Generate deterministic mock output based on signature
+        mock_outputs = generate_signature_outputs(program.signature, inputs)
+        {:ok, mock_outputs, state}
+    end
+  end
+
+  defp generate_mock_response("list_programs", _args, state) do
+    programs =
+      state.programs
+      |> Enum.map(fn {id, program} ->
+        %{
+          id: id,
+          signature: program.signature,
+          created_at: program.created_at
+        }
+      end)
+
+    response = %{programs: programs}
+    {:ok, response, state}
+  end
+
+  defp generate_mock_response("get_stats", _args, state) do
+    response = %{
+      programs_created: map_size(state.programs),
+      server_type: "bridge_mock",
+      adapter_type: :bridge_mock,
+      layer: :layer_2,
+      protocol_validated: true,
+      uptime_seconds: DateTime.diff(DateTime.utc_now(), state.stats.start_time, :second)
+    }
+
+    {:ok, response, state}
+  end
+
+  defp generate_mock_response("delete_program", args, state) do
+    program_id = Map.get(args, "program_id") || Map.get(args, :program_id)
+
+    case Map.get(state.programs, program_id) do
+      nil ->
+        {:error, "Program not found: #{program_id}", state}
+
+      _program ->
+        new_programs = Map.delete(state.programs, program_id)
+
+        response = %{
+          status: "deleted",
+          program_id: program_id
+        }
+
+        {:ok, response, %{state | programs: new_programs}}
+    end
+  end
+
+  defp generate_mock_response("get_program_info", args, state) do
+    program_id = Map.get(args, "program_id") || Map.get(args, :program_id)
+
+    case Map.get(state.programs, program_id) do
+      nil ->
+        {:error, "Program not found: #{program_id}", state}
+
+      program ->
+        {:ok, program, state}
+    end
+  end
+
+  defp generate_mock_response(command, _args, state) do
+    {:error, "Unknown command: #{command}", state}
+  end
+
+  defp generate_signature_outputs(signature, inputs) do
+    outputs = Map.get(signature, "outputs", [])
+    input_hash = :erlang.phash2(inputs)
+
+    Enum.reduce(outputs, %{}, fn output, acc ->
+      name = Map.get(output, "name")
+      type = Map.get(output, "type", "string")
+
+      mock_value =
+        case type do
+          "string" -> "bridge_mock_#{name}_#{input_hash}"
+          "int" -> rem(input_hash, 1000)
+          "float" -> rem(input_hash, 1000) / 10.0
+          "bool" -> rem(input_hash, 2) == 0
+          _ -> "bridge_mock_#{name}_#{input_hash}"
+        end
+
+      Map.put(acc, name, mock_value)
+    end)
+  end
+
+  defp should_trigger_error?(error_scenarios, command, _args) do
+    # Check if any error scenario matches this command
+    error_scenarios
+    |> Enum.find_value(:ok, fn {_id, scenario} ->
+      scenario_command = Map.get(scenario, :command)
+      scenario_probability = Map.get(scenario, :probability, 1.0)
+
+      if scenario_command == command or scenario_command == :any do
+        if :rand.uniform() < scenario_probability do
+          error_type = Map.get(scenario, :error_type, :mock_error)
+          message = Map.get(scenario, :message, "Mock error triggered")
+          {:error, error_type, message}
+        else
+          :ok
+        end
+      else
+        nil
+      end
+    end)
   end
 end

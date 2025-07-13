@@ -135,8 +135,8 @@ defmodule DSPex.Testing.TestMode do
         DSPex.Adapters.Mock.start_link()
 
       :bridge_mock ->
-        # Start bridge mock server
-        DSPex.Testing.BridgeMockServer.start_link()
+        # Bridge mock adapter will auto-start when needed
+        :ok
 
       :full_integration ->
         # Services will be started by the regular supervision tree
@@ -158,10 +158,7 @@ defmodule DSPex.Testing.TestMode do
         :ok
 
       :bridge_mock ->
-        if Process.whereis(DSPex.Testing.BridgeMockServer) do
-          DSPex.Testing.BridgeMockServer.stop()
-        end
-
+        # Bridge mock adapter is self-contained, no external process to stop
         :ok
 
       :full_integration ->
@@ -343,8 +340,9 @@ defmodule DSPex.Testing.TestMode do
         end
 
       :bridge_mock ->
-        if Process.whereis(DSPex.Testing.BridgeMockServer) do
-          DSPex.Testing.BridgeMockServer.reset()
+        # Reset the bridge mock adapter if it's running
+        if Process.whereis(DSPex.Adapters.BridgeMock) do
+          DSPex.Adapters.BridgeMock.reset()
         end
 
       :full_integration ->

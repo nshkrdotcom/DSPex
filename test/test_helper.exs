@@ -3,6 +3,9 @@ Code.require_file("support/supervision_test_helpers.ex", __DIR__)
 Code.require_file("support/bridge_test_helpers.ex", __DIR__)
 Code.require_file("support/monitor_test_helpers.ex", __DIR__)
 Code.require_file("support/unified_test_foundation.ex", __DIR__)
+Code.require_file("support/testing/test_mode.ex", __DIR__)
+Code.require_file("support/testing/bridge_mock_server.ex", __DIR__)
+Code.require_file("support/testing/mock_isolation.ex", __DIR__)
 
 # Enable Python bridge for tests when GEMINI_API_KEY is available
 gemini_key = System.get_env("GEMINI_API_KEY")

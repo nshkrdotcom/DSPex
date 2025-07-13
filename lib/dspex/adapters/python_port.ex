@@ -132,7 +132,20 @@ defmodule DSPex.Adapters.PythonPort do
   def get_program_info(program_id) do
     ensure_bridge_started()
 
-    Bridge.call(:get_program_info, %{program_id: program_id})
+    case Bridge.call(:get_program_info, %{program_id: program_id}) do
+      {:ok, info} ->
+        # Ensure the program ID is included in the response
+        enhanced_info =
+          Map.merge(info, %{
+            "id" => program_id,
+            :id => program_id
+          })
+
+        {:ok, enhanced_info}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   @impl true
@@ -151,7 +164,21 @@ defmodule DSPex.Adapters.PythonPort do
   def get_stats do
     ensure_bridge_started()
 
-    Bridge.call(:get_stats, %{})
+    case Bridge.call(:get_stats, %{}) do
+      {:ok, bridge_stats} ->
+        # Enhance bridge stats with adapter-specific information
+        adapter_stats =
+          Map.merge(bridge_stats, %{
+            adapter_type: :python_port,
+            layer: :layer_3,
+            python_execution: true
+          })
+
+        {:ok, adapter_stats}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   # Test layer support
@@ -215,14 +242,22 @@ defmodule DSPex.Adapters.PythonPort do
   defp convert_config(config) do
     # Convert adapter config format to bridge format
     # The bridge expects certain keys in specific formats
-    config
-    |> Map.new(fn
-      {:id, value} -> {"id", value}
-      {"id", value} -> {"id", value}
-      {:signature, value} -> {"signature", convert_signature(value)}
-      {"signature", value} -> {"signature", convert_signature(value)}
-      {key, value} -> {to_string(key), value}
-    end)
+    converted =
+      config
+      |> Map.new(fn
+        {:id, value} -> {"id", value}
+        {"id", value} -> {"id", value}
+        {:signature, value} -> {"signature", convert_signature(value)}
+        {"signature", value} -> {"signature", convert_signature(value)}
+        {key, value} -> {to_string(key), value}
+      end)
+
+    # Ensure program ID is present - generate one if missing
+    case Map.get(converted, "id") do
+      nil -> Map.put(converted, "id", generate_program_id())
+      "" -> Map.put(converted, "id", generate_program_id())
+      _id -> converted
+    end
   end
 
   defp convert_signature(signature) when is_map(signature) do
@@ -258,5 +293,9 @@ defmodule DSPex.Adapters.PythonPort do
       Map.get(response, :program_id) ||
       Map.get(response, "id") ||
       Map.get(response, :id)
+  end
+
+  defp generate_program_id do
+    "python_port_#{:erlang.unique_integer([:positive])}"
   end
 end

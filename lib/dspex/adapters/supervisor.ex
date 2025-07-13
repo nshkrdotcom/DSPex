@@ -10,7 +10,6 @@ defmodule DSPex.Adapters.Supervisor do
   use Supervisor
 
   alias DSPex.Adapters.Registry
-  alias DSPex.Testing.TestMode
 
   require Logger
 
@@ -172,7 +171,8 @@ defmodule DSPex.Adapters.Supervisor do
   end
 
   defp determine_test_adapters(opts) do
-    test_mode = Keyword.get(opts, :test_mode) || TestMode.current_test_mode()
+    # Use environment variable or explicit test_mode option
+    test_mode = Keyword.get(opts, :test_mode) || get_test_mode_from_env()
 
     case test_mode do
       :mock_adapter -> [:mock]
@@ -180,6 +180,15 @@ defmodule DSPex.Adapters.Supervisor do
       :full_integration -> [:mock, :bridge_mock, :python_port]
       # Default to mock for safety
       _ -> [:mock]
+    end
+  end
+
+  defp get_test_mode_from_env do
+    case System.get_env("TEST_MODE") do
+      "mock_adapter" -> :mock_adapter
+      "bridge_mock" -> :bridge_mock
+      "full_integration" -> :full_integration
+      _ -> :mock_adapter
     end
   end
 
