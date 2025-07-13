@@ -1,4 +1,4 @@
-# Ash DSPy Integration
+# DSPex
 
 > **Revolutionary ML Infrastructure**: Native Elixir syntax for DSPy programs with production-ready Ash framework integration.
 
@@ -8,7 +8,7 @@
 
 ## 🚀 Vision
 
-Ash DSPy Integration brings DSPy's declarative language model programming to the Elixir ecosystem with **native signature syntax** and production-ready infrastructure. Instead of Python's verbose class-based signatures, write elegant Elixir:
+DSPex brings DSPy's declarative language model programming to the Elixir ecosystem with **native signature syntax** and production-ready infrastructure. Instead of Python's verbose class-based signatures, write elegant Elixir:
 
 ```elixir
 # Instead of Python DSPy's verbose syntax
