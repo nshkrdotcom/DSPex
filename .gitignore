@@ -100,3 +100,6 @@ coverage/
 lcov.info
 
 docs/ashDocs/
+
+
+repomix*.xml

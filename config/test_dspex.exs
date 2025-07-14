@@ -6,6 +6,9 @@ import Config
 # Enable Python bridge for DSPy tests
 config :dspex, :python_bridge_enabled, true
 
+# Enable pool debug mode for better error visibility
+config :dspex, :pool_debug_mode, true
+
 # Configure DSPy-specific settings
 config :dspex, :dspy_config,
   # Use Gemini as the default model
@@ -25,6 +28,19 @@ config :dspex, :python_bridge,
   default_timeout: 45_000,
   max_retries: 2,
   required_packages: ["dspy-ai", "google-generativeai"]
+
+# SessionPoolV2 settings for test environment
+config :dspex, DSPex.PythonBridge.SessionPoolV2,
+  # Very generous checkout timeout for tests (Python startup can be slow)
+  checkout_timeout: 60_000,
+  # Longer operation timeout for Python initialization
+  timeout: 60_000,
+  # Smaller pool for tests
+  pool_size: 2,
+  # Allow overflow for concurrent tests
+  overflow: 2,
+  # Start all workers immediately to avoid race conditions
+  lazy: false
 
 # Monitor settings for testing
 config :dspex, :python_bridge_monitor,

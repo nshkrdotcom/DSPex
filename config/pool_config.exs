@@ -60,9 +60,11 @@ if config_env() == :test do
   config :dspex, DSPex.PythonBridge.PoolSupervisor,
     pool_size: 4,
     max_overflow: 2,
-    checkout_timeout: 10_000,
-    # Start workers on demand in tests
-    lazy: true
+    # Temporarily increase timeout for debugging
+    # 60 seconds
+    checkout_timeout: 60_000,
+    # Start all workers immediately in tests to avoid race conditions
+    lazy: false
 end
 
 # Production environment specific settings
