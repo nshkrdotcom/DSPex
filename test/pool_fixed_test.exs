@@ -4,10 +4,24 @@ defmodule PoolFixedTest do
 
   @moduletag :layer_3
 
-  test "pool works with lazy initialization" do
-    # Ensure pooling is enabled
-    Application.put_env(:dspex, :pooling_enabled, true)
+  setup do
+    # Check if TEST_MODE and pooling are configured correctly
+    test_mode = System.get_env("TEST_MODE", "unit")
+    pooling_enabled = Application.get_env(:dspex, :pooling_enabled, false)
 
+    cond do
+      test_mode != "full_integration" ->
+        {:ok, skip: "Skipping pool tests - TEST_MODE=#{test_mode} (requires full_integration)"}
+
+      not pooling_enabled ->
+        {:ok, skip: "Skipping pool tests - pooling_enabled=#{pooling_enabled} (requires true)"}
+
+      true ->
+        :ok
+    end
+  end
+
+  test "pool works with lazy initialization" do
     # Start the app
     {:ok, _} = Application.ensure_all_started(:dspex)
 
@@ -30,7 +44,7 @@ defmodule PoolFixedTest do
 
     # Try to use the pool through the adapter
     adapter = DSPex.Adapters.Registry.get_adapter()
-    assert adapter == DSPex.Adapters.PythonPool
+    assert adapter == DSPex.Adapters.PythonPoolV2
 
     # Try a health check
     IO.puts("\nTrying health check...")

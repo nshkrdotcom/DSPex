@@ -40,7 +40,7 @@ defmodule DSPex.Adapters.PythonPort do
 
   @behaviour DSPex.Adapters.Adapter
 
-  alias DSPex.PythonBridge.Bridge
+  alias DSPex.PythonBridge.{Bridge, SessionPool}
 
   require Logger
 
@@ -50,14 +50,30 @@ defmodule DSPex.Adapters.PythonPort do
   def create_program(config) do
     case ensure_bridge_started() do
       :ok ->
-        # Use existing Bridge.call/2 infrastructure
-        case Bridge.call(:create_program, convert_config(config)) do
-          {:ok, response} ->
-            program_id = extract_program_id(response)
-            {:ok, program_id}
+        # Use appropriate backend based on pooling mode
+        if Process.get(:use_pool_mode, false) do
+          # Use SessionPool for pooled mode
+          python_config = convert_config(config)
+          session_id = Map.get(config, :session_id, "anonymous")
+          
+          case SessionPool.execute_in_session(session_id, :create_program, python_config) do
+            {:ok, response} ->
+              program_id = extract_program_id(response)
+              {:ok, program_id}
 
-          {:error, reason} ->
-            {:error, reason}
+            {:error, reason} ->
+              {:error, reason}
+          end
+        else
+          # Use existing Bridge.call/2 infrastructure
+          case Bridge.call(:create_program, convert_config(config)) do
+            {:ok, response} ->
+              program_id = extract_program_id(response)
+              {:ok, program_id}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
         end
 
       {:error, reason} ->
@@ -74,12 +90,25 @@ defmodule DSPex.Adapters.PythonPort do
           inputs: inputs
         }
 
-        case Bridge.call(:execute_program, args) do
-          {:ok, response} ->
-            {:ok, response}
+        if Process.get(:use_pool_mode, false) do
+          # Use SessionPool for pooled mode
+          session_id = Map.get(inputs, :session_id, "anonymous")
+          
+          case SessionPool.execute_in_session(session_id, :execute_program, args) do
+            {:ok, response} ->
+              {:ok, response}
 
-          {:error, reason} ->
-            {:error, reason}
+            {:error, reason} ->
+              {:error, reason}
+          end
+        else
+          case Bridge.call(:execute_program, args) do
+            {:ok, response} ->
+              {:ok, response}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
         end
 
       {:error, reason} ->
@@ -97,12 +126,25 @@ defmodule DSPex.Adapters.PythonPort do
           options: options
         }
 
-        case Bridge.call(:execute_program, args) do
-          {:ok, response} ->
-            {:ok, response}
+        if Process.get(:use_pool_mode, false) do
+          # Use SessionPool for pooled mode
+          session_id = Map.get(options, :session_id, Map.get(inputs, :session_id, "anonymous"))
+          
+          case SessionPool.execute_in_session(session_id, :execute_program, args, options) do
+            {:ok, response} ->
+              {:ok, response}
 
-          {:error, reason} ->
-            {:error, reason}
+            {:error, reason} ->
+              {:error, reason}
+          end
+        else
+          case Bridge.call(:execute_program, args) do
+            {:ok, response} ->
+              {:ok, response}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
         end
 
       {:error, reason} ->
@@ -114,17 +156,33 @@ defmodule DSPex.Adapters.PythonPort do
   def list_programs do
     case ensure_bridge_started() do
       :ok ->
-        case Bridge.call(:list_programs, %{}) do
-          {:ok, %{"programs" => programs}} ->
-            program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
-            {:ok, program_ids}
+        if Process.get(:use_pool_mode, false) do
+          # Use SessionPool for pooled mode
+          case SessionPool.execute_anonymous(:list_programs, %{}) do
+            {:ok, %{"programs" => programs}} ->
+              program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
+              {:ok, program_ids}
 
-          {:ok, %{programs: programs}} ->
-            program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
-            {:ok, program_ids}
+            {:ok, %{programs: programs}} ->
+              program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
+              {:ok, program_ids}
 
-          {:error, reason} ->
-            {:error, reason}
+            {:error, reason} ->
+              {:error, reason}
+          end
+        else
+          case Bridge.call(:list_programs, %{}) do
+            {:ok, %{"programs" => programs}} ->
+              program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
+              {:ok, program_ids}
+
+            {:ok, %{programs: programs}} ->
+              program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
+              {:ok, program_ids}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
         end
 
       {:error, reason} ->
@@ -136,9 +194,17 @@ defmodule DSPex.Adapters.PythonPort do
   def delete_program(program_id) do
     case ensure_bridge_started() do
       :ok ->
-        case Bridge.call(:delete_program, %{program_id: program_id}) do
-          {:ok, _} -> :ok
-          {:error, reason} -> {:error, reason}
+        if Process.get(:use_pool_mode, false) do
+          # Use SessionPool for pooled mode
+          case SessionPool.execute_anonymous(:delete_program, %{program_id: program_id}) do
+            {:ok, _} -> :ok
+            {:error, reason} -> {:error, reason}
+          end
+        else
+          case Bridge.call(:delete_program, %{program_id: program_id}) do
+            {:ok, _} -> :ok
+            {:error, reason} -> {:error, reason}
+          end
         end
 
       {:error, reason} ->
@@ -152,19 +218,37 @@ defmodule DSPex.Adapters.PythonPort do
   def get_program_info(program_id) do
     case ensure_bridge_started() do
       :ok ->
-        case Bridge.call(:get_program_info, %{program_id: program_id}) do
-          {:ok, info} ->
-            # Ensure the program ID is included in the response
-            enhanced_info =
-              Map.merge(info, %{
-                "id" => program_id,
-                :id => program_id
-              })
+        if Process.get(:use_pool_mode, false) do
+          # Use SessionPool for pooled mode
+          case SessionPool.execute_anonymous(:get_program_info, %{program_id: program_id}) do
+            {:ok, info} ->
+              # Ensure the program ID is included in the response
+              enhanced_info =
+                Map.merge(info, %{
+                  "id" => program_id,
+                  :id => program_id
+                })
 
-            {:ok, enhanced_info}
+              {:ok, enhanced_info}
 
-          {:error, reason} ->
-            {:error, reason}
+            {:error, reason} ->
+              {:error, reason}
+          end
+        else
+          case Bridge.call(:get_program_info, %{program_id: program_id}) do
+            {:ok, info} ->
+              # Ensure the program ID is included in the response
+              enhanced_info =
+                Map.merge(info, %{
+                  "id" => program_id,
+                  :id => program_id
+                })
+
+              {:ok, enhanced_info}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
         end
 
       {:error, reason} ->
@@ -176,11 +260,21 @@ defmodule DSPex.Adapters.PythonPort do
   def health_check do
     case ensure_bridge_started() do
       :ok ->
-        case Bridge.call(:ping, %{}) do
-          {:ok, %{"status" => "ok"}} -> :ok
-          {:ok, %{status: "ok"}} -> :ok
-          {:error, reason} -> {:error, reason}
-          _ -> {:error, :unhealthy}
+        if Process.get(:use_pool_mode, false) do
+          # Use SessionPool for pooled mode
+          case SessionPool.execute_anonymous(:ping, %{}) do
+            {:ok, %{"status" => "ok"}} -> :ok
+            {:ok, %{status: "ok"}} -> :ok
+            {:error, reason} -> {:error, reason}
+            _ -> {:error, :unhealthy}
+          end
+        else
+          case Bridge.call(:ping, %{}) do
+            {:ok, %{"status" => "ok"}} -> :ok
+            {:ok, %{status: "ok"}} -> :ok
+            {:error, reason} -> {:error, reason}
+            _ -> {:error, :unhealthy}
+          end
         end
 
       {:error, reason} ->
@@ -192,20 +286,41 @@ defmodule DSPex.Adapters.PythonPort do
   def get_stats do
     case ensure_bridge_started() do
       :ok ->
-        case Bridge.call(:get_stats, %{}) do
-          {:ok, bridge_stats} ->
-            # Enhance bridge stats with adapter-specific information
-            adapter_stats =
-              Map.merge(bridge_stats, %{
-                adapter_type: :python_port,
-                layer: :layer_3,
-                python_execution: true
-              })
+        if Process.get(:use_pool_mode, false) do
+          # Use SessionPool for pooled mode
+          case SessionPool.execute_anonymous(:get_stats, %{}) do
+            {:ok, bridge_stats} ->
+              # Enhance bridge stats with adapter-specific information
+              adapter_stats =
+                Map.merge(bridge_stats, %{
+                  adapter_type: :python_port,
+                  layer: :layer_3,
+                  python_execution: true,
+                  pooling_enabled: true
+                })
 
-            {:ok, adapter_stats}
+              {:ok, adapter_stats}
 
-          {:error, reason} ->
-            {:error, reason}
+            {:error, reason} ->
+              {:error, reason}
+          end
+        else
+          case Bridge.call(:get_stats, %{}) do
+            {:ok, bridge_stats} ->
+              # Enhance bridge stats with adapter-specific information
+              adapter_stats =
+                Map.merge(bridge_stats, %{
+                  adapter_type: :python_port,
+                  layer: :layer_3,
+                  python_execution: true,
+                  pooling_enabled: false
+                })
+
+              {:ok, adapter_stats}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
         end
 
       {:error, reason} ->
@@ -217,11 +332,21 @@ defmodule DSPex.Adapters.PythonPort do
   def configure_lm(config) do
     case ensure_bridge_started() do
       :ok ->
-        case Bridge.call(:configure_lm, config) do
-          {:ok, %{"status" => "configured"}} -> :ok
-          {:ok, %{status: "configured"}} -> :ok
-          {:error, reason} -> {:error, reason}
-          _ -> {:error, :configuration_failed}
+        if Process.get(:use_pool_mode, false) do
+          # Use SessionPool for pooled mode
+          case SessionPool.execute_anonymous(:configure_lm, config) do
+            {:ok, %{"status" => "configured"}} -> :ok
+            {:ok, %{status: "configured"}} -> :ok
+            {:error, reason} -> {:error, reason}
+            _ -> {:error, :configuration_failed}
+          end
+        else
+          case Bridge.call(:configure_lm, config) do
+            {:ok, %{"status" => "configured"}} -> :ok
+            {:ok, %{status: "configured"}} -> :ok
+            {:error, reason} -> {:error, reason}
+            _ -> {:error, :configuration_failed}
+          end
         end
 
       {:error, reason} ->
@@ -258,7 +383,12 @@ defmodule DSPex.Adapters.PythonPort do
   def get_bridge_status do
     case ensure_bridge_started() do
       :ok ->
-        Bridge.get_status()
+        if Process.get(:use_pool_mode, false) do
+          # Get pool status instead
+          SessionPool.get_pool_status()
+        else
+          Bridge.get_status()
+        end
 
       {:error, reason} ->
         {:error, reason}
@@ -273,7 +403,12 @@ defmodule DSPex.Adapters.PythonPort do
   def restart_bridge do
     case ensure_bridge_started() do
       :ok ->
-        Bridge.restart()
+        if Process.get(:use_pool_mode, false) do
+          # Cannot restart pool from here
+          {:error, "Cannot restart pool - use pool supervisor"}
+        else
+          Bridge.restart()
+        end
 
       {:error, reason} ->
         {:error, reason}
@@ -283,17 +418,60 @@ defmodule DSPex.Adapters.PythonPort do
   # Private functions
 
   defp ensure_bridge_started do
-    # The bridge is managed by the supervision tree in full integration mode
-    # We just need to check if it's running
-    case Process.whereis(Bridge) do
-      nil ->
-        # In test mode, the bridge should be started by the supervision tree
-        # based on the TEST_MODE configuration
-        Logger.error("Python bridge not running - check supervision configuration")
-        {:error, "Python bridge not available"}
-
-      _pid ->
+    # Use Process.whereis first (more reliable than Registry)
+    pool_pid = Process.whereis(DSPex.PythonBridge.SessionPool)
+    bridge_pid = Process.whereis(DSPex.PythonBridge.Bridge)
+    
+    cond do
+      # If pool is running, use it regardless of configuration
+      pool_pid != nil and Process.alive?(pool_pid) ->
+        Process.put(:use_pool_mode, true)
+        Logger.debug("Using Python session pool: #{inspect(pool_pid)}")
         :ok
+        
+      # If bridge is running, use it
+      bridge_pid != nil and Process.alive?(bridge_pid) ->
+        Process.put(:use_pool_mode, false)
+        Logger.debug("Using Python bridge: #{inspect(bridge_pid)}")
+        :ok
+        
+      # Fall back to Registry lookup if Process.whereis returns nil
+      true ->
+        case detect_via_registry() do
+          {:ok, mode} ->
+            Process.put(:use_pool_mode, mode == :pool)
+            Logger.debug("Detected via Registry: #{if mode == :pool, do: "pool", else: "bridge"}")
+            :ok
+            
+          {:error, reason} ->
+            Logger.error("Python bridge not available: #{reason}")
+            {:error, "Python bridge not available"}
+        end
+    end
+  end
+
+  defp detect_via_registry do
+    # Try Registry lookup as fallback
+    pool_lookup = Registry.lookup(DSPex.Registry, {DSPex.PythonBridge.SessionPool, :pool})
+    bridge_lookup = Registry.lookup(DSPex.Registry, DSPex.PythonBridge.Bridge)
+    
+    case {pool_lookup, bridge_lookup} do
+      {[{pool_pid, _}], _} when is_pid(pool_pid) ->
+        if Process.alive?(pool_pid) do
+          {:ok, :pool}
+        else
+          {:error, "Pool process found but not alive"}
+        end
+        
+      {_, [{bridge_pid, _}]} when is_pid(bridge_pid) ->
+        if Process.alive?(bridge_pid) do
+          {:ok, :bridge}
+        else
+          {:error, "Bridge process found but not alive"}
+        end
+        
+      _ ->
+        {:error, "No Python service found in Registry"}
     end
   end
 

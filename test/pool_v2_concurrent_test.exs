@@ -130,7 +130,7 @@ defmodule PoolV2ConcurrentTest do
             )
 
           case result do
-            {:ok, program_id} ->
+            {:ok, _program_id} ->
               # List programs to verify it was created
               list_result =
                 SessionPoolV2.execute_in_session("blocking_test_#{i}", :list_programs, %{},
@@ -151,7 +151,12 @@ defmodule PoolV2ConcurrentTest do
 
     # All operations should succeed
     for {i, result} <- results do
-      assert {:ok, programs} = result
+      assert {:ok, response} = result
+      # The response is a map with "programs" key
+      assert is_map(response)
+      assert Map.has_key?(response, "programs") or Map.has_key?(response, :programs)
+      
+      programs = Map.get(response, "programs") || Map.get(response, :programs)
       assert is_list(programs)
       assert length(programs) > 0
       IO.puts("Session #{i} has #{length(programs)} programs")

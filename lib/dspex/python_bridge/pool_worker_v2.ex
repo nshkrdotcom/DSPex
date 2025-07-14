@@ -110,7 +110,8 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
         handle_anonymous_checkout(from, worker_state, pool_state)
 
       _ ->
-        {:error, {:invalid_checkout_type, checkout_type}}
+        # NimblePool expects :remove or :skip, not :error
+        {:remove, {:invalid_checkout_type, checkout_type}, pool_state}
     end
   end
 
@@ -182,27 +183,31 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
         stats: Map.update(worker_state.stats, :checkouts, 1, &(&1 + 1))
     }
 
-    # Connect port to checking out process with Process.alive? guard
-    try do
-      if is_port(worker_state.port) and Process.alive?(pid) do
-        Port.connect(worker_state.port, pid)
-      else
-        Logger.error(
-          "[#{worker_state.worker_id}] Cannot connect port - port valid: #{is_port(worker_state.port)}, pid #{inspect(pid)} alive: #{Process.alive?(pid)}"
-        )
+    # Use safe port connection
+    case safe_port_connect(worker_state.port, pid, worker_state.worker_id) do
+      {:ok, _port} ->
+        # Return worker state as client state
+        {:ok, updated_state, updated_state, pool_state}
 
-        raise ArgumentError, "Invalid port or dead process"
-      end
+      {:error, :not_a_pid} ->
+        Logger.error("[#{worker_state.worker_id}] Invalid PID type during checkout: #{inspect(pid)}")
+        {:remove, {:checkout_failed, :invalid_pid}, pool_state}
 
-      # Return worker state as client state
-      {:ok, updated_state, updated_state, pool_state}
-    catch
-      :error, reason ->
-        Logger.error(
-          "[#{worker_state.worker_id}] Failed to connect port to PID #{inspect(pid)} (alive? #{Process.alive?(pid)}): #{inspect(reason)}"
-        )
+      {:error, :process_not_alive} ->
+        Logger.error("[#{worker_state.worker_id}] Target process not alive during checkout: #{inspect(pid)}")
+        {:remove, {:checkout_failed, :process_not_alive}, pool_state}
 
-        {:error, reason}
+      {:error, :port_closed} ->
+        Logger.error("[#{worker_state.worker_id}] Port closed during checkout")
+        {:remove, {:checkout_failed, :port_closed}, pool_state}
+
+      {:error, :port_not_owned} ->
+        Logger.error("[#{worker_state.worker_id}] Port not owned by worker during checkout")
+        {:remove, {:checkout_failed, :port_not_owned}, pool_state}
+
+      {:error, reason} ->
+        Logger.error("[#{worker_state.worker_id}] Port connection failed: #{inspect(reason)}")
+        {:remove, {:checkout_failed, reason}, pool_state}
     end
   end
 
@@ -213,25 +218,31 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
       | stats: Map.update(worker_state.stats, :checkouts, 1, &(&1 + 1))
     }
 
-    try do
-      if is_port(updated_state.port) and Process.alive?(pid) do
-        Port.connect(updated_state.port, pid)
-      else
-        Logger.error(
-          "[#{worker_state.worker_id}] Cannot connect port - port valid: #{is_port(updated_state.port)}, pid #{inspect(pid)} alive: #{Process.alive?(pid)}"
-        )
+    # Use safe port connection
+    case safe_port_connect(worker_state.port, pid, worker_state.worker_id) do
+      {:ok, _port} ->
+        # Return worker state as client state
+        {:ok, updated_state, updated_state, pool_state}
 
-        raise ArgumentError, "Invalid port or dead process"
-      end
+      {:error, :not_a_pid} ->
+        Logger.error("[#{worker_state.worker_id}] Invalid PID type during anonymous checkout: #{inspect(pid)}")
+        {:remove, {:checkout_failed, :invalid_pid}, pool_state}
 
-      {:ok, updated_state, updated_state, pool_state}
-    catch
-      :error, reason ->
-        Logger.error(
-          "[#{worker_state.worker_id}] Failed to connect port to PID #{inspect(pid)} (alive? #{Process.alive?(pid)}): #{inspect(reason)}"
-        )
+      {:error, :process_not_alive} ->
+        Logger.error("[#{worker_state.worker_id}] Target process not alive during anonymous checkout: #{inspect(pid)}")
+        {:remove, {:checkout_failed, :process_not_alive}, pool_state}
 
-        {:error, reason}
+      {:error, :port_closed} ->
+        Logger.error("[#{worker_state.worker_id}] Port closed during anonymous checkout")
+        {:remove, {:checkout_failed, :port_closed}, pool_state}
+
+      {:error, :port_not_owned} ->
+        Logger.error("[#{worker_state.worker_id}] Port not owned by worker during anonymous checkout")
+        {:remove, {:checkout_failed, :port_not_owned}, pool_state}
+
+      {:error, reason} ->
+        Logger.error("[#{worker_state.worker_id}] Port connection failed during anonymous checkout: #{inspect(reason)}")
+        {:remove, {:checkout_failed, reason}, pool_state}
     end
   end
 
@@ -389,6 +400,67 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
 
   defp generate_worker_id do
     "worker_#{:erlang.unique_integer([:positive])}_#{:erlang.system_time(:microsecond)}"
+  end
+
+  # Remove @doc since this is a private function
+  @spec validate_port(port()) :: {:ok, port()} | {:error, atom()}
+  defp validate_port(port) when is_port(port) do
+    case Port.info(port) do
+      nil ->
+        {:error, :port_closed}
+
+      _port_info ->
+        # For pool workers, we just need to verify the port is open
+        # The port will be connected to different processes during checkout
+        {:ok, port}
+    end
+  end
+
+  defp validate_port(_), do: {:error, :not_a_port}
+
+  # Safely connects a port to a target process with full validation
+  @spec safe_port_connect(port(), pid(), String.t()) :: {:ok, port()} | {:error, term()}
+  defp safe_port_connect(port, target_pid, worker_id) do
+    Logger.debug("[#{worker_id}] Attempting safe port connection to #{inspect(target_pid)}")
+
+    # Validate inputs
+    with :ok <- validate_pid(target_pid),
+         {:ok, _port} <- validate_port(port),
+         :ok <- attempt_port_connect(port, target_pid, worker_id) do
+      {:ok, port}
+    else
+      {:error, reason} = error ->
+        Logger.error("[#{worker_id}] Safe port connect failed: #{inspect(reason)}")
+        error
+    end
+  end
+
+  defp validate_pid(pid) when is_pid(pid) do
+    if Process.alive?(pid) do
+      :ok
+    else
+      {:error, :process_not_alive}
+    end
+  end
+
+  defp validate_pid(_), do: {:error, :not_a_pid}
+
+  defp attempt_port_connect(port, target_pid, worker_id) do
+    try do
+      Port.connect(port, target_pid)
+      Logger.debug("[#{worker_id}] Successfully connected port to #{inspect(target_pid)}")
+      :ok
+    rescue
+      ArgumentError ->
+        # This can happen if the port was closed between validation and connect
+        {:error, :port_closed_during_connect}
+    catch
+      :error, :badarg ->
+        {:error, :badarg}
+
+      :error, reason ->
+        {:error, {:connect_failed, reason}}
+    end
   end
 
   @doc """
