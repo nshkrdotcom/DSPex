@@ -15,7 +15,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   use GenServer
   require Logger
 
-  alias DSPex.PythonBridge.{PoolWorkerV2, Protocol}
+  alias DSPex.PythonBridge.{PoolWorkerV2, PoolWorkerV2Enhanced, Protocol, SessionAffinity}
 
   # Configuration defaults
   @default_pool_size System.schedulers_online() * 2
@@ -74,6 +74,18 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
         {:session, session_id},
         fn _from, worker_state ->
           Logger.debug("Successfully checked out worker: #{inspect(worker_state.worker_id)}")
+          
+          # Record session affinity for enhanced workers
+          if Map.has_key?(worker_state, :state_machine) do
+            try do
+              SessionAffinity.bind_session(session_id, worker_state.worker_id)
+            rescue
+              _ -> 
+                # SessionAffinity might not be running, that's ok for basic workers
+                :ok
+            end
+          end
+          
           # Get the port from worker state
           port = worker_state.port
 
@@ -301,6 +313,19 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     # Initialize session tracking table
     ensure_session_table()
 
+    # Start session affinity manager if enhanced workers are enabled
+    worker_module = Keyword.get(opts, :worker_module, PoolWorkerV2)
+    if worker_module == PoolWorkerV2Enhanced do
+      case SessionAffinity.start_link(name: :"#{__MODULE__}_session_affinity") do
+        {:ok, _} -> 
+          Logger.info("Session affinity manager started for enhanced pool")
+        {:error, {:already_started, _}} -> 
+          Logger.debug("Session affinity manager already running")
+        {:error, reason} -> 
+          Logger.warning("Failed to start session affinity manager: #{inspect(reason)}")
+      end
+    end
+
     # Parse configuration
     pool_size = Keyword.get(opts, :pool_size, @default_pool_size)
     overflow = Keyword.get(opts, :overflow, @default_overflow)
@@ -312,9 +337,9 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     # Get lazy configuration from opts or app config
     lazy = Keyword.get(opts, :lazy, Application.get_env(:dspex, :pool_lazy, false))
 
-    # Start NimblePool
+    # Start NimblePool with configurable worker module
     pool_config = [
-      worker: {PoolWorkerV2, []},
+      worker: {worker_module, []},
       pool_size: pool_size,
       max_overflow: overflow,
       lazy: lazy,
@@ -337,7 +362,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
           started_at: System.monotonic_time(:millisecond)
         }
 
-        Logger.info("Session pool V2 started with #{pool_size} workers, #{overflow} overflow")
+        worker_type = if worker_module == PoolWorkerV2Enhanced, do: "enhanced", else: "basic"
+        Logger.info("Session pool V2 started with #{pool_size} #{worker_type} workers, #{overflow} overflow")
         {:ok, state}
 
       {:error, reason} ->
@@ -348,13 +374,21 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   @impl true
   def handle_call(:get_status, _from, state) do
     sessions = get_session_info()
+    
+    # Try to get session affinity stats if available
+    affinity_stats = try do
+      SessionAffinity.get_stats()
+    rescue
+      _ -> %{}
+    end
 
     status = %{
       pool_size: state.pool_size,
       max_overflow: state.overflow,
       active_sessions: length(sessions),
       sessions: sessions,
-      uptime_ms: System.monotonic_time(:millisecond) - state.started_at
+      uptime_ms: System.monotonic_time(:millisecond) - state.started_at,
+      session_affinity: affinity_stats
     }
 
     {:reply, status, state}
@@ -409,6 +443,27 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     # Reschedule
     cleanup_ref = schedule_cleanup()
     {:noreply, %{state | cleanup_ref: cleanup_ref}}
+  end
+
+  @impl true
+  def handle_info({:replace_worker, worker_id, metadata}, state) do
+    Logger.info("Received request to replace worker #{worker_id}: #{inspect(metadata)}")
+    
+    # NimblePool handles worker creation automatically when workers are removed
+    # We just need to track metrics here
+    
+    # TODO: Add telemetry when available
+    # :telemetry.execute(
+    #   [:dspex, :pool, :worker, :replaced],
+    #   %{count: 1},
+    #   %{
+    #     worker_id: worker_id,
+    #     reason: Map.get(metadata, :reason, :unknown),
+    #     pool_name: state.pool_name
+    #   }
+    # )
+    
+    {:noreply, state}
   end
 
   @impl true
