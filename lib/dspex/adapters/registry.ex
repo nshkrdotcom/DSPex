@@ -37,7 +37,7 @@ defmodule DSPex.Adapters.Registry do
 
   @adapters %{
     python_port: DSPex.Adapters.PythonPort,
-    python_pool: DSPex.Adapters.PythonPool,
+    python_pool: DSPex.Adapters.PythonPoolV2,
     bridge_mock: DSPex.Adapters.BridgeMock,
     mock: DSPex.Adapters.Mock
   }
@@ -98,6 +98,7 @@ defmodule DSPex.Adapters.Registry do
           adapter_name == DSPex.Adapters.BridgeMock -> adapter_name
           adapter_name == DSPex.Adapters.PythonPort -> adapter_name
           adapter_name == DSPex.Adapters.PythonPool -> adapter_name
+          adapter_name == DSPex.Adapters.PythonPoolV2 -> adapter_name
           true -> Map.get(@adapters, @default_adapter)
         end
 

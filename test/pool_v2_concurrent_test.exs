@@ -119,7 +119,7 @@ defmodule PoolV2ConcurrentTest do
               "blocking_test_#{i}",
               :create_program,
               %{
-                program_id: "test_program_#{i}_#{System.unique_integer([:positive])}",
+                id: "test_program_#{i}_#{System.unique_integer([:positive])}",
                 signature: %{
                   inputs: [%{name: "input", type: "string"}],
                   outputs: [%{name: "output", type: "string"}]

@@ -57,7 +57,7 @@ defmodule DSPex.PoolV2TestHelpers do
     end
 
     %{
-      pid: pid,
+      pool_pid: pid,  # Changed to match test expectations
       genserver_name: genserver_name,
       pool_name: pool_name,
       pool_size: pool_size

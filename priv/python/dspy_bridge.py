@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+
+# Debug logging - write to file immediately to debug startup issues
+import sys
+import os
+with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+    f.write(f"=== DSPy Bridge Starting ===\n")
+    f.write(f"PID: {os.getpid()}\n")
+    f.write(f"Args: {sys.argv}\n")
+    f.write(f"Python: {sys.executable}\n")
+    f.write(f"Working Dir: {os.getcwd()}\n")
+    f.flush()
+
 """
 DSPy Bridge for Elixir Integration
 
@@ -165,6 +177,11 @@ class DSPyBridge:
         Returns:
             Status information including timestamp
         """
+        # Debug log
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] ping() called with args: {args}\n")
+            f.flush()
+        
         response = {
             "status": "ok",
             "timestamp": time.time(),
@@ -179,6 +196,11 @@ class DSPyBridge:
             
         if self.mode == "pool-worker" and hasattr(self, 'current_session'):
             response["current_session"] = self.current_session
+            
+        # Debug log
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] ping() returning: {response}\n")
+            f.flush()
             
         return response
     
@@ -917,10 +939,23 @@ def read_message() -> Optional[Dict[str, Any]]:
     Returns:
         Parsed JSON message or None if EOF/error
     """
+    # Debug log
+    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+        f.write(f"[{time.time()}] read_message() called\n")
+        f.flush()
+    
     try:
         # For Erlang ports, we need to use readexactly-style approach
         # Read 4-byte length header
         length_bytes = sys.stdin.buffer.read(4)
+        
+        # Debug log
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] Read length bytes: {len(length_bytes)} bytes\n")
+            if len(length_bytes) > 0:
+                f.write(f"[{time.time()}] Raw length bytes: {length_bytes.hex()}\n")
+            f.flush()
+        
         if len(length_bytes) == 0:  # EOF - process shutdown
             return None
         elif len(length_bytes) < 4:  # Partial read - should not happen with ports
@@ -929,8 +964,19 @@ def read_message() -> Optional[Dict[str, Any]]:
         
         length = struct.unpack('>I', length_bytes)[0]
         
+        # Debug log
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] Unpacked length: {length}\n")
+            f.flush()
+        
         # Read message payload
         message_bytes = sys.stdin.buffer.read(length)
+        
+        # Debug log
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] Read message bytes: {len(message_bytes)}/{length}\n")
+            f.flush()
+        
         if len(message_bytes) == 0:  # EOF - process shutdown
             return None
         elif len(message_bytes) < length:  # Partial read - should not happen with ports
@@ -939,13 +985,34 @@ def read_message() -> Optional[Dict[str, Any]]:
         
         # Parse JSON
         message_str = message_bytes.decode('utf-8')
-        return json.loads(message_str)
+        
+        # Debug log
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] Message string: {message_str}\n")
+            f.flush()
+        
+        parsed = json.loads(message_str)
+        
+        # Debug log
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] Parsed message: {json.dumps(parsed)}\n")
+            f.flush()
+        
+        return parsed
         
     except (EOFError, json.JSONDecodeError, UnicodeDecodeError) as e:
         print(f"Error reading message: {e}", file=sys.stderr)
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] Error in read_message: {e}\n")
+            f.write(f"[{time.time()}] Traceback: {traceback.format_exc()}\n")
+            f.flush()
         return None
     except Exception as e:
         print(f"Unexpected error reading message: {e}", file=sys.stderr)
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] Unexpected error in read_message: {e}\n")
+            f.write(f"[{time.time()}] Traceback: {traceback.format_exc()}\n")
+            f.flush()
         return None
 
 
@@ -956,22 +1023,44 @@ def write_message(message: Dict[str, Any]) -> None:
     Args:
         message: Dictionary to send as JSON
     """
+    # Debug log
+    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+        f.write(f"[{time.time()}] write_message() called with: {json.dumps(message)}\n")
+        f.flush()
+    
     try:
         # Encode message as JSON
         message_str = json.dumps(message, ensure_ascii=False)
         message_bytes = message_str.encode('utf-8')
         length = len(message_bytes)
         
+        # Debug log
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] Writing message, length: {length}, bytes: {message_bytes[:100]}...\n")
+            f.flush()
+        
         # Write length header (4 bytes, big-endian) + message
         sys.stdout.buffer.write(struct.pack('>I', length))
         sys.stdout.buffer.write(message_bytes)
         sys.stdout.buffer.flush()
         
+        # Debug log
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] Message written and flushed\n")
+            f.flush()
+        
     except BrokenPipeError:
         # Pipe was closed by the other end, exit gracefully
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] BrokenPipeError - exiting\n")
+            f.flush()
         sys.exit(0)
     except Exception as e:
         print(f"Error writing message: {e}", file=sys.stderr)
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] Error in write_message: {e}\n")
+            f.write(f"[{time.time()}] Traceback: {traceback.format_exc()}\n")
+            f.flush()
 
 
 def main():
@@ -980,12 +1069,22 @@ def main():
     
     Reads messages from stdin, processes commands, and writes responses to stdout.
     """
+    # Debug log that main started
+    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+        f.write(f"Main function started\n")
+        f.flush()
+    
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='DSPy Bridge for Elixir Integration')
     parser.add_argument('--mode', choices=['standalone', 'pool-worker'], default='standalone',
                         help='Bridge operation mode')
     parser.add_argument('--worker-id', type=str, help='Worker ID for pool-worker mode')
     args = parser.parse_args()
+    
+    # Debug log parsed args
+    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+        f.write(f"Parsed args: mode={args.mode}, worker_id={args.worker_id}\n")
+        f.flush()
     
     # Create bridge with specified mode
     bridge = DSPyBridge(mode=args.mode, worker_id=args.worker_id)
@@ -995,12 +1094,40 @@ def main():
         print(f"Worker ID: {args.worker_id}", file=sys.stderr)
     print(f"DSPy available: {DSPY_AVAILABLE}", file=sys.stderr)
     
+    # Debug log stdin info
+    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+        f.write(f"[{time.time()}] stdin info:\n")
+        f.write(f"  isatty: {sys.stdin.isatty()}\n")
+        f.write(f"  fileno: {sys.stdin.fileno()}\n")
+        f.write(f"  mode: {getattr(sys.stdin, 'mode', 'N/A')}\n")
+        f.write(f"  buffer: {sys.stdin.buffer}\n")
+        f.flush()
+    
+    # Debug log
+    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+        f.write(f"[{time.time()}] Entering main loop\n")
+        f.flush()
+    
     try:
         while True:
+            # Debug log
+            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                f.write(f"[{time.time()}] Waiting for message...\n")
+                f.flush()
+            
             # Read incoming message
             message = read_message()
+            
+            # Debug log
+            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                f.write(f"[{time.time()}] Message received: {message}\n")
+                f.flush()
+            
             if message is None:
                 print("No more messages, exiting", file=sys.stderr)
+                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                    f.write(f"[{time.time()}] No more messages, exiting\n")
+                    f.flush()
                 break
             
             # Extract message components
@@ -1008,13 +1135,30 @@ def main():
             command = message.get('command')
             args = message.get('args', {})
             
+            # Debug log
+            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                f.write(f"[{time.time()}] Processing: id={request_id}, command={command}\n")
+                f.flush()
+            
             if request_id is None or command is None:
                 print(f"Invalid message format: {message}", file=sys.stderr)
+                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                    f.write(f"[{time.time()}] Invalid message format\n")
+                    f.flush()
                 continue
             
             try:
                 # Execute command
+                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                    f.write(f"[{time.time()}] Executing command: {command}\n")
+                    f.flush()
+                
                 result = bridge.handle_command(command, args)
+                
+                # Debug log
+                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                    f.write(f"[{time.time()}] Command result: {json.dumps(result)}\n")
+                    f.flush()
                 
                 # Send success response
                 response = {
@@ -1026,6 +1170,12 @@ def main():
                 write_message(response)
                 
             except Exception as e:
+                # Debug log
+                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                    f.write(f"[{time.time()}] Command error: {e}\n")
+                    f.write(f"[{time.time()}] Traceback: {traceback.format_exc()}\n")
+                    f.flush()
+                
                 # Send error response
                 error_response = {
                     'id': request_id,

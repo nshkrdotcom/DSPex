@@ -12,11 +12,11 @@ defmodule PortCommunicationTest do
     script_path = env_info.script_path
 
     # Start Python process in pool-worker mode
+    # Note: Don't use :stderr_to_stdout with packet mode as it corrupts the packet stream
     port_opts = [
       :binary,
       :exit_status,
       {:packet, 4},
-      :stderr_to_stdout,
       {:args, [script_path, "--mode", "pool-worker", "--worker-id", "test123"]}
     ]
 
@@ -24,16 +24,14 @@ defmodule PortCommunicationTest do
     port = Port.open({:spawn_executable, python_path}, port_opts)
     Logger.info("Port opened: #{inspect(port)}")
 
-    # Create a ping request
-    request =
-      Jason.encode!(%{
-        "id" => 0,
-        "command" => "ping",
-        "args" => %{"initialization" => true, "worker_id" => "test123"},
-        "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
-      })
+    # Create a ping request using Protocol to add packet header
+    request = DSPex.PythonBridge.Protocol.encode_request(
+      0,
+      :ping,
+      %{initialization: true, worker_id: "test123"}
+    )
 
-    Logger.info("Request JSON: #{request}")
+    Logger.info("Request with packet header: #{inspect(request)}")
     Logger.info("Request byte size: #{byte_size(request)}")
 
     # Send using Port.command/2
@@ -47,15 +45,16 @@ defmodule PortCommunicationTest do
         Logger.info("Raw data: #{inspect(data, limit: :infinity)}")
         Logger.info("Data byte size: #{byte_size(data)}")
 
-        # Try to decode
-        case Jason.decode(data) do
-          {:ok, decoded} ->
-            Logger.info("Decoded response: #{inspect(decoded, pretty: true)}")
-            assert decoded["success"] == true
+        # Try to decode using Protocol
+        case DSPex.PythonBridge.Protocol.decode_response(data) do
+          {:ok, request_id, response} ->
+            Logger.info("Decoded response for request #{request_id}: #{inspect(response, pretty: true)}")
+            assert request_id == 0
+            assert response["status"] == "ok"
 
           {:error, reason} ->
             Logger.error("Failed to decode: #{inspect(reason)}")
-            flunk("JSON decode failed")
+            flunk("Protocol decode failed")
         end
 
       {^port, {:exit_status, status}} ->

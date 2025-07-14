@@ -71,7 +71,7 @@ defmodule DSPex.Adapters.ModeCompatibilityTest do
 
       try do
         adapter = DSPex.Adapters.Registry.get_adapter()
-        assert adapter == DSPex.Adapters.PythonPool
+        assert adapter == DSPex.Adapters.PythonPoolV2
       after
         Application.put_env(:dspex, :pooling_enabled, original_pooling)
       end
@@ -81,7 +81,7 @@ defmodule DSPex.Adapters.ModeCompatibilityTest do
   describe "adapter behavior consistency" do
     test "both adapters implement same behavior" do
       # Check that both adapters implement the required callbacks
-      for adapter <- [DSPex.Adapters.PythonPort, DSPex.Adapters.PythonPool] do
+      for adapter <- [DSPex.Adapters.PythonPort, DSPex.Adapters.PythonPoolV2] do
         # Ensure module is loaded
         Code.ensure_loaded(adapter)
 
@@ -102,7 +102,7 @@ defmodule DSPex.Adapters.ModeCompatibilityTest do
 
       # Test with pooling enabled
       Application.put_env(:dspex, :pooling_enabled, true)
-      assert DSPex.Adapters.Registry.get_adapter() == DSPex.Adapters.PythonPool
+      assert DSPex.Adapters.Registry.get_adapter() == DSPex.Adapters.PythonPoolV2
 
       # Reset to original
       Application.put_env(:dspex, :pooling_enabled, false)

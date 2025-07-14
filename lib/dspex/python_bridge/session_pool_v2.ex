@@ -308,13 +308,16 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     # Get name from opts or generate unique pool name
     genserver_name = Keyword.get(opts, :name, __MODULE__)
     pool_name = :"#{genserver_name}_pool"
+    
+    # Get lazy configuration from opts or app config
+    lazy = Keyword.get(opts, :lazy, Application.get_env(:dspex, :pool_lazy, false))
 
     # Start NimblePool
     pool_config = [
       worker: {PoolWorkerV2, []},
       pool_size: pool_size,
       max_overflow: overflow,
-      lazy: true,
+      lazy: lazy,
       name: pool_name
     ]
 
