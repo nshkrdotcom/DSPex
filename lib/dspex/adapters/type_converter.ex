@@ -1,10 +1,7 @@
 defmodule DSPex.Adapters.TypeConverter do
   @moduledoc """
-  Type conversion system for adapter data transformation.
-
-  Handles bidirectional type conversion between Elixir types and DSPy types,
-  ensuring data integrity and proper format transformation across adapter
-  boundaries. Supports complex nested structures and custom type mappings.
+  Type conversion between Elixir and adapter-specific formats.
+  Enhanced with test layer awareness and ML-specific types.
   """
 
   require Logger
@@ -12,10 +9,29 @@ defmodule DSPex.Adapters.TypeConverter do
   @type conversion_opts :: [
           strict: boolean(),
           atom_keys: boolean(),
-          custom_types: map()
+          custom_types: map(),
+          test_layer: atom()
         ]
 
-  # DSPy to Elixir type mappings
+  # Enhanced type mappings with ML-specific types and test layer awareness
+  @type_mappings %{
+    # Basic types
+    :string => %{python: "str", json_schema: "string", mock: "string"},
+    :integer => %{python: "int", json_schema: "integer", mock: "integer"},
+    :float => %{python: "float", json_schema: "number", mock: "float"},
+    :boolean => %{python: "bool", json_schema: "boolean", mock: "boolean"},
+    :atom => %{python: "str", json_schema: "string", mock: "string"},
+    :any => %{python: "Any", json_schema: "any", mock: "any"},
+    :map => %{python: "Dict", json_schema: "object", mock: "map"},
+
+    # ML-specific types
+    :embedding => %{python: "List[float]", json_schema: "array", mock: "embedding"},
+    :probability => %{python: "float", json_schema: "number", mock: "probability"},
+    :confidence_score => %{python: "float", json_schema: "number", mock: "confidence"},
+    :reasoning_chain => %{python: "List[str]", json_schema: "array", mock: "reasoning"}
+  }
+
+  # Legacy mappings for backward compatibility
   @dspy_to_elixir %{
     "str" => :string,
     "int" => :integer,
@@ -27,7 +43,6 @@ defmodule DSPex.Adapters.TypeConverter do
     "NoneType" => nil
   }
 
-  # Elixir to DSPy type mappings
   @elixir_to_dspy %{
     string: "str",
     integer: "int",
@@ -38,6 +53,123 @@ defmodule DSPex.Adapters.TypeConverter do
     atom: "str",
     nil: "None"
   }
+
+  @doc """
+  Convert type to target format with test layer awareness.
+  """
+  @spec convert_type(atom() | tuple(), atom(), conversion_opts()) :: String.t() | map() | tuple()
+  def convert_type(type, target_format, opts \\ []) do
+    test_layer = Keyword.get(opts, :test_layer)
+
+    case type do
+      # Basic types
+      basic when is_atom(basic) ->
+        get_type_mapping(basic, target_format, test_layer)
+
+      # Composite types
+      {:list, inner_type} ->
+        inner_converted = convert_type(inner_type, target_format, opts)
+
+        case target_format do
+          :python -> "List[#{inner_converted}]"
+          :json_schema -> %{type: "array", items: inner_converted}
+          :mock -> {:list, inner_converted}
+        end
+
+      {:dict, key_type, value_type} ->
+        key_converted = convert_type(key_type, target_format, opts)
+        value_converted = convert_type(value_type, target_format, opts)
+
+        case target_format do
+          :python ->
+            "Dict[#{key_converted}, #{value_converted}]"
+
+          :json_schema ->
+            %{
+              type: "object",
+              additionalProperties: value_converted
+            }
+
+          :mock ->
+            {:dict, key_converted, value_converted}
+        end
+
+      {:union, types} ->
+        converted_types = Enum.map(types, &convert_type(&1, target_format, opts))
+
+        case target_format do
+          :python -> "Union[#{Enum.join(converted_types, ", ")}]"
+          :json_schema -> %{anyOf: converted_types}
+          :mock -> {:union, converted_types}
+        end
+    end
+  end
+
+  @doc """
+  Convert signature to target format with test layer awareness.
+  """
+  @spec convert_signature_to_format(module(), atom(), conversion_opts()) :: map()
+  def convert_signature_to_format(signature_module, target_format, opts \\ []) do
+    signature = signature_module.__signature__()
+
+    %{
+      inputs: convert_fields_to_format(signature.inputs, target_format, opts),
+      outputs: convert_fields_to_format(signature.outputs, target_format, opts)
+    }
+  end
+
+  @doc """
+  Validate input against expected type with test layer awareness.
+  """
+  @spec validate_input(any(), atom() | tuple(), conversion_opts()) ::
+          {:ok, any()} | {:error, String.t()}
+  def validate_input(value, expected_type, opts \\ []) do
+    test_layer = Keyword.get(opts, :test_layer, :layer_3)
+
+    case {value, expected_type, test_layer} do
+      # Basic type validation
+      {v, :string, _} when is_binary(v) ->
+        {:ok, v}
+
+      {v, :integer, _} when is_integer(v) ->
+        {:ok, v}
+
+      {v, :float, _} when is_float(v) ->
+        {:ok, v}
+
+      {v, :boolean, _} when is_boolean(v) ->
+        {:ok, v}
+
+      {v, :any, _} ->
+        {:ok, v}
+
+      # ML-specific validation
+      {v, :probability, _} when is_float(v) and v >= 0.0 and v <= 1.0 ->
+        {:ok, v}
+
+      {v, :confidence_score, _} when is_float(v) and v >= 0.0 and v <= 1.0 ->
+        {:ok, v}
+
+      {v, :embedding, _} when is_list(v) ->
+        if Enum.all?(v, &is_float/1) do
+          {:ok, v}
+        else
+          {:error, "Embedding must be a list of floats"}
+        end
+
+      # Composite type validation
+      {v, {:list, inner_type}, layer} when is_list(v) ->
+        validate_list_items(v, inner_type, [{:test_layer, layer} | opts])
+
+      # Test layer specific relaxed validation
+      {v, type, :layer_1} ->
+        # Layer 1 (mock) accepts more flexible types
+        validate_mock_input(v, type)
+
+      {value, type, _} ->
+        {:error, "Expected #{inspect(type)}, got #{inspect(value)}"}
+    end
+  end
 
   @doc """
   Converts DSPy types to Elixir types.
@@ -324,6 +456,84 @@ defmodule DSPex.Adapters.TypeConverter do
   end
 
   # Private Functions
+
+  defp convert_fields_to_format(fields, target_format, opts) do
+    Enum.map(fields, fn {name, type, constraints} ->
+      converted_type = convert_type(type, target_format, opts)
+
+      case target_format do
+        :python ->
+          %{
+            name: to_string(name),
+            type: converted_type,
+            description: get_field_description(constraints)
+          }
+
+        :json_schema ->
+          base_schema = %{
+            type: converted_type,
+            description: get_field_description(constraints)
+          }
+
+          add_json_schema_constraints(base_schema, constraints)
+
+        :mock ->
+          %{
+            name: name,
+            type: converted_type,
+            constraints: constraints
+          }
+      end
+    end)
+  end
+
+  defp get_type_mapping(type, target_format, test_layer) do
+    case Map.get(@type_mappings, type) do
+      nil ->
+        {:error, "Unknown type: #{type}"}
+
+      mapping ->
+        # Use test-layer specific mapping if available
+        case test_layer do
+          :layer_1 -> Map.get(mapping, :mock, Map.get(mapping, target_format))
+          :layer_2 -> Map.get(mapping, target_format, to_string(type))
+          :layer_3 -> Map.get(mapping, target_format, to_string(type))
+          _ -> Map.get(mapping, target_format, to_string(type))
+        end
+    end
+  end
+
+  defp validate_list_items(list, inner_type, opts) do
+    case Enum.reduce_while(list, {:ok, []}, fn item, {:ok, acc} ->
+           case validate_input(item, inner_type, opts) do
+             {:ok, validated_item} -> {:cont, {:ok, acc ++ [validated_item]}}
+             error -> {:halt, error}
+           end
+         end) do
+      {:ok, validated_list} -> {:ok, validated_list}
+      error -> error
+    end
+  end
+
+  defp validate_mock_input(value, _type) do
+    # Mock adapter accepts any reasonable input for testing
+    {:ok, value}
+  end
+
+  defp get_field_description(constraints) do
+    Keyword.get(constraints, :description, "")
+  end
+
+  defp add_json_schema_constraints(schema, constraints) do
+    Enum.reduce(constraints, schema, fn
+      {:min_length, min}, acc -> Map.put(acc, :minLength, min)
+      {:max_length, max}, acc -> Map.put(acc, :maxLength, max)
+      {:min_value, min}, acc -> Map.put(acc, :minimum, min)
+      {:max_value, max}, acc -> Map.put(acc, :maximum, max)
+      {:one_of, values}, acc -> Map.put(acc, :enum, values)
+      _, acc -> acc
+    end)
+  end
 
   defp parse_dspy_type(type_string) do
     cond do

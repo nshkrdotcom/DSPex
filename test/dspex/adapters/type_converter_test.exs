@@ -260,6 +260,158 @@ defmodule DSPex.Adapters.TypeConverterTest do
     end
   end
 
+  describe "convert_type/3 (enhanced)" do
+    test "converts basic types to python format" do
+      assert TypeConverter.convert_type(:string, :python) == "str"
+      assert TypeConverter.convert_type(:integer, :python) == "int"
+      assert TypeConverter.convert_type(:float, :python) == "float"
+      assert TypeConverter.convert_type(:boolean, :python) == "bool"
+      assert TypeConverter.convert_type(:any, :python) == "Any"
+    end
+
+    test "converts ML-specific types" do
+      assert TypeConverter.convert_type(:embedding, :python) == "List[float]"
+      assert TypeConverter.convert_type(:probability, :python) == "float"
+      assert TypeConverter.convert_type(:confidence_score, :python) == "float"
+      assert TypeConverter.convert_type(:reasoning_chain, :python) == "List[str]"
+    end
+
+    test "converts composite types" do
+      assert TypeConverter.convert_type({:list, :string}, :python) == "List[str]"
+      assert TypeConverter.convert_type({:dict, :string, :integer}, :python) == "Dict[str, int]"
+
+      union_result = TypeConverter.convert_type({:union, [:string, :integer]}, :python)
+      assert union_result == "Union[str, int]"
+    end
+
+    test "converts to json_schema format" do
+      assert TypeConverter.convert_type(:string, :json_schema) == "string"
+      assert TypeConverter.convert_type(:integer, :json_schema) == "integer"
+      assert TypeConverter.convert_type(:float, :json_schema) == "number"
+      assert TypeConverter.convert_type(:boolean, :json_schema) == "boolean"
+
+      list_result = TypeConverter.convert_type({:list, :string}, :json_schema)
+      assert list_result == %{type: "array", items: "string"}
+
+      dict_result = TypeConverter.convert_type({:dict, :string, :integer}, :json_schema)
+      assert dict_result == %{type: "object", additionalProperties: "integer"}
+    end
+
+    test "converts to mock format" do
+      assert TypeConverter.convert_type(:string, :mock) == "string"
+      assert TypeConverter.convert_type(:integer, :mock) == "integer"
+      assert TypeConverter.convert_type(:embedding, :mock) == "embedding"
+      assert TypeConverter.convert_type(:probability, :mock) == "probability"
+    end
+
+    test "respects test layer preferences" do
+      assert TypeConverter.convert_type(:embedding, :mock, test_layer: :layer_1) == "embedding"
+
+      assert TypeConverter.convert_type(:probability, :mock, test_layer: :layer_1) ==
+               "probability"
+    end
+  end
+
+  describe "validate_input/3 (enhanced)" do
+    test "validates ML-specific types" do
+      assert {:ok, 0.5} = TypeConverter.validate_input(0.5, :probability)
+      assert {:ok, +0.0} = TypeConverter.validate_input(+0.0, :probability)
+      assert {:ok, 1.0} = TypeConverter.validate_input(1.0, :probability)
+
+      assert {:error, _} = TypeConverter.validate_input(-0.1, :probability)
+      assert {:error, _} = TypeConverter.validate_input(1.1, :probability)
+
+      assert {:ok, 0.8} = TypeConverter.validate_input(0.8, :confidence_score)
+
+      embedding = [0.1, 0.2, 0.3, 0.4]
+      assert {:ok, ^embedding} = TypeConverter.validate_input(embedding, :embedding)
+
+      assert {:error, _} = TypeConverter.validate_input([0.1, "invalid"], :embedding)
+    end
+
+    test "test layer specific validation" do
+      # Mock layer should accept flexible inputs
+      assert {:ok, 42} = TypeConverter.validate_input(42, :string, test_layer: :layer_1)
+
+      assert {:ok, "hello"} =
+               TypeConverter.validate_input("hello", :integer, test_layer: :layer_1)
+
+      # Integration layer should be strict
+      assert {:error, _} = TypeConverter.validate_input(42, :string, test_layer: :layer_3)
+      assert {:error, _} = TypeConverter.validate_input("hello", :integer, test_layer: :layer_3)
+    end
+
+    test "validates composite types" do
+      assert {:ok, ["a", "b", "c"]} =
+               TypeConverter.validate_input(["a", "b", "c"], {:list, :string})
+
+      assert {:error, _} = TypeConverter.validate_input(["a", 1, "c"], {:list, :string})
+    end
+  end
+
+  describe "convert_signature_to_format/3 (enhanced)" do
+    defmodule TestSignature do
+      use DSPex.Signature
+
+      @signature_ast {:->, [],
+                      [
+                        [{:question, :string}, {:context, {:list, :string}}],
+                        [
+                          {:answer, :string},
+                          {:confidence, :probability},
+                          {:reasoning, :reasoning_chain}
+                        ]
+                      ]}
+    end
+
+    test "converts signature to python format" do
+      result = TypeConverter.convert_signature_to_format(TestSignature, :python)
+
+      assert Map.has_key?(result, :inputs)
+      assert Map.has_key?(result, :outputs)
+
+      inputs = result.inputs
+      assert length(inputs) == 2
+
+      question_input = Enum.find(inputs, &(&1.name == "question"))
+      assert question_input.type == "str"
+
+      context_input = Enum.find(inputs, &(&1.name == "context"))
+      assert context_input.type == "List[str]"
+
+      outputs = result.outputs
+      assert length(outputs) == 3
+
+      confidence_output = Enum.find(outputs, &(&1.name == "confidence"))
+      assert confidence_output.type == "float"
+
+      reasoning_output = Enum.find(outputs, &(&1.name == "reasoning"))
+      assert reasoning_output.type == "List[str]"
+    end
+
+    test "converts signature to mock format" do
+      result = TypeConverter.convert_signature_to_format(TestSignature, :mock)
+
+      inputs = result.inputs
+      question_input = Enum.find(inputs, &(&1.name == :question))
+      assert question_input.type == "string"
+
+      context_input = Enum.find(inputs, &(&1.name == :context))
+      assert context_input.type == {:list, "string"}
+    end
+
+    test "applies test layer specific conversions" do
+      mock_result =
+        TypeConverter.convert_signature_to_format(TestSignature, :mock, test_layer: :layer_1)
+
+      python_result =
+        TypeConverter.convert_signature_to_format(TestSignature, :python, test_layer: :layer_3)
+
+      # Results should differ based on test layer
+      assert mock_result != python_result
+    end
+  end
+
   describe "complex type parsing" do
     test "handles nested list types" do
       assert TypeConverter.dspy_to_elixir("List[List[int]]") == {:list, {:list, :integer}}

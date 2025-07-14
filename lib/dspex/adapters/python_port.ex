@@ -48,13 +48,17 @@ defmodule DSPex.Adapters.PythonPort do
 
   @impl true
   def create_program(config) do
-    ensure_bridge_started()
+    case ensure_bridge_started() do
+      :ok ->
+        # Use existing Bridge.call/2 infrastructure
+        case Bridge.call(:create_program, convert_config(config)) do
+          {:ok, response} ->
+            program_id = extract_program_id(response)
+            {:ok, program_id}
 
-    # Use existing Bridge.call/2 infrastructure
-    case Bridge.call(:create_program, convert_config(config)) do
-      {:ok, response} ->
-        program_id = extract_program_id(response)
-        {:ok, program_id}
+          {:error, reason} ->
+            {:error, reason}
+        end
 
       {:error, reason} ->
         {:error, reason}
@@ -63,16 +67,20 @@ defmodule DSPex.Adapters.PythonPort do
 
   @impl true
   def execute_program(program_id, inputs) do
-    ensure_bridge_started()
+    case ensure_bridge_started() do
+      :ok ->
+        args = %{
+          program_id: program_id,
+          inputs: inputs
+        }
 
-    args = %{
-      program_id: program_id,
-      inputs: inputs
-    }
+        case Bridge.call(:execute_program, args) do
+          {:ok, response} ->
+            {:ok, response}
 
-    case Bridge.call(:execute_program, args) do
-      {:ok, response} ->
-        {:ok, response}
+          {:error, reason} ->
+            {:error, reason}
+        end
 
       {:error, reason} ->
         {:error, reason}
@@ -81,17 +89,21 @@ defmodule DSPex.Adapters.PythonPort do
 
   @impl true
   def execute_program(program_id, inputs, options) do
-    ensure_bridge_started()
+    case ensure_bridge_started() do
+      :ok ->
+        args = %{
+          program_id: program_id,
+          inputs: inputs,
+          options: options
+        }
 
-    args = %{
-      program_id: program_id,
-      inputs: inputs,
-      options: options
-    }
+        case Bridge.call(:execute_program, args) do
+          {:ok, response} ->
+            {:ok, response}
 
-    case Bridge.call(:execute_program, args) do
-      {:ok, response} ->
-        {:ok, response}
+          {:error, reason} ->
+            {:error, reason}
+        end
 
       {:error, reason} ->
         {:error, reason}
@@ -100,16 +112,20 @@ defmodule DSPex.Adapters.PythonPort do
 
   @impl true
   def list_programs do
-    ensure_bridge_started()
+    case ensure_bridge_started() do
+      :ok ->
+        case Bridge.call(:list_programs, %{}) do
+          {:ok, %{"programs" => programs}} ->
+            program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
+            {:ok, program_ids}
 
-    case Bridge.call(:list_programs, %{}) do
-      {:ok, %{"programs" => programs}} ->
-        program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
-        {:ok, program_ids}
+          {:ok, %{programs: programs}} ->
+            program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
+            {:ok, program_ids}
 
-      {:ok, %{programs: programs}} ->
-        program_ids = Enum.map(programs, fn p -> Map.get(p, "id") || Map.get(p, :id) end)
-        {:ok, program_ids}
+          {:error, reason} ->
+            {:error, reason}
+        end
 
       {:error, reason} ->
         {:error, reason}
@@ -118,11 +134,15 @@ defmodule DSPex.Adapters.PythonPort do
 
   @impl true
   def delete_program(program_id) do
-    ensure_bridge_started()
+    case ensure_bridge_started() do
+      :ok ->
+        case Bridge.call(:delete_program, %{program_id: program_id}) do
+          {:ok, _} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
 
-    case Bridge.call(:delete_program, %{program_id: program_id}) do
-      {:ok, _} -> :ok
-      {:error, reason} -> {:error, reason}
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -130,18 +150,22 @@ defmodule DSPex.Adapters.PythonPort do
 
   @impl true
   def get_program_info(program_id) do
-    ensure_bridge_started()
+    case ensure_bridge_started() do
+      :ok ->
+        case Bridge.call(:get_program_info, %{program_id: program_id}) do
+          {:ok, info} ->
+            # Ensure the program ID is included in the response
+            enhanced_info =
+              Map.merge(info, %{
+                "id" => program_id,
+                :id => program_id
+              })
 
-    case Bridge.call(:get_program_info, %{program_id: program_id}) do
-      {:ok, info} ->
-        # Ensure the program ID is included in the response
-        enhanced_info =
-          Map.merge(info, %{
-            "id" => program_id,
-            :id => program_id
-          })
+            {:ok, enhanced_info}
 
-        {:ok, enhanced_info}
+          {:error, reason} ->
+            {:error, reason}
+        end
 
       {:error, reason} ->
         {:error, reason}
@@ -150,31 +174,39 @@ defmodule DSPex.Adapters.PythonPort do
 
   @impl true
   def health_check do
-    ensure_bridge_started()
+    case ensure_bridge_started() do
+      :ok ->
+        case Bridge.call(:ping, %{}) do
+          {:ok, %{"status" => "ok"}} -> :ok
+          {:ok, %{status: "ok"}} -> :ok
+          {:error, reason} -> {:error, reason}
+          _ -> {:error, :unhealthy}
+        end
 
-    case Bridge.call(:ping, %{}) do
-      {:ok, %{"status" => "ok"}} -> :ok
-      {:ok, %{status: "ok"}} -> :ok
-      {:error, reason} -> {:error, reason}
-      _ -> {:error, :unhealthy}
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
   @impl true
   def get_stats do
-    ensure_bridge_started()
+    case ensure_bridge_started() do
+      :ok ->
+        case Bridge.call(:get_stats, %{}) do
+          {:ok, bridge_stats} ->
+            # Enhance bridge stats with adapter-specific information
+            adapter_stats =
+              Map.merge(bridge_stats, %{
+                adapter_type: :python_port,
+                layer: :layer_3,
+                python_execution: true
+              })
 
-    case Bridge.call(:get_stats, %{}) do
-      {:ok, bridge_stats} ->
-        # Enhance bridge stats with adapter-specific information
-        adapter_stats =
-          Map.merge(bridge_stats, %{
-            adapter_type: :python_port,
-            layer: :layer_3,
-            python_execution: true
-          })
+            {:ok, adapter_stats}
 
-        {:ok, adapter_stats}
+          {:error, reason} ->
+            {:error, reason}
+        end
 
       {:error, reason} ->
         {:error, reason}
@@ -208,8 +240,13 @@ defmodule DSPex.Adapters.PythonPort do
   Returns detailed information about the bridge state, uptime, and statistics.
   """
   def get_bridge_status do
-    ensure_bridge_started()
-    Bridge.get_status()
+    case ensure_bridge_started() do
+      :ok ->
+        Bridge.get_status()
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   @doc """
@@ -218,8 +255,13 @@ defmodule DSPex.Adapters.PythonPort do
   Useful for recovering from errors or applying configuration changes.
   """
   def restart_bridge do
-    ensure_bridge_started()
-    Bridge.restart()
+    case ensure_bridge_started() do
+      :ok ->
+        Bridge.restart()
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   # Private functions
@@ -232,7 +274,7 @@ defmodule DSPex.Adapters.PythonPort do
         # In test mode, the bridge should be started by the supervision tree
         # based on the TEST_MODE configuration
         Logger.error("Python bridge not running - check supervision configuration")
-        raise "Python bridge not available"
+        {:error, "Python bridge not available"}
 
       _pid ->
         :ok
@@ -258,6 +300,27 @@ defmodule DSPex.Adapters.PythonPort do
       "" -> Map.put(converted, "id", generate_program_id())
       _id -> converted
     end
+  end
+
+  defp convert_signature(signature) when is_atom(signature) do
+    # Convert signature module to dictionary format
+    case signature.__signature__() do
+      %{inputs: inputs, outputs: outputs} ->
+        %{
+          "inputs" => convert_io_list(inputs),
+          "outputs" => convert_io_list(outputs)
+        }
+
+      _ ->
+        # Fallback to TypeConverter for complex signatures
+        DSPex.Adapters.TypeConverter.convert_signature_to_format(signature, :python)
+        |> convert_signature()
+    end
+  rescue
+    _ ->
+      # If signature module doesn't have __signature__/0, use TypeConverter
+      DSPex.Adapters.TypeConverter.convert_signature_to_format(signature, :python)
+      |> convert_signature()
   end
 
   defp convert_signature(signature) when is_map(signature) do

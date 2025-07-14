@@ -123,6 +123,7 @@ class DSPyBridge:
                 'delete_program': self.delete_program,
                 'get_stats': self.get_stats,
                 'cleanup': self.cleanup,
+                'reset_state': self.reset_state,
                 'get_program_info': self.get_program_info
             }
             
@@ -439,6 +440,37 @@ class DSPyBridge:
             "programs_removed": program_count
         }
     
+    def reset_state(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Reset all bridge state (alias for cleanup with additional reset info).
+        
+        Clears all programs and resets counters for clean test isolation.
+        
+        Args:
+            args: Optional parameters
+            
+        Returns:
+            Dictionary with reset status
+        """
+        program_count = len(self.programs)
+        command_count = self.command_count
+        error_count = self.error_count
+        
+        # Clear all state
+        self.programs.clear()
+        self.command_count = 0
+        self.error_count = 0
+        
+        # Force garbage collection
+        gc.collect()
+        
+        return {
+            "status": "reset",
+            "programs_cleared": program_count,
+            "commands_reset": command_count,
+            "errors_reset": error_count
+        }
+    
     def _get_memory_usage(self) -> Dict[str, Union[int, str]]:
         """
         Get current memory usage statistics.
@@ -651,16 +683,23 @@ def read_message() -> Optional[Dict[str, Any]]:
         Parsed JSON message or None if EOF/error
     """
     try:
+        # For Erlang ports, we need to use readexactly-style approach
         # Read 4-byte length header
         length_bytes = sys.stdin.buffer.read(4)
-        if len(length_bytes) < 4:
+        if len(length_bytes) == 0:  # EOF - process shutdown
+            return None
+        elif len(length_bytes) < 4:  # Partial read - should not happen with ports
+            print(f"Partial length header read: {len(length_bytes)} bytes", file=sys.stderr)
             return None
         
         length = struct.unpack('>I', length_bytes)[0]
         
         # Read message payload
         message_bytes = sys.stdin.buffer.read(length)
-        if len(message_bytes) < length:
+        if len(message_bytes) == 0:  # EOF - process shutdown
+            return None
+        elif len(message_bytes) < length:  # Partial read - should not happen with ports
+            print(f"Partial message read: {len(message_bytes)}/{length} bytes", file=sys.stderr)
             return None
         
         # Parse JSON

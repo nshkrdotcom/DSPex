@@ -226,7 +226,15 @@ defmodule DSPex.PythonBridge.Bridge do
             }
 
             Logger.info("Python bridge started successfully")
-            {:ok, state}
+
+            # Send an initial ping to establish the connection and prevent early exit
+            request_id = 1
+            request = Protocol.encode_request(request_id, :ping, %{})
+            request_bytes = :erlang.iolist_to_binary(request)
+            send(port, {self(), {:command, request_bytes}})
+
+            updated_state = %{state | request_id: request_id}
+            {:ok, updated_state}
 
           {:error, reason} ->
             Logger.error("Failed to start Python process: #{reason}")

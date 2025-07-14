@@ -443,18 +443,103 @@ defmodule DSPex.Adapters.Mock do
   end
 
   defp generate_mock_response(signature, inputs, scenarios) do
-    # Extract output types from signature
-    outputs = Map.get(signature, "outputs") || Map.get(signature, :outputs) || []
+    # Handle both signature modules and signature maps
+    signature_data = extract_signature_data(signature)
+    outputs = Map.get(signature_data, "outputs") || Map.get(signature_data, :outputs) || []
 
     # Generate deterministic responses based on input types and configured scenarios
     Enum.reduce(outputs, %{}, fn output, acc ->
-      output_name = Map.get(output, "name") || Map.get(output, :name)
-      output_type = Map.get(output, "type") || Map.get(output, :type)
+      # Output should already be a map from convert_fields_to_map
+      output_name =
+        case output do
+          %{"name" => name} -> name
+          %{:name => name} -> to_string(name)
+          {name, _type} when is_atom(name) -> to_string(name)
+          {name, _type, _constraints} when is_atom(name) -> to_string(name)
+          _ -> "unknown"
+        end
+
+      output_type =
+        case output do
+          %{"type" => type} -> type
+          %{:type => type} -> to_string(type)
+          {_name, type} when is_atom(type) -> convert_type_to_string(type)
+          {_name, type, _constraints} -> convert_type_to_string(type)
+          _ -> "string"
+        end
 
       mock_value = generate_mock_value(output_type, inputs, scenarios, output_name)
       Map.put(acc, output_name, mock_value)
     end)
   end
+
+  # Extract signature data from either module or map
+  defp extract_signature_data(signature) when is_atom(signature) do
+    # Handle signature module - call __signature__() function
+    if function_exported?(signature, :__signature__, 0) do
+      signature.__signature__()
+    else
+      # Fallback - try to get signature from metadata
+      case signature.__info__(:attributes) do
+        attributes when is_list(attributes) ->
+          case Keyword.get(attributes, :signature_ast) do
+            [{signature_ast, _}] -> convert_ast_to_map(signature_ast)
+            _ -> %{}
+          end
+
+        _ ->
+          %{}
+      end
+    end
+  end
+
+  defp extract_signature_data(signature) when is_map(signature) do
+    # Handle signature map directly
+    signature
+  end
+
+  defp extract_signature_data(_signature) do
+    # Default fallback
+    %{}
+  end
+
+  # Convert signature AST to map format
+  defp convert_ast_to_map({:->, _, [inputs, outputs]}) do
+    %{
+      "inputs" => convert_fields_to_map(inputs),
+      "outputs" => convert_fields_to_map(outputs)
+    }
+  end
+
+  defp convert_ast_to_map(_) do
+    %{}
+  end
+
+  defp convert_fields_to_map(fields) when is_list(fields) do
+    Enum.map(fields, fn
+      {name, type, _constraints} when is_atom(name) ->
+        %{"name" => to_string(name), "type" => convert_type_to_string(type)}
+
+      {name, type} when is_atom(name) ->
+        %{"name" => to_string(name), "type" => convert_type_to_string(type)}
+
+      _ ->
+        %{"name" => "unknown", "type" => "string"}
+    end)
+  end
+
+  defp convert_fields_to_map(_) do
+    []
+  end
+
+  defp convert_type_to_string(:string), do: "string"
+  defp convert_type_to_string(:integer), do: "int"
+  defp convert_type_to_string(:float), do: "float"
+  defp convert_type_to_string(:boolean), do: "bool"
+  defp convert_type_to_string(:probability), do: "float"
+  defp convert_type_to_string({:list, inner}), do: "List[#{convert_type_to_string(inner)}]"
+  defp convert_type_to_string(type) when is_atom(type), do: to_string(type)
+  defp convert_type_to_string(_), do: "string"
 
   defp generate_mock_value("string", inputs, scenarios, field_name) do
     # Check for scenario-specific responses

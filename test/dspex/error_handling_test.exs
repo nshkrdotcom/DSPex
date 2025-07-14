@@ -7,7 +7,6 @@ defmodule DSPex.ErrorHandlingTest do
   """
   use ExUnit.Case, async: false
   import ExUnit.CaptureLog
-  import ExUnit.CaptureIO
 
   alias DSPex.{Config, Testing.TestMode}
   alias DSPex.PythonBridge.Protocol

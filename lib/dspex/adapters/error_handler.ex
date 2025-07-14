@@ -1,11 +1,18 @@
 defmodule DSPex.Adapters.ErrorHandler do
   @moduledoc """
-  Centralized error handling for the adapter system.
-
-  Provides standardized error handling, classification, recovery strategies,
-  and user-friendly error messages across all adapter implementations.
-  Supports error tracking, metrics, and debugging context.
+  Standardized error handling for adapter operations with test layer awareness.
   """
+
+  defstruct [:type, :message, :context, :recoverable, :retry_after, :test_layer]
+
+  @type adapter_error :: %__MODULE__{
+          type: atom(),
+          message: String.t(),
+          context: map(),
+          recoverable: boolean(),
+          retry_after: pos_integer() | nil,
+          test_layer: atom() | nil
+        }
 
   require Logger
 
@@ -42,6 +49,146 @@ defmodule DSPex.Adapters.ErrorHandler do
           recovery_strategy: recovery_strategy(),
           metadata: map()
         }
+
+  @doc """
+  Wrap error with context and test layer awareness.
+  """
+  @spec wrap_error(term(), map()) :: adapter_error()
+  def wrap_error(error, context \\ %{}) do
+    test_layer = get_test_layer()
+
+    case error do
+      {:error, :timeout} ->
+        %__MODULE__{
+          type: :timeout,
+          message: "Operation timed out",
+          context: context,
+          recoverable: true,
+          retry_after: get_retry_delay(:timeout, test_layer),
+          test_layer: test_layer
+        }
+
+      {:error, :connection_failed} ->
+        %__MODULE__{
+          type: :connection_failed,
+          message: "Failed to connect to adapter backend",
+          context: context,
+          recoverable: should_retry_connection?(test_layer),
+          retry_after: get_retry_delay(:connection_failed, test_layer),
+          test_layer: test_layer
+        }
+
+      {:error, {:validation_failed, details}} ->
+        %__MODULE__{
+          type: :validation_failed,
+          message: "Input validation failed: #{details}",
+          context: context,
+          recoverable: false,
+          retry_after: nil,
+          test_layer: test_layer
+        }
+
+      {:error, {:program_not_found, program_id}} ->
+        %__MODULE__{
+          type: :program_not_found,
+          message: "Program not found: #{program_id}",
+          context: Map.put(context, :program_id, program_id),
+          recoverable: false,
+          retry_after: nil,
+          test_layer: test_layer
+        }
+
+      {:error, {:bridge_error, bridge_details}} ->
+        %__MODULE__{
+          type: :bridge_error,
+          message: "Python bridge error: #{inspect(bridge_details)}",
+          context: Map.put(context, :bridge_details, bridge_details),
+          recoverable: should_retry_bridge_error?(bridge_details, test_layer),
+          retry_after: get_retry_delay(:bridge_error, test_layer),
+          test_layer: test_layer
+        }
+
+      {:error, reason} when is_binary(reason) ->
+        %__MODULE__{
+          type: :unknown,
+          message: reason,
+          context: context,
+          recoverable: false,
+          retry_after: nil,
+          test_layer: test_layer
+        }
+
+      other ->
+        %__MODULE__{
+          type: :unexpected,
+          message: "Unexpected error: #{inspect(other)}",
+          context: context,
+          recoverable: false,
+          retry_after: nil,
+          test_layer: test_layer
+        }
+    end
+  end
+
+  @spec should_retry?(adapter_error()) :: boolean()
+  def should_retry?(%__MODULE__{recoverable: recoverable}), do: recoverable
+
+  @spec get_retry_delay(adapter_error()) :: pos_integer() | nil
+  def get_retry_delay(%__MODULE__{retry_after: delay}), do: delay
+
+  @spec get_error_context(adapter_error()) :: map()
+  def get_error_context(%__MODULE__{context: context}), do: context
+
+  @spec is_test_error?(adapter_error()) :: boolean()
+  def is_test_error?(%__MODULE__{test_layer: test_layer}) do
+    test_layer in [:layer_1, :layer_2, :layer_3]
+  end
+
+  @doc """
+  Format error for logging with test context.
+  """
+  @spec format_error(adapter_error()) :: String.t()
+  def format_error(%__MODULE__{} = error) do
+    base_msg = "#{error.type}: #{error.message}"
+
+    case error.test_layer do
+      nil -> base_msg
+      layer -> "#{base_msg} [#{layer}]"
+    end
+  end
+
+  @spec format_error(term()) :: String.t()
+  def format_error({:configuration_error, details}) do
+    "Configuration error: #{details}. Please check your adapter settings."
+  end
+
+  def format_error({:connection_error, details}) do
+    "Connection error: #{details}. Please ensure the service is running and accessible."
+  end
+
+  def format_error({:timeout, details}) do
+    "Operation timed out: #{details}. Consider increasing the timeout or checking system load."
+  end
+
+  def format_error({:validation_error, field, reason}) do
+    "Validation error for #{field}: #{reason}"
+  end
+
+  def format_error({:not_found, resource}) do
+    "Resource not found: #{resource}"
+  end
+
+  def format_error({:permission_denied, resource}) do
+    "Permission denied for: #{resource}"
+  end
+
+  def format_error(error) when is_binary(error) do
+    error
+  end
+
+  def format_error(error) do
+    "An error occurred: #{inspect(error)}"
+  end
 
   @doc """
   Handles adapter-specific errors with appropriate recovery strategies.
@@ -160,45 +307,6 @@ defmodule DSPex.Adapters.ErrorHandler do
   end
 
   @doc """
-  Formats error for user-friendly display.
-
-  Converts internal error representations to clear, actionable messages
-  for end users while preserving technical details for debugging.
-  """
-  @spec format_error(term()) :: String.t()
-  def format_error({:configuration_error, details}) do
-    "Configuration error: #{details}. Please check your adapter settings."
-  end
-
-  def format_error({:connection_error, details}) do
-    "Connection error: #{details}. Please ensure the service is running and accessible."
-  end
-
-  def format_error({:timeout, details}) do
-    "Operation timed out: #{details}. Consider increasing the timeout or checking system load."
-  end
-
-  def format_error({:validation_error, field, reason}) do
-    "Validation error for #{field}: #{reason}"
-  end
-
-  def format_error({:not_found, resource}) do
-    "Resource not found: #{resource}"
-  end
-
-  def format_error({:permission_denied, resource}) do
-    "Permission denied for: #{resource}"
-  end
-
-  def format_error(error) when is_binary(error) do
-    error
-  end
-
-  def format_error(error) do
-    "An error occurred: #{inspect(error)}"
-  end
-
-  @doc """
   Enriches error with additional context for debugging.
 
   Adds metadata, timestamps, and adapter information to errors
@@ -243,6 +351,62 @@ defmodule DSPex.Adapters.ErrorHandler do
     )
 
     :ok
+  end
+
+  # Test layer specific retry delays
+  # Fast for mock tests
+  defp get_retry_delay(:timeout, :layer_1), do: 100
+  # Medium for protocol tests  
+  defp get_retry_delay(:timeout, :layer_2), do: 500
+  # Slower for integration tests
+  defp get_retry_delay(:timeout, :layer_3), do: 5000
+  defp get_retry_delay(:timeout, _), do: 5000
+
+  defp get_retry_delay(:connection_failed, :layer_1), do: 100
+  defp get_retry_delay(:connection_failed, :layer_2), do: 1000
+  defp get_retry_delay(:connection_failed, :layer_3), do: 10000
+  defp get_retry_delay(:connection_failed, _), do: 10000
+
+  defp get_retry_delay(:bridge_error, test_layer) do
+    get_retry_delay(:connection_failed, test_layer)
+  end
+
+  # Test layer specific retry logic
+  # Mock should never fail connection
+  defp should_retry_connection?(:layer_1), do: false
+  # Protocol tests may need retries
+  defp should_retry_connection?(:layer_2), do: true
+  # Integration tests definitely need retries
+  defp should_retry_connection?(:layer_3), do: true
+
+  # No bridge in mock
+  defp should_retry_bridge_error?(_details, :layer_1), do: false
+
+  defp should_retry_bridge_error?(details, :layer_2) do
+    # Protocol layer retries specific bridge protocol errors
+    case details do
+      %{type: :protocol_error} -> false
+      %{type: :timeout} -> true
+      _ -> false
+    end
+  end
+
+  defp should_retry_bridge_error?(details, :layer_3) do
+    # Full integration retries most bridge errors
+    case details do
+      %{type: :validation_error} -> false
+      _ -> true
+    end
+  end
+
+  defp get_test_layer do
+    # Try to get test layer from environment or process
+    case System.get_env("TEST_MODE") do
+      "mock_adapter" -> :layer_1
+      "bridge_mock" -> :layer_2
+      "full_integration" -> :layer_3
+      _ -> :layer_3
+    end
   end
 
   # Private Functions
