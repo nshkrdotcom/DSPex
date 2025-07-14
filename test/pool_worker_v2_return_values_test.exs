@@ -21,11 +21,10 @@ defmodule PoolWorkerV2ReturnValuesTest do
       true ->
         # Start a test pool for our tests
         pool_config = [
-          name: {:local, :test_return_values_pool},
-          worker_module: PoolWorkerV2,
-          size: 1,
+          name: :test_return_values_pool,
+          worker: {PoolWorkerV2, []},
+          pool_size: 1,
           max_overflow: 0,
-          strategy: :lifo,
           lazy: false
         ]
 
@@ -44,23 +43,23 @@ defmodule PoolWorkerV2ReturnValuesTest do
       # Test successful checkout
       test_pid = self()
       
-      # Use NimblePool checkout to test the return values
-      assert {:ok, {client_state, _server_ref}} = 
-        NimblePool.checkout(
-          pool_pid,
-          :checkout,
+      # Use NimblePool checkout! to test the return values
+      assert {:ok, result} = 
+        NimblePool.checkout!(
+          :test_return_values_pool,
+          :anonymous,
           fn _from, worker_state ->
             # This simulates what handle_checkout should return
             assert %PoolWorkerV2{} = worker_state
             assert is_port(worker_state.port)
             
-            # Return valid NimblePool tuple
-            {:ok, worker_state, worker_state}
+            # Return result and checkin status
+            {{:ok, worker_state}, :ok}
           end,
           5000
         )
       
-      assert %PoolWorkerV2{} = client_state
+      assert %PoolWorkerV2{} = result
     end
 
     test "connection failure returns remove tuple", %{pool_pid: pool_pid} do
