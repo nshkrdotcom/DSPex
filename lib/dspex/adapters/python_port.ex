@@ -213,6 +213,22 @@ defmodule DSPex.Adapters.PythonPort do
     end
   end
 
+  @impl true
+  def configure_lm(config) do
+    case ensure_bridge_started() do
+      :ok ->
+        case Bridge.call(:configure_lm, config) do
+          {:ok, %{"status" => "configured"}} -> :ok
+          {:ok, %{status: "configured"}} -> :ok
+          {:error, reason} -> {:error, reason}
+          _ -> {:error, :configuration_failed}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   # Test layer support
 
   @impl true

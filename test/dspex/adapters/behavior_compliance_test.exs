@@ -41,15 +41,24 @@ defmodule DSPex.Adapters.BehaviorComplianceTest do
     # Ensure clean Mock process for each test
     setup_isolated_mock()
 
+    # Configure LM for the Mock adapter
+    default_lm = Application.get_env(:dspex, :default_lm)
+
+    if default_lm do
+      DSPex.Adapters.Mock.configure_lm(default_lm)
+    end
+
     :ok
   end
 
   defp setup_isolated_mock do
-    # Kill any existing Mock process
+    # Gracefully stop any existing Mock process
     if pid = Process.whereis(DSPex.Adapters.Mock) do
-      Process.exit(pid, :kill)
-      # Allow cleanup
-      Process.sleep(10)
+      try do
+        GenServer.stop(pid, :normal, 5000)
+      catch
+        :exit, _ -> :ok
+      end
     end
 
     # Start fresh Mock process

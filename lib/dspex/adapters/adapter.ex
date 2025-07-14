@@ -62,6 +62,9 @@ defmodule DSPex.Adapters.Adapter do
   @callback health_check() :: :ok | error()
   @callback get_stats() :: {:ok, map()} | error()
 
+  # Language Model Configuration
+  @callback configure_lm(config()) :: :ok | error()
+
   # Test layer compatibility (required for 3-layer testing)
   @callback supports_test_layer?(atom()) :: boolean()
   @callback get_test_capabilities() :: map()

@@ -1,0 +1,263 @@
+name: Pool System Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run stress tests nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Test type to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - unit
+          - integration
+          - stress
+          - chaos
+
+env:
+  MIX_ENV: test
+  ELIXIR_VERSION: '1.18'
+  OTP_VERSION: '27'
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Elixir
+      uses: erlef/setup-beam@v1
+      with:
+        elixir-version: ${{ env.ELIXIR_VERSION }}
+        otp-version: ${{ env.OTP_VERSION }}
+    
+    - name: Restore dependencies cache
+      uses: actions/cache@v3
+      with:
+        path: deps
+        key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+        restore-keys: ${{ runner.os }}-mix-
+    
+    - name: Install dependencies
+      run: mix deps.get
+    
+    - name: Run unit tests
+      run: |
+        mix test --only unit --cover
+        mix test.fast
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./cover/excoveralls.json
+        flags: unit-tests
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pool_size: [1, 4, 8]
+        python_version: ['3.11', '3.12']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python_version }}
+    
+    - name: Install Python dependencies
+      run: |
+        pip install -r priv/python/requirements.txt
+    
+    - name: Set up Elixir
+      uses: erlef/setup-beam@v1
+      with:
+        elixir-version: ${{ env.ELIXIR_VERSION }}
+        otp-version: ${{ env.OTP_VERSION }}
+    
+    - name: Install Elixir dependencies
+      run: mix deps.get
+    
+    - name: Run integration tests
+      env:
+        POOL_SIZE: ${{ matrix.pool_size }}
+      run: |
+        mix test --only integration --max-failures 3
+        mix test.protocol
+        mix test.integration
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: integration-test-results-${{ matrix.pool_size }}-py${{ matrix.python_version }}
+        path: _build/test/logs/
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.inputs.test_type == 'all'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up environment
+      uses: erlef/setup-beam@v1
+      with:
+        elixir-version: ${{ env.ELIXIR_VERSION }}
+        otp-version: ${{ env.OTP_VERSION }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        mix deps.get
+        pip install -r priv/python/requirements.txt
+    
+    - name: Run performance benchmarks
+      run: |
+        mix run benchmarks/pool_performance.exs
+    
+    - name: Store benchmark results
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        tool: 'customBiggerIsBetter'
+        output-file-path: benchmark_results.json
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+
+  stress-tests:
+    name: Stress Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event.inputs.test_type == 'stress'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up environment
+      uses: erlef/setup-beam@v1
+      with:
+        elixir-version: ${{ env.ELIXIR_VERSION }}
+        otp-version: ${{ env.OTP_VERSION }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        mix deps.get
+        pip install -r priv/python/requirements.txt
+    
+    - name: Run load tests
+      run: |
+        mix test --only load_test --timeout 600000
+    
+    - name: Generate load test report
+      run: |
+        mix run scripts/generate_load_report.exs
+    
+    - name: Upload load test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: load-test-results-${{ github.run_id }}
+        path: |
+          load_test_report.html
+          load_test_metrics.json
+
+  chaos-tests:
+    name: Chaos Engineering Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event.inputs.test_type == 'chaos'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up environment
+      uses: erlef/setup-beam@v1
+      with:
+        elixir-version: ${{ env.ELIXIR_VERSION }}
+        otp-version: ${{ env.OTP_VERSION }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        mix deps.get
+        pip install -r priv/python/requirements.txt
+    
+    - name: Run chaos tests
+      run: |
+        mix test --only chaos --max-failures 1 --seed 0
+    
+    - name: Analyze chaos test results
+      run: |
+        mix run scripts/analyze_chaos_results.exs
+    
+    - name: Upload chaos test analysis
+      uses: actions/upload-artifact@v3
+      with:
+        name: chaos-test-analysis-${{ github.run_id }}
+        path: chaos_analysis.md
+
+  test-matrix-summary:
+    name: Test Matrix Summary
+    needs: [unit-tests, integration-tests, performance-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Check test results
+      run: |
+        if [[ "${{ needs.unit-tests.result }}" != "success" ]]; then
+          echo "Unit tests failed"
+          exit 1
+        fi
+        
+        if [[ "${{ needs.integration-tests.result }}" != "success" ]]; then
+          echo "Integration tests failed"
+          exit 1
+        fi
+        
+        echo "All required tests passed!"
+
+  notify-results:
+    name: Notify Test Results
+    needs: [test-matrix-summary, stress-tests, chaos-tests]
+    runs-on: ubuntu-latest
+    if: always() && (github.event_name == 'schedule' || failure())
+    
+    steps:
+    - name: Send notification
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        text: |
+          Pool System Test Results:
+          - Unit Tests: ${{ needs.unit-tests.result }}
+          - Integration Tests: ${{ needs.integration-tests.result }}
+          - Stress Tests: ${{ needs.stress-tests.result || 'skipped' }}
+          - Chaos Tests: ${{ needs.chaos-tests.result || 'skipped' }}
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      if: always()

@@ -37,6 +37,7 @@ defmodule DSPex.Adapters.Registry do
 
   @adapters %{
     python_port: DSPex.Adapters.PythonPort,
+    python_pool: DSPex.Adapters.PythonPool,
     bridge_mock: DSPex.Adapters.BridgeMock,
     mock: DSPex.Adapters.Mock
   }
@@ -44,6 +45,7 @@ defmodule DSPex.Adapters.Registry do
   @test_layer_adapters %{
     mock_adapter: :mock,
     bridge_mock: :bridge_mock,
+    # This will be resolved based on pooling config
     full_integration: :python_port
   }
 
@@ -95,6 +97,7 @@ defmodule DSPex.Adapters.Registry do
           adapter_name == DSPex.Adapters.Mock -> adapter_name
           adapter_name == DSPex.Adapters.BridgeMock -> adapter_name
           adapter_name == DSPex.Adapters.PythonPort -> adapter_name
+          adapter_name == DSPex.Adapters.PythonPool -> adapter_name
           true -> Map.get(@adapters, @default_adapter)
         end
 
@@ -317,7 +320,19 @@ defmodule DSPex.Adapters.Registry do
     test_adapter = get_test_mode_adapter()
     config_adapter = Application.get_env(:dspex, :adapter)
 
-    resolved = test_adapter || config_adapter || @default_adapter
+    # Check if we should use pooled adapter for layer 3
+    resolved =
+      case test_adapter do
+        :python_port ->
+          if Application.get_env(:dspex, :pooling_enabled, false) do
+            :python_pool
+          else
+            :python_port
+          end
+
+        other ->
+          other || config_adapter || @default_adapter
+      end
 
     Logger.debug("""
     Adapter resolution:

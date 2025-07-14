@@ -31,6 +31,7 @@ import time
 import gc
 import threading
 import os
+import argparse
 from typing import Dict, Any, Optional, List, Union
 
 # Handle DSPy import with fallback
@@ -58,13 +59,26 @@ class DSPyBridge:
     execution requests from the Elixir side.
     """
     
-    def __init__(self):
+    def __init__(self, mode="standalone", worker_id=None):
         """Initialize the bridge with empty program registry."""
-        self.programs: Dict[str, Any] = {}
+        self.mode = mode
+        self.worker_id = worker_id
+        
+        # In pool-worker mode, programs are namespaced by session
+        if mode == "pool-worker":
+            self.session_programs: Dict[str, Dict[str, Any]] = {}  # {session_id: {program_id: program}}
+            self.current_session = None
+        else:
+            self.programs: Dict[str, Any] = {}
+            
         self.start_time = time.time()
         self.command_count = 0
         self.error_count = 0
         self.lock = threading.Lock()
+        
+        # Language Model configuration
+        self.lm_configured = False
+        self.current_lm_config = None
         
         # Initialize DSPy if available
         if DSPY_AVAILABLE:
@@ -115,6 +129,7 @@ class DSPyBridge:
             
             handlers = {
                 'ping': self.ping,
+                'configure_lm': self.configure_lm,
                 'create_program': self.create_program,
                 'create_gemini_program': self.create_gemini_program,
                 'execute_program': self.execute_program,
@@ -124,7 +139,9 @@ class DSPyBridge:
                 'get_stats': self.get_stats,
                 'cleanup': self.cleanup,
                 'reset_state': self.reset_state,
-                'get_program_info': self.get_program_info
+                'get_program_info': self.get_program_info,
+                'cleanup_session': self.cleanup_session,
+                'shutdown': self.shutdown
             }
             
             if command not in handlers:
@@ -148,13 +165,76 @@ class DSPyBridge:
         Returns:
             Status information including timestamp
         """
-        return {
+        response = {
             "status": "ok",
             "timestamp": time.time(),
             "dspy_available": DSPY_AVAILABLE,
             "gemini_available": GEMINI_AVAILABLE,
-            "uptime": time.time() - self.start_time
+            "uptime": time.time() - self.start_time,
+            "mode": self.mode
         }
+        
+        if self.worker_id:
+            response["worker_id"] = self.worker_id
+            
+        if self.mode == "pool-worker" and hasattr(self, 'current_session'):
+            response["current_session"] = self.current_session
+            
+        return response
+    
+    def configure_lm(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Configure the language model for DSPy.
+        
+        Args:
+            args: Configuration with model, api_key, temperature
+            
+        Returns:
+            Status information about the configuration
+        """
+        try:
+            model = args.get('model')
+            api_key = args.get('api_key')
+            temperature = args.get('temperature', 0.7)
+            provider = args.get('provider', 'google')
+            
+            if not model:
+                raise ValueError("Model name is required")
+            if not api_key:
+                raise ValueError("API key is required")
+            
+            # Configure based on provider
+            if provider == 'google' and model.startswith('gemini'):
+                import dspy
+                # Configure Google/Gemini LM
+                lm = dspy.Google(
+                    model=model,
+                    api_key=api_key,
+                    temperature=temperature
+                )
+                dspy.settings.configure(lm=lm)
+                
+                self.lm_configured = True
+                self.current_lm_config = args
+                
+                # Store per-session in pool-worker mode
+                if self.mode == "pool-worker" and hasattr(self, 'current_session') and self.current_session:
+                    if not hasattr(self, 'session_lms'):
+                        self.session_lms = {}
+                    self.session_lms[self.current_session] = args
+                
+                return {
+                    "status": "configured",
+                    "model": model,
+                    "provider": provider,
+                    "temperature": temperature
+                }
+            else:
+                raise ValueError(f"Unsupported provider/model combination: {provider}/{model}")
+                
+        except Exception as e:
+            self.error_count += 1
+            return {"error": str(e)}
     
     def create_program(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -179,8 +259,21 @@ class DSPyBridge:
         if not program_id:
             raise ValueError("Program ID is required")
         
-        if program_id in self.programs:
-            raise ValueError(f"Program with ID '{program_id}' already exists")
+        # Handle session-based storage in pool-worker mode
+        if self.mode == "pool-worker":
+            session_id = args.get('session_id')
+            if not session_id:
+                raise ValueError("Session ID required in pool-worker mode")
+            
+            # Initialize session if needed
+            if session_id not in self.session_programs:
+                self.session_programs[session_id] = {}
+                
+            if program_id in self.session_programs[session_id]:
+                raise ValueError(f"Program with ID '{program_id}' already exists in session {session_id}")
+        else:
+            if program_id in self.programs:
+                raise ValueError(f"Program with ID '{program_id}' already exists")
         
         try:
             # Create dynamic signature class
@@ -189,14 +282,20 @@ class DSPyBridge:
             # Create program based on type
             program = self._create_program_instance(signature_class, program_type)
             
-            # Store program
-            self.programs[program_id] = {
+            # Store program based on mode
+            program_info = {
                 'program': program,
                 'signature': signature_def,
                 'created_at': time.time(),
                 'execution_count': 0,
                 'last_executed': None
             }
+            
+            if self.mode == "pool-worker":
+                session_id = args.get('session_id')
+                self.session_programs[session_id][program_id] = program_info
+            else:
+                self.programs[program_id] = program_info
             
             return {
                 "program_id": program_id,
@@ -285,11 +384,46 @@ class DSPyBridge:
         if not program_id:
             raise ValueError("Program ID is required")
         
-        if program_id not in self.programs:
-            raise ValueError(f"Program not found: {program_id}")
-        
-        program_info = self.programs[program_id]
+        # Get program based on mode
+        if self.mode == "pool-worker":
+            session_id = args.get('session_id')
+            if not session_id:
+                raise ValueError("Session ID required in pool-worker mode")
+            
+            if session_id not in self.session_programs:
+                raise ValueError(f"Session not found: {session_id}")
+                
+            if program_id not in self.session_programs[session_id]:
+                raise ValueError(f"Program not found in session {session_id}: {program_id}")
+                
+            program_info = self.session_programs[session_id][program_id]
+        else:
+            if program_id not in self.programs:
+                raise ValueError(f"Program not found: {program_id}")
+                
+            program_info = self.programs[program_id]
+            
         program = program_info['program']
+        
+        # Check if LM is configured
+        if not self.lm_configured:
+            # Try to use default from environment if available
+            api_key = os.environ.get('GEMINI_API_KEY')
+            if api_key:
+                self.configure_lm({
+                    'model': 'gemini-1.5-flash',
+                    'api_key': api_key,
+                    'temperature': 0.7,
+                    'provider': 'google'
+                })
+            else:
+                raise RuntimeError("No LM is loaded.")
+        
+        # Restore session LM if in pool-worker mode
+        if self.mode == "pool-worker" and hasattr(self, 'session_lms'):
+            session_id = args.get('session_id')
+            if session_id in self.session_lms:
+                self.configure_lm(self.session_lms[session_id])
         
         try:
             # Execute the program
@@ -327,14 +461,40 @@ class DSPyBridge:
         """
         program_list = []
         
-        for program_id, program_info in self.programs.items():
-            program_list.append({
-                "id": program_id,
-                "created_at": program_info['created_at'],
-                "execution_count": program_info['execution_count'],
-                "last_executed": program_info['last_executed'],
-                "signature": program_info['signature']
-            })
+        if self.mode == "pool-worker":
+            session_id = args.get('session_id')
+            if session_id and session_id in self.session_programs:
+                # List programs for specific session
+                for program_id, program_info in self.session_programs[session_id].items():
+                    program_list.append({
+                        "id": program_id,
+                        "created_at": program_info['created_at'],
+                        "execution_count": program_info['execution_count'],
+                        "last_executed": program_info['last_executed'],
+                        "signature": program_info['signature'],
+                        "session_id": session_id
+                    })
+            else:
+                # List all programs across all sessions
+                for session_id, session_programs in self.session_programs.items():
+                    for program_id, program_info in session_programs.items():
+                        program_list.append({
+                            "id": program_id,
+                            "created_at": program_info['created_at'],
+                            "execution_count": program_info['execution_count'],
+                            "last_executed": program_info['last_executed'],
+                            "signature": program_info['signature'],
+                            "session_id": session_id
+                        })
+        else:
+            for program_id, program_info in self.programs.items():
+                program_list.append({
+                    "id": program_id,
+                    "created_at": program_info['created_at'],
+                    "execution_count": program_info['execution_count'],
+                    "last_executed": program_info['last_executed'],
+                    "signature": program_info['signature']
+                })
         
         return {
             "programs": program_list,
@@ -357,10 +517,23 @@ class DSPyBridge:
         if not program_id:
             raise ValueError("Program ID is required")
         
-        if program_id not in self.programs:
-            raise ValueError(f"Program not found: {program_id}")
-        
-        del self.programs[program_id]
+        if self.mode == "pool-worker":
+            session_id = args.get('session_id')
+            if not session_id:
+                raise ValueError("Session ID required in pool-worker mode")
+            
+            if session_id not in self.session_programs:
+                raise ValueError(f"Session not found: {session_id}")
+                
+            if program_id not in self.session_programs[session_id]:
+                raise ValueError(f"Program not found in session {session_id}: {program_id}")
+                
+            del self.session_programs[session_id][program_id]
+        else:
+            if program_id not in self.programs:
+                raise ValueError(f"Program not found: {program_id}")
+            
+            del self.programs[program_id]
         
         # Trigger garbage collection to free memory
         gc.collect()
@@ -469,6 +642,68 @@ class DSPyBridge:
             "programs_cleared": program_count,
             "commands_reset": command_count,
             "errors_reset": error_count
+        }
+    
+    def cleanup_session(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Clean up a specific session in pool-worker mode.
+        
+        Args:
+            args: Dictionary containing session_id
+            
+        Returns:
+            Dictionary with cleanup status
+        """
+        if self.mode != "pool-worker":
+            return {"status": "not_applicable", "mode": self.mode}
+            
+        session_id = args.get('session_id')
+        if not session_id:
+            raise ValueError("Session ID required for cleanup")
+            
+        if session_id in self.session_programs:
+            program_count = len(self.session_programs[session_id])
+            del self.session_programs[session_id]
+            
+            # Force garbage collection
+            gc.collect()
+            
+            return {
+                "status": "cleaned",
+                "session_id": session_id,
+                "programs_removed": program_count
+            }
+        else:
+            return {
+                "status": "not_found",
+                "session_id": session_id
+            }
+    
+    def shutdown(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Graceful shutdown command for pool-worker mode.
+        
+        Args:
+            args: Dictionary containing optional worker_id
+            
+        Returns:
+            Dictionary with shutdown acknowledgment
+        """
+        # Clean up all sessions if in pool-worker mode
+        if self.mode == "pool-worker":
+            sessions_cleaned = len(self.session_programs)
+            self.session_programs.clear()
+        else:
+            self.programs.clear()
+            
+        # Force garbage collection
+        gc.collect()
+        
+        return {
+            "status": "shutting_down",
+            "worker_id": self.worker_id,
+            "mode": self.mode,
+            "sessions_cleaned": sessions_cleaned if self.mode == "pool-worker" else 0
         }
     
     def _get_memory_usage(self) -> Dict[str, Union[int, str]]:
@@ -732,6 +967,9 @@ def write_message(message: Dict[str, Any]) -> None:
         sys.stdout.buffer.write(message_bytes)
         sys.stdout.buffer.flush()
         
+    except BrokenPipeError:
+        # Pipe was closed by the other end, exit gracefully
+        sys.exit(0)
     except Exception as e:
         print(f"Error writing message: {e}", file=sys.stderr)
 
@@ -742,9 +980,19 @@ def main():
     
     Reads messages from stdin, processes commands, and writes responses to stdout.
     """
-    bridge = DSPyBridge()
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='DSPy Bridge for Elixir Integration')
+    parser.add_argument('--mode', choices=['standalone', 'pool-worker'], default='standalone',
+                        help='Bridge operation mode')
+    parser.add_argument('--worker-id', type=str, help='Worker ID for pool-worker mode')
+    args = parser.parse_args()
     
-    print("DSPy Bridge started", file=sys.stderr)
+    # Create bridge with specified mode
+    bridge = DSPyBridge(mode=args.mode, worker_id=args.worker_id)
+    
+    print(f"DSPy Bridge started in {args.mode} mode", file=sys.stderr)
+    if args.worker_id:
+        print(f"Worker ID: {args.worker_id}", file=sys.stderr)
     print(f"DSPy available: {DSPY_AVAILABLE}", file=sys.stderr)
     
     try:
@@ -793,11 +1041,19 @@ def main():
     
     except KeyboardInterrupt:
         print("Bridge interrupted by user", file=sys.stderr)
+    except BrokenPipeError:
+        # Pipe closed, exit silently
+        pass
     except Exception as e:
         print(f"Unexpected bridge error: {e}", file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)
     finally:
-        print("DSPy Bridge shutting down", file=sys.stderr)
+        # Use try-except for final message to avoid BrokenPipeError on stderr
+        try:
+            print("DSPy Bridge shutting down", file=sys.stderr)
+            sys.stderr.flush()
+        except:
+            pass
 
 
 if __name__ == '__main__':

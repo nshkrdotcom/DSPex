@@ -33,6 +33,9 @@ defmodule DSPex.MixProject do
   defp deps do
     [
       {:jason, "~> 1.4"},
+      {:nimble_pool, "~> 1.1"},
+      {:telemetry, "~> 1.2"},
+      {:telemetry_poller, "~> 1.0"},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end

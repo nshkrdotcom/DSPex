@@ -20,17 +20,33 @@ defmodule DSPex.PythonBridge.ConditionalSupervisor do
   @impl true
   def init(opts) do
     children =
-      case should_start_bridge?(opts) do
-        true ->
-          Logger.info("Starting Python bridge supervisor")
+      case determine_bridge_mode(opts) do
+        :pool ->
+          Logger.info("Starting Python bridge pool supervisor")
+          [DSPex.PythonBridge.PoolSupervisor]
+
+        :single ->
+          Logger.info("Starting Python bridge supervisor (single mode)")
           [DSPex.PythonBridge.Supervisor]
 
-        false ->
+        :disabled ->
           Logger.info("Python bridge disabled or environment not available")
           []
       end
 
     Supervisor.init(children, strategy: :one_for_one)
+  end
+
+  defp determine_bridge_mode(opts) do
+    # Check if pooling is enabled
+    pooling_enabled =
+      Keyword.get(opts, :pooling_enabled, Application.get_env(:dspex, :pooling_enabled, false))
+
+    cond do
+      not should_start_bridge?(opts) -> :disabled
+      pooling_enabled -> :pool
+      true -> :single
+    end
   end
 
   defp should_start_bridge?(opts) do

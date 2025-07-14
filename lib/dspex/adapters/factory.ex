@@ -351,9 +351,19 @@ defmodule DSPex.Adapters.Factory do
   defp apply_with_timeout(adapter, operation, args, timeout) do
     task = Task.async(fn -> apply(adapter, operation, args) end)
 
-    case Task.yield(task, timeout) || Task.shutdown(task) do
-      {:ok, result} -> result
-      nil -> {:error, :timeout}
+    case Task.yield(task, timeout) do
+      {:ok, result} ->
+        result
+
+      nil ->
+        # Give the task a chance to finish gracefully
+        case Task.shutdown(task, :brutal_kill) do
+          {:ok, result} -> result
+          nil -> {:error, :timeout}
+        end
+
+      {:exit, reason} ->
+        {:error, {:task_exit, reason}}
     end
   end
 

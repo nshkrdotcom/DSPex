@@ -102,6 +102,17 @@ if config_env() == :test do
     # Very frequent health checks in tests
     health_check_interval: 1_000,
     failure_threshold: 2
+
+  # Pooling configuration for tests
+  # This is read by ConditionalSupervisor at startup
+  test_mode = System.get_env("TEST_MODE", "mock_adapter")
+  pooling_enabled = test_mode == "full_integration"
+
+  config :dspex,
+    pooling_enabled: pooling_enabled,
+    # Small pool for tests
+    pool_size: 2,
+    pool_mode: :test
 end
 
 if config_env() == :prod do

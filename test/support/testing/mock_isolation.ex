@@ -36,6 +36,14 @@ defmodule DSPex.Testing.MockIsolation do
     # Store the current process's mock adapter name
     Process.put(:test_mock_name, mock_name)
 
+    # Configure LM for the isolated mock instance
+    default_lm = Application.get_env(:dspex, :default_lm)
+
+    if default_lm do
+      # Configure the mock with the default LM
+      GenServer.call(mock_name, {:command, :configure_lm, default_lm})
+    end
+
     on_exit(fn ->
       # Clean up the mock adapter when test finishes
       if Process.alive?(pid) do
@@ -155,6 +163,15 @@ defmodule DSPex.Testing.MockIsolation.IsolatedMock do
   def ping do
     mock_name = MockIsolation.current_mock_name()
     GenServer.call(mock_name, {:command, :ping, %{}})
+  end
+
+  def configure_lm(config) do
+    mock_name = MockIsolation.current_mock_name()
+
+    case GenServer.call(mock_name, {:command, :configure_lm, config}) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   def get_program_info(program_id) do

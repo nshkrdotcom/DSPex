@@ -31,7 +31,9 @@ defmodule DSPex.Adapters.Mock do
     # Operation statistics
     :stats,
     # Error injection rules
-    :error_injection
+    :error_injection,
+    # Language model configuration
+    :lm_config
   ]
 
   # Public API
@@ -161,6 +163,17 @@ defmodule DSPex.Adapters.Mock do
     end
   end
 
+  @impl true
+  def configure_lm(config) do
+    _ = ensure_started()
+
+    # Store LM config and check it during execute_program
+    case GenServer.call(__MODULE__, {:command, :configure_lm, config}) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   # GenServer Callbacks
   @impl true
   def init(opts) do
@@ -177,7 +190,8 @@ defmodule DSPex.Adapters.Mock do
         errors_injected: 0,
         uptime_start: DateTime.utc_now()
       },
-      error_injection: %{}
+      error_injection: %{},
+      lm_config: nil
     }
 
     Logger.debug("Mock adapter started with config: #{inspect(config)}")
@@ -197,7 +211,8 @@ defmodule DSPex.Adapters.Mock do
           executions_run: 0,
           errors_injected: 0,
           uptime_start: DateTime.utc_now()
-        }
+        },
+        lm_config: nil
     }
 
     {:reply, :ok, new_state}
@@ -308,38 +323,45 @@ defmodule DSPex.Adapters.Mock do
     program_id = Map.get(args, :program_id) || Map.get(args, "program_id")
     inputs = Map.get(args, :inputs) || Map.get(args, "inputs") || %{}
 
-    case Map.get(state.programs, program_id) do
+    # Check if LM is configured (mimic real behavior)
+    case state.lm_config do
       nil ->
-        {:error, "Program not found: #{program_id}", state}
+        {:error, "No LM is loaded.", state}
 
-      program ->
-        execution_id = generate_execution_id()
+      _config ->
+        case Map.get(state.programs, program_id) do
+          nil ->
+            {:error, "Program not found: #{program_id}", state}
 
-        # Generate mock response based on signature
-        result = generate_mock_response(program.signature, inputs, state.scenarios)
+          program ->
+            execution_id = generate_execution_id()
 
-        execution_record = %{
-          id: execution_id,
-          program_id: program_id,
-          inputs: inputs,
-          result: result,
-          executed_at: DateTime.utc_now()
-        }
+            # Generate mock response based on signature
+            result = generate_mock_response(program.signature, inputs, state.scenarios)
 
-        # Update state
-        new_executions = Map.put(state.executions, execution_id, execution_record)
-        updated_program = update_in(program, [:executions], &(&1 + 1))
-        new_programs = Map.put(state.programs, program_id, updated_program)
-        new_stats = update_in(state.stats, [:executions_run], &(&1 + 1))
+            execution_record = %{
+              id: execution_id,
+              program_id: program_id,
+              inputs: inputs,
+              result: result,
+              executed_at: DateTime.utc_now()
+            }
 
-        new_state = %{
-          state
-          | executions: new_executions,
-            programs: new_programs,
-            stats: new_stats
-        }
+            # Update state
+            new_executions = Map.put(state.executions, execution_id, execution_record)
+            updated_program = update_in(program, [:executions], &(&1 + 1))
+            new_programs = Map.put(state.programs, program_id, updated_program)
+            new_stats = update_in(state.stats, [:executions_run], &(&1 + 1))
 
-        {:ok, result, new_state}
+            new_state = %{
+              state
+              | executions: new_executions,
+                programs: new_programs,
+                stats: new_stats
+            }
+
+            {:ok, result, new_state}
+        end
     end
   end
 
@@ -396,6 +418,18 @@ defmodule DSPex.Adapters.Mock do
     }
 
     {:ok, stats, state}
+  end
+
+  defp handle_command(:configure_lm, config, state) do
+    # Store the LM configuration
+    result = %{
+      status: "configured",
+      model: Map.get(config, :model) || Map.get(config, "model"),
+      provider: Map.get(config, :provider) || Map.get(config, "provider", "mock"),
+      temperature: Map.get(config, :temperature) || Map.get(config, "temperature", 0.7)
+    }
+
+    {:ok, result, %{state | lm_config: config}}
   end
 
   # Helper Functions

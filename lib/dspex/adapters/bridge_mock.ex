@@ -160,6 +160,20 @@ defmodule DSPex.Adapters.BridgeMock do
     end
   end
 
+  @impl true
+  def configure_lm(config) do
+    with :ok <- ensure_server_started() do
+      request = %{command: "configure_lm", args: config}
+
+      case send_mock_command(request) do
+        {:ok, %{"status" => "configured"}} -> :ok
+        {:ok, %{status: "configured"}} -> :ok
+        {:error, reason} -> {:error, reason}
+        _ -> {:error, :configuration_failed}
+      end
+    end
+  end
+
   # Test layer support
 
   @impl true

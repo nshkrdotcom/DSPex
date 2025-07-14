@@ -5,6 +5,17 @@ defmodule DSPex.Adapters.BehaviorTest do
 
   @moduletag :layer_1
 
+  setup do
+    # Ensure Mock adapter is configured with LM for tests
+    default_lm = Application.get_env(:dspex, :default_lm)
+
+    if default_lm do
+      Mock.configure_lm(default_lm)
+    end
+
+    :ok
+  end
+
   describe "adapter behavior compliance" do
     @adapters [
       {Mock, :mock, :layer_1},
