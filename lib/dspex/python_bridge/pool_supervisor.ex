@@ -95,6 +95,9 @@ defmodule DSPex.PythonBridge.PoolSupervisor do
       Logger.info("Starting Python bridge pool supervisor")
 
       children = [
+        # Session store for centralized session management
+        {DSPex.PythonBridge.SessionStore, []},
+
         # Session pool manager with NimblePool
         {DSPex.PythonBridge.SessionPoolV2,
          [

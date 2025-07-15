@@ -2,8 +2,8 @@ import Config
 
 # Configure DSPex for signature examples
 config :dspex,
-  # Enable Python bridge pooling for better performance
-  pooling_enabled: true,
+  # Disable Python bridge pooling temporarily to test signatures
+  pooling_enabled: false,
   # Configure pool settings
   pool_size: 2,
   overflow: 1,

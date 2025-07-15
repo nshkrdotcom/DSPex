@@ -92,14 +92,26 @@ defmodule DSPex.Adapters.PythonPort do
 
         if Process.get(:use_pool_mode, false) do
           # Use SessionPool for pooled mode
-          session_id = Map.get(inputs, :session_id, "anonymous")
+          session_id = Map.get(inputs, :session_id)
 
-          case SessionPoolV2.execute_in_session(session_id, :execute_program, args) do
-            {:ok, response} ->
-              {:ok, response}
+          if session_id && session_id != "anonymous" do
+            # Use specific session if provided
+            case SessionPoolV2.execute_in_session(session_id, :execute_program, args) do
+              {:ok, response} ->
+                {:ok, response}
 
-            {:error, reason} ->
-              {:error, reason}
+              {:error, reason} ->
+                {:error, reason}
+            end
+          else
+            # Use anonymous execution for default case
+            case SessionPoolV2.execute_anonymous(:execute_program, args) do
+              {:ok, response} ->
+                {:ok, response}
+
+              {:error, reason} ->
+                {:error, reason}
+            end
           end
         else
           case Bridge.call(:execute_program, args) do
@@ -129,14 +141,26 @@ defmodule DSPex.Adapters.PythonPort do
         if Process.get(:use_pool_mode, false) do
           # Use SessionPool for pooled mode
           session_id =
-            Keyword.get(options, :session_id, Map.get(inputs, :session_id, "anonymous"))
+            Keyword.get(options, :session_id, Map.get(inputs, :session_id))
 
-          case SessionPoolV2.execute_in_session(session_id, :execute_program, args, options) do
-            {:ok, response} ->
-              {:ok, response}
+          if session_id && session_id != "anonymous" do
+            # Use specific session if provided
+            case SessionPoolV2.execute_in_session(session_id, :execute_program, args, options) do
+              {:ok, response} ->
+                {:ok, response}
 
-            {:error, reason} ->
-              {:error, reason}
+              {:error, reason} ->
+                {:error, reason}
+            end
+          else
+            # Use anonymous execution for default case
+            case SessionPoolV2.execute_anonymous(:execute_program, args, options) do
+              {:ok, response} ->
+                {:ok, response}
+
+              {:error, reason} ->
+                {:error, reason}
+            end
           end
         else
           case Bridge.call(:execute_program, args) do
