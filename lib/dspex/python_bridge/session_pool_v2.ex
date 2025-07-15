@@ -1,15 +1,17 @@
 defmodule DSPex.PythonBridge.SessionPoolV2 do
   @moduledoc """
-  Refactored Session-aware pool manager for Python bridge workers.
+  Minimal session pool manager for Python bridge workers.
 
-  This version correctly implements the NimblePool pattern by moving blocking
-  I/O operations to client processes instead of the pool manager GenServer.
+  This version implements a streamlined, stateless pooling approach focused on
+  the "Golden Path" architecture. It provides essential pooling functionality
+  without complex enterprise features.
 
-  Key differences from V1:
-  - execute_in_session/4 is a public function, not a GenServer call
-  - Blocking receive operations happen in client processes
-  - Direct port communication without intermediary functions
-  - Simplified session tracking using ETS
+  Key features:
+  - Stateless architecture with no session affinity
+  - Direct port communication between clients and Python processes
+  - Simple error handling with structured error responses
+  - ETS-based session tracking for observability only
+  - Focus on PoolWorkerV2 (not Enhanced variants)
   """
 
   use GenServer
@@ -17,19 +19,14 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
 
   alias DSPex.PythonBridge.{
     PoolWorkerV2,
-    PoolWorkerV2Enhanced,
-    Protocol,
-    PoolErrorHandler,
-    CircuitBreaker,
-    RetryLogic,
-    ErrorRecoveryOrchestrator
+    Protocol
   }
 
   # Configuration defaults
   @default_pool_size System.schedulers_online() * 2
   @default_overflow 2
-  @default_checkout_timeout 5_000
-  @default_operation_timeout 30_000
+  @default_checkout_timeout 15_000  # Increased from 10s to 15s for worker initialization
+  @default_operation_timeout 60_000  # Increased from 45s to 60s for Python operations
   @health_check_interval 30_000
   @session_cleanup_interval 300_000
 
@@ -51,74 +48,22 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   ## Public API - Client Functions
 
   @doc """
-  Executes a command within a session context with comprehensive error handling.
+  Executes a command within a session context.
 
   This function runs in the CLIENT process, not the pool manager.
-  It uses RetryLogic and PoolErrorHandler for robust error handling.
+  It provides direct port communication with simple error handling.
+
+  ## Parameters
+  - session_id: String identifier for session tracking (observability only)
+  - command: Atom representing the command to execute
+  - args: Map of arguments to pass to the Python process
+  - opts: Keyword list of options (pool_name, timeout, etc.)
+
+  ## Returns
+  - {:ok, result} on success
+  - {:error, {category, type, message, context}} on error
   """
   def execute_in_session(session_id, command, args, opts \\ []) do
-    # Normalize opts to handle both maps and keyword lists
-    normalized_opts = normalize_opts(opts)
-
-    context = %{
-      session_id: session_id,
-      command: command,
-      args: args,
-      operation: :execute_command,
-      adapter: __MODULE__
-    }
-
-    # Wrap entire operation in retry logic with circuit breaker protection
-    retry_opts = [
-      max_attempts: Keyword.get(normalized_opts, :max_retries, 3),
-      circuit: :pool_operations,
-      base_delay: 1_000,
-      context: context
-    ]
-
-    RetryLogic.with_retry(
-      fn ->
-        do_execute_with_error_handling(session_id, command, args, normalized_opts, context)
-      end,
-      retry_opts
-    )
-  end
-
-  @doc """
-  Executes a command without session binding with error handling.
-
-  This function runs in the CLIENT process for anonymous operations.
-  """
-  def execute_anonymous(command, args, opts \\ []) do
-    # Normalize opts to handle both maps and keyword lists
-    normalized_opts = normalize_opts(opts)
-
-    context = %{
-      command: command,
-      args: args,
-      operation: :execute_anonymous,
-      adapter: __MODULE__
-    }
-
-    # Use retry logic for anonymous operations too
-    retry_opts = [
-      max_attempts: Keyword.get(normalized_opts, :max_retries, 2),
-      circuit: :anonymous_operations,
-      base_delay: 500,
-      context: context
-    ]
-
-    RetryLogic.with_retry(
-      fn -> do_execute_anonymous_with_error_handling(command, args, normalized_opts, context) end,
-      retry_opts
-    )
-  end
-
-  ## Private Error Handling Functions
-
-  @spec do_execute_with_error_handling(String.t(), atom(), map(), keyword(), map()) ::
-          {:ok, term()} | {:error, term()}
-  defp do_execute_with_error_handling(session_id, command, args, opts, context) do
     opts = normalize_opts(opts)
     pool_name = Keyword.get(opts, :pool_name, get_default_pool_name())
     pool_timeout = Keyword.get(opts, :pool_timeout, @default_checkout_timeout)
@@ -126,42 +71,49 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
 
     # Track session for monitoring (but not for affinity)
     track_session(session_id)
+    update_session_activity(session_id)
 
     try do
-      # In stateless architecture, we don't need session-specific checkout
-      # Any available worker can handle any session by fetching data from centralized store
+      # In stateless architecture, any worker can handle any session
       NimblePool.checkout!(
         pool_name,
-        :any_worker,  # Changed from {:session, session_id} to :any_worker
-        fn from, worker ->
-          execute_with_worker_error_handling(
-            worker,
-            command,
-            args,
-            operation_timeout,
-            Map.merge(context, %{session_id: session_id, from: from})
-          )
+        :any_worker,
+        fn _from, worker ->
+          execute_with_worker(worker, command, args, operation_timeout, session_id)
         end,
         pool_timeout
       )
     catch
       :exit, {:timeout, _} ->
-        handle_pool_error({:timeout, :checkout_timeout}, context)
+        {:error, {:timeout_error, :checkout_timeout, "No workers available", %{pool_name: pool_name, session_id: session_id}}}
 
       :exit, {:noproc, _} ->
-        handle_pool_error({:resource_error, :pool_not_available}, context)
+        {:error, {:resource_error, :pool_not_available, "Pool not started", %{pool_name: pool_name}}}
 
       :exit, reason ->
-        handle_pool_error({:system_error, reason}, context)
+        {:error, {:system_error, :pool_exit, "Pool process exited", %{reason: reason, session_id: session_id}}}
 
       kind, error ->
-        handle_pool_error({:unexpected_error, {kind, error}}, context)
+        {:error, {:system_error, :unexpected_error, "Unexpected error during checkout", %{kind: kind, error: error, session_id: session_id}}}
     end
   end
 
-  @spec do_execute_anonymous_with_error_handling(atom(), map(), keyword(), map()) ::
-          {:ok, term()} | {:error, term()}
-  defp do_execute_anonymous_with_error_handling(command, args, opts, context) do
+  @doc """
+  Executes a command without session binding.
+
+  This function runs in the CLIENT process for anonymous operations.
+  Provides the same functionality as execute_in_session/4 but without session tracking.
+
+  ## Parameters
+  - command: Atom representing the command to execute
+  - args: Map of arguments to pass to the Python process
+  - opts: Keyword list of options (pool_name, timeout, etc.)
+
+  ## Returns
+  - {:ok, result} on success
+  - {:error, {category, type, message, context}} on error
+  """
+  def execute_anonymous(command, args, opts \\ []) do
     opts = normalize_opts(opts)
     pool_name = Keyword.get(opts, :pool_name, get_default_pool_name())
     pool_timeout = Keyword.get(opts, :pool_timeout, @default_checkout_timeout)
@@ -171,61 +123,45 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
       NimblePool.checkout!(
         pool_name,
         :anonymous,
-        fn from, worker ->
-          execute_with_worker_error_handling(
-            worker,
-            command,
-            args,
-            operation_timeout,
-            Map.merge(context, %{from: from})
-          )
+        fn _from, worker ->
+          execute_with_worker(worker, command, args, operation_timeout, nil)
         end,
         pool_timeout
       )
     catch
       :exit, {:timeout, _} ->
-        handle_pool_error({:timeout, :checkout_timeout}, context)
+        {:error, {:timeout_error, :checkout_timeout, "No workers available", %{pool_name: pool_name}}}
+
+      :exit, {:noproc, _} ->
+        {:error, {:resource_error, :pool_not_available, "Pool not started", %{pool_name: pool_name}}}
 
       :exit, reason ->
-        handle_pool_error({:system_error, reason}, context)
+        {:error, {:system_error, :pool_exit, "Pool process exited", %{reason: reason}}}
 
       kind, error ->
-        handle_pool_error({:unexpected_error, {kind, error}}, context)
+        {:error, {:system_error, :unexpected_error, "Unexpected error during checkout", %{kind: kind, error: error}}}
     end
   end
 
-  @spec execute_with_worker_error_handling(map(), atom(), map(), pos_integer(), map()) ::
-          {{:ok, term()} | {:error, term()}, atom()}
-  defp execute_with_worker_error_handling(worker, command, args, timeout, context) do
-    enhanced_context =
-      Map.merge(context, %{
-        worker_id: worker.worker_id,
-        worker_state: get_worker_state(worker)
-      })
+  ## Private Worker Communication Functions
 
+  @spec execute_with_worker(map(), atom(), map(), pos_integer(), String.t() | nil) ::
+          {{:ok, term()} | {:error, term()}, atom()}
+  defp execute_with_worker(worker, command, args, timeout, session_id) do
     # Generate request ID and encode
     request_id = System.unique_integer([:positive, :monotonic])
 
-    enhanced_args =
-      if session_id = Map.get(context, :session_id) do
-        Map.put(args, :session_id, session_id)
-      else
-        args
-      end
+    # Add session_id to args if provided (for observability)
+    enhanced_args = if session_id, do: Map.put(args, :session_id, session_id), else: args
 
     try do
       request_payload = Protocol.encode_request(request_id, command, enhanced_args)
-
-      # Record session affinity for enhanced workers
-      if session_id = Map.get(context, :session_id) do
-        bind_session_if_enhanced(session_id, worker)
-      end
 
       # Send command to port
       port = worker.port
       Port.command(port, request_payload)
 
-      # Wait for response with comprehensive error handling
+      # Wait for response with simple error handling
       receive do
         {^port, {:data, data}} ->
           case Protocol.decode_response(data) do
@@ -233,185 +169,39 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
               {{:ok, response}, :ok}
 
             {:ok, other_id, _} ->
-              error = handle_response_mismatch(request_id, other_id, enhanced_context)
+              error = {:communication_error, :response_mismatch, "Expected ID #{request_id}, got #{other_id}", %{expected_id: request_id, actual_id: other_id, worker_id: worker.worker_id}}
               {{:error, error}, :close}
 
             {:error, _id, reason} ->
-              error =
-                PoolErrorHandler.wrap_pool_error(
-                  {:python_error, reason},
-                  enhanced_context
-                )
-
+              error = {:communication_error, :python_error, reason, %{worker_id: worker.worker_id, session_id: session_id}}
               {{:error, error}, :ok}
 
             {:error, reason} ->
-              error = handle_decode_error(reason, enhanced_context)
+              error = {:communication_error, :decode_error, "Failed to decode response: #{inspect(reason)}", %{decode_reason: reason, worker_id: worker.worker_id}}
               {{:error, error}, :close}
           end
 
         {^port, {:exit_status, status}} ->
-          error = handle_port_exit(status, enhanced_context)
+          error = {:communication_error, :port_exited, "Python process exited with status #{status}", %{exit_status: status, worker_id: worker.worker_id}}
           {{:error, error}, :close}
       after
         timeout ->
-          error = handle_command_timeout(worker, command, timeout, enhanced_context)
+          Logger.error("Command timeout for worker #{worker.worker_id}: #{command} (#{timeout}ms)")
+          error = {:timeout_error, :command_timeout, "Command timed out after #{timeout}ms", %{timeout_ms: timeout, worker_id: worker.worker_id, command: command}}
           {{:error, error}, :close}
       end
     catch
       :exit, {:timeout, _} ->
-        error = handle_command_timeout(worker, command, timeout, enhanced_context)
+        error = {:timeout_error, :command_timeout, "Command timed out after #{timeout}ms", %{timeout_ms: timeout, worker_id: worker.worker_id, command: command}}
         {{:error, error}, :close}
 
       :error, {:badarg, _} ->
-        error =
-          PoolErrorHandler.wrap_pool_error(
-            {:command_send_failed, "Port.command/2 failed - port may be closed"},
-            enhanced_context
-          )
-
+        error = {:communication_error, :port_send_failed, "Port.command/2 failed - port may be closed", %{worker_id: worker.worker_id}}
         {{:error, error}, :close}
 
       kind, error ->
-        wrapped = handle_command_error(kind, error, enhanced_context)
-        {{:error, wrapped}, :close}
-    end
-  end
-
-  @spec handle_pool_error(term(), map()) :: {:ok, term()} | {:error, PoolErrorHandler.t()}
-  defp handle_pool_error(error, context) do
-    wrapped = PoolErrorHandler.wrap_pool_error(error, context)
-
-    # Attempt recovery through orchestrator for critical errors
-    case wrapped.severity do
-      :critical ->
-        case ErrorRecoveryOrchestrator.handle_error(wrapped, context) do
-          {:ok, {:recovered, result}} ->
-            Logger.info("Pool error recovered: #{wrapped.error_category}")
-            {:ok, result}
-
-          {:ok, {:failover, result}} ->
-            Logger.warning("Pool operation succeeded through failover")
-            {:ok, result}
-
-          {:error, _recovery_error} ->
-            Logger.error(
-              "Pool error recovery failed: #{PoolErrorHandler.format_for_logging(wrapped)}"
-            )
-
-            {:error, wrapped}
-        end
-
-      _ ->
-        Logger.warning("Pool error: #{PoolErrorHandler.format_for_logging(wrapped)}")
-        {:error, wrapped}
-    end
-  end
-
-  @spec handle_response_mismatch(non_neg_integer(), non_neg_integer(), %{
-          adapter: DSPex.PythonBridge.SessionPoolV2,
-          args: term(),
-          command: term(),
-          from: term(),
-          operation: :execute_anonymous | :execute_command,
-          worker_id: term(),
-          worker_state: atom(),
-          session_id: term()
-        }) :: PoolErrorHandler.t()
-  defp handle_response_mismatch(expected_id, actual_id, context) do
-    PoolErrorHandler.wrap_pool_error(
-      {:response_mismatch, "Expected ID #{expected_id}, got #{actual_id}"},
-      Map.merge(context, %{expected_id: expected_id, actual_id: actual_id})
-    )
-  end
-
-  @spec handle_decode_error(:binary_data | :decode_error | :malformed_response, %{
-          adapter: DSPex.PythonBridge.SessionPoolV2,
-          args: term(),
-          command: term(),
-          from: term(),
-          operation: :execute_anonymous | :execute_command,
-          worker_id: term(),
-          worker_state: atom(),
-          session_id: term()
-        }) :: PoolErrorHandler.t()
-  defp handle_decode_error(reason, context) do
-    PoolErrorHandler.wrap_pool_error(
-      {:decode_error, reason},
-      Map.merge(context, %{decode_reason: reason})
-    )
-  end
-
-  @spec handle_port_exit(integer(), map()) :: map()
-  defp handle_port_exit(status, context) do
-    # Record circuit breaker failure for port exits if available
-    if circuit_breaker_available?() do
-      CircuitBreaker.record_failure(:worker_ports, {:port_exit, status})
-    end
-
-    PoolErrorHandler.wrap_pool_error(
-      {:port_exited, status},
-      Map.merge(context, %{exit_status: status})
-    )
-  end
-
-  @spec handle_command_timeout(map(), atom(), pos_integer(), map()) :: map()
-  defp handle_command_timeout(worker, command, timeout, context) do
-    Logger.error("Command timeout for worker #{worker.worker_id}: #{command} (#{timeout}ms)")
-
-    # Record circuit breaker failure for timeouts if available
-    if circuit_breaker_available?() do
-      CircuitBreaker.record_failure(:worker_commands, :timeout)
-    end
-
-    PoolErrorHandler.wrap_pool_error(
-      {:timeout, :command_timeout},
-      Map.merge(context, %{
-        worker_health: get_worker_health(worker),
-        command_duration: timeout,
-        timeout_ms: timeout
-      })
-    )
-  end
-
-  @spec handle_command_error(atom(), term(), map()) :: map()
-  defp handle_command_error(kind, error, context) do
-    Logger.error("Command error: #{kind} - #{inspect(error)}")
-
-    PoolErrorHandler.wrap_pool_error(
-      {:command_error, {kind, error}},
-      Map.merge(context, %{error_kind: kind})
-    )
-  end
-
-  @spec get_worker_state(map()) :: atom()
-  defp get_worker_state(worker) do
-    case Map.get(worker, :state_machine) do
-      %{state: state} -> state
-      _ -> :unknown
-    end
-  end
-
-  @spec get_worker_health(map()) :: atom()
-  defp get_worker_health(worker) do
-    case Map.get(worker, :state_machine) do
-      %{health: health} -> health
-      _ -> :unknown
-    end
-  end
-
-  @spec bind_session_if_enhanced(String.t(), map()) :: :ok
-  defp bind_session_if_enhanced(_session_id, _worker) do
-    # In stateless architecture, we don't bind sessions to specific workers
-    # Any worker can handle any session by fetching data from centralized store
-    :ok
-  end
-
-  @spec circuit_breaker_available?() :: boolean()
-  defp circuit_breaker_available? do
-    case Process.whereis(CircuitBreaker) do
-      nil -> false
-      _pid -> true
+        error_tuple = {:system_error, :command_error, "Unexpected error during command execution", %{error_kind: kind, error: error, worker_id: worker.worker_id}}
+        {{:error, error_tuple}, :close}
     end
   end
 
@@ -452,7 +242,15 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
         :ok
 
       [] ->
-        track_session(session_id)
+        # If session doesn't exist, create it with 1 operation
+        session_info = %{
+          session_id: session_id,
+          started_at: System.monotonic_time(:millisecond),
+          last_activity: System.monotonic_time(:millisecond),
+          operations: 1
+        }
+        _result = :ets.insert(@session_table, {session_id, session_info})
+        :ok
     end
   end
 
@@ -513,12 +311,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     # Initialize session tracking table
     _result = ensure_session_table()
 
-    # In stateless architecture, we don't use session affinity
-    # All workers can handle any session by fetching data from SessionStore
+    # In minimal pooling, we only use PoolWorkerV2 (not Enhanced)
     worker_module = Keyword.get(opts, :worker_module, PoolWorkerV2)
-    
-    # Note: Session affinity is disabled in stateless architecture
-    # Workers fetch session data from centralized SessionStore as needed
 
     # Parse configuration
     pool_size = Keyword.get(opts, :pool_size, @default_pool_size)
@@ -528,15 +322,13 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     genserver_name = Keyword.get(opts, :name, __MODULE__)
     pool_name = :"#{genserver_name}_pool"
 
-    # Get lazy configuration from opts or app config
-    lazy = Keyword.get(opts, :lazy, Application.get_env(:dspex, :pool_lazy, false))
-
-    # Start NimblePool with configurable worker module
+    # Start NimblePool with simple worker configuration
+    # Enable lazy initialization to avoid blocking pool startup on worker initialization
     pool_config = [
       worker: {worker_module, []},
       pool_size: pool_size,
       max_overflow: overflow,
-      lazy: lazy,
+      lazy: true,  # Don't pre-start all workers to avoid initialization blocking
       name: pool_name
     ]
 
@@ -557,10 +349,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
           worker_module: worker_module
         }
 
-        worker_type = if worker_module == PoolWorkerV2Enhanced, do: "enhanced", else: "basic"
-
         Logger.info(
-          "Session pool V2 started with #{pool_size} #{worker_type} workers, #{overflow} overflow"
+          "Minimal session pool V2 started with #{pool_size} workers, #{overflow} overflow"
         )
 
         {:ok, state}
