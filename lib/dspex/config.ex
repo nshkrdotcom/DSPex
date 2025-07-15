@@ -10,7 +10,7 @@ defmodule DSPex.Config do
   Configuration is organized into logical sections:
 
   - `:signature_system` - Native Elixir signature compilation and validation
-  - `:python_bridge` - Python DSPy process communication settings  
+  - `:python_bridge` - Python DSPy process communication settings
   - `:python_bridge_monitor` - Health monitoring and failure detection
   - `:python_bridge_supervisor` - Supervision tree configuration
 
@@ -100,6 +100,16 @@ defmodule DSPex.Config do
       max_seconds: 60,
       bridge_restart: :permanent,
       monitor_restart: :permanent
+    },
+    minimal_python_pool: %{
+      pool_size: System.schedulers_online(),
+      overflow: 2,
+      checkout_timeout: 5_000,
+      operation_timeout: 30_000,
+      python_executable: "python3",
+      script_path: "priv/python/dspy_bridge.py",
+      health_check_enabled: true,
+      session_tracking_enabled: true
     }
   }
 
@@ -108,7 +118,11 @@ defmodule DSPex.Config do
     "DSPEX_BRIDGE_TIMEOUT" => [:python_bridge, :default_timeout],
     "DSPEX_LOG_LEVEL" => [:system, :log_level],
     "DSPEX_HEALTH_CHECK_INTERVAL" => [:python_bridge_monitor, :health_check_interval],
-    "DSPEX_FAILURE_THRESHOLD" => [:python_bridge_monitor, :failure_threshold]
+    "DSPEX_FAILURE_THRESHOLD" => [:python_bridge_monitor, :failure_threshold],
+    "DSPEX_POOL_SIZE" => [:minimal_python_pool, :pool_size],
+    "DSPEX_POOL_OVERFLOW" => [:minimal_python_pool, :overflow],
+    "DSPEX_CHECKOUT_TIMEOUT" => [:minimal_python_pool, :checkout_timeout],
+    "DSPEX_OPERATION_TIMEOUT" => [:minimal_python_pool, :operation_timeout]
   }
 
   ## Public API
@@ -182,6 +196,7 @@ defmodule DSPex.Config do
     issues = validate_python_bridge(issues)
     issues = validate_monitor_config(issues)
     issues = validate_supervisor_config(issues)
+    issues = validate_minimal_python_pool(issues)
     issues = validate_environment_variables(issues)
 
     case issues do
@@ -281,7 +296,9 @@ defmodule DSPex.Config do
               :response_timeout,
               :restart_delay,
               :restart_cooldown,
-              :max_seconds
+              :max_seconds,
+              :checkout_timeout,
+              :operation_timeout
             ] do
     case Integer.parse(value) do
       {int_val, ""} ->
@@ -296,7 +313,14 @@ defmodule DSPex.Config do
   end
 
   defp parse_env_value(key, value)
-       when key in [:max_retries, :failure_threshold, :max_restart_attempts, :max_restarts] do
+       when key in [
+              :max_retries,
+              :failure_threshold,
+              :max_restart_attempts,
+              :max_restarts,
+              :pool_size,
+              :overflow
+            ] do
     case Integer.parse(value) do
       {int_val, ""} when int_val >= 0 ->
         int_val
@@ -313,7 +337,9 @@ defmodule DSPex.Config do
               :validation_enabled,
               :compile_time_checks,
               :type_validation_strict,
-              :cache_compiled_signatures
+              :cache_compiled_signatures,
+              :health_check_enabled,
+              :session_tracking_enabled
             ] do
     case String.downcase(value) do
       val when val in ["true", "1", "yes", "on"] ->
@@ -444,6 +470,39 @@ defmodule DSPex.Config do
     end
   end
 
+  defp validate_minimal_python_pool(issues) do
+    config = get(:minimal_python_pool)
+
+    issues = validate_positive_integer(config, :pool_size, issues)
+    issues = validate_non_negative_integer(config, :overflow, issues)
+    issues = validate_timeout(config, :checkout_timeout, issues)
+    issues = validate_timeout(config, :operation_timeout, issues)
+
+    issues =
+      validate_boolean_setting(config, :health_check_enabled, "health_check_enabled", issues)
+
+    issues =
+      validate_boolean_setting(
+        config,
+        :session_tracking_enabled,
+        "session_tracking_enabled",
+        issues
+      )
+
+    # Validate that checkout_timeout < operation_timeout
+    checkout_timeout = Map.get(config, :checkout_timeout, 0)
+    operation_timeout = Map.get(config, :operation_timeout, 0)
+
+    if checkout_timeout >= operation_timeout do
+      [
+        "checkout_timeout (#{checkout_timeout}) should be less than operation_timeout (#{operation_timeout})"
+        | issues
+      ]
+    else
+      issues
+    end
+  end
+
   defp validate_environment_variables(issues) do
     Enum.reduce(@env_var_mappings, issues, fn {env_var, [_section, key]}, acc ->
       case System.get_env(env_var) do
@@ -475,6 +534,13 @@ defmodule DSPex.Config do
     case Map.get(config, key) do
       value when is_integer(value) and value > 0 -> issues
       invalid -> ["Invalid positive integer value for #{key}: #{inspect(invalid)}" | issues]
+    end
+  end
+
+  defp validate_non_negative_integer(config, key, issues) do
+    case Map.get(config, key) do
+      value when is_integer(value) and value >= 0 -> issues
+      invalid -> ["Invalid non-negative integer value for #{key}: #{inspect(invalid)}" | issues]
     end
   end
 

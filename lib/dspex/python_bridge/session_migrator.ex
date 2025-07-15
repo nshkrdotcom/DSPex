@@ -15,21 +15,22 @@ defmodule DSPex.PythonBridge.SessionMigrator do
 
   @default_migration_table :dspex_session_migrations
   @migration_timeout 30_000
-  @cleanup_interval 300_000  # 5 minutes
+  # 5 minutes
+  @cleanup_interval 300_000
 
   @type migration_status :: :pending | :in_progress | :completed | :failed | :rolled_back
 
   @type migration_state :: %{
-    migration_id: String.t(),
-    session_id: String.t(),
-    from_worker: String.t() | nil,
-    to_worker: String.t() | nil,
-    status: migration_status(),
-    started_at: integer(),
-    completed_at: integer() | nil,
-    error: term() | nil,
-    rollback_data: map() | nil
-  }
+          migration_id: String.t(),
+          session_id: String.t(),
+          from_worker: String.t() | nil,
+          to_worker: String.t() | nil,
+          status: migration_status(),
+          started_at: integer(),
+          completed_at: integer() | nil,
+          error: term() | nil,
+          rollback_data: map() | nil
+        }
 
   ## Client API
 
@@ -54,7 +55,11 @@ defmodule DSPex.PythonBridge.SessionMigrator do
   @spec migrate_session(GenServer.server(), String.t(), String.t() | nil, String.t() | nil) ::
           {:ok, String.t()} | {:error, term()}
   def migrate_session(server, session_id, from_worker, to_worker) do
-    GenServer.call(server, {:migrate_session, session_id, from_worker, to_worker}, @migration_timeout + 5000)
+    GenServer.call(
+      server,
+      {:migrate_session, session_id, from_worker, to_worker},
+      @migration_timeout + 5000
+    )
   end
 
   @doc """
@@ -65,7 +70,8 @@ defmodule DSPex.PythonBridge.SessionMigrator do
     get_migration_status(__MODULE__, migration_id)
   end
 
-  @spec get_migration_status(GenServer.server(), String.t()) :: {:ok, migration_state()} | {:error, :not_found}
+  @spec get_migration_status(GenServer.server(), String.t()) ::
+          {:ok, migration_state()} | {:error, :not_found}
   def get_migration_status(server, migration_id) do
     GenServer.call(server, {:get_migration_status, migration_id})
   end
@@ -132,13 +138,14 @@ defmodule DSPex.PythonBridge.SessionMigrator do
     session_store = Keyword.get(opts, :session_store, DSPex.PythonBridge.SessionStore)
 
     # Create ETS table for migration tracking
-    table = :ets.new(migration_table, [
-      :set,
-      :public,
-      :named_table,
-      {:read_concurrency, true},
-      {:write_concurrency, true}
-    ])
+    table =
+      :ets.new(migration_table, [
+        :set,
+        :public,
+        :named_table,
+        {:read_concurrency, true},
+        {:write_concurrency, true}
+      ])
 
     # Schedule periodic cleanup of old migrations
     Process.send_after(self(), :cleanup_old_migrations, cleanup_interval)
@@ -199,6 +206,7 @@ defmodule DSPex.PythonBridge.SessionMigrator do
     case :ets.lookup(state.table, migration_id) do
       [{^migration_id, migration_state}] ->
         {:reply, {:ok, migration_state}, state}
+
       [] ->
         {:reply, {:error, :not_found}, state}
     end
@@ -206,13 +214,16 @@ defmodule DSPex.PythonBridge.SessionMigrator do
 
   @impl true
   def handle_call(:list_active_migrations, _from, state) do
-    active_migrations = :ets.select(state.table, [
-      {{:"$1", :"$2"},
-       [{:"/=", {:map_get, :status, :"$2"}, :completed},
-        {:"/=", {:map_get, :status, :"$2"}, :failed},
-        {:"/=", {:map_get, :status, :"$2"}, :rolled_back}],
-       [:"$2"]}
-    ])
+    active_migrations =
+      :ets.select(state.table, [
+        {{:"$1", :"$2"},
+         [
+           {:"/=", {:map_get, :status, :"$2"}, :completed},
+           {:"/=", {:map_get, :status, :"$2"}, :failed},
+           {:"/=", {:map_get, :status, :"$2"}, :rolled_back}
+         ], [:"$2"]}
+      ])
+
     {:reply, active_migrations, state}
   end
 
@@ -224,9 +235,11 @@ defmodule DSPex.PythonBridge.SessionMigrator do
           :ok ->
             new_stats = Map.update(state.stats, :migrations_rolled_back, 1, &(&1 + 1))
             {:reply, :ok, %{state | stats: new_stats}}
+
           {:error, reason} ->
             {:reply, {:error, reason}, state}
         end
+
       [] ->
         {:reply, {:error, :not_found}, state}
     end
@@ -238,16 +251,20 @@ defmodule DSPex.PythonBridge.SessionMigrator do
       [{^migration_id, migration_state}] ->
         case migration_state.status do
           status when status in [:pending, :in_progress] ->
-            updated_state = %{migration_state |
-              status: :failed,
-              completed_at: System.monotonic_time(:second),
-              error: :cancelled
+            updated_state = %{
+              migration_state
+              | status: :failed,
+                completed_at: System.monotonic_time(:second),
+                error: :cancelled
             }
+
             :ets.insert(state.table, {migration_id, updated_state})
             {:reply, :ok, state}
+
           _ ->
             {:reply, {:error, :cannot_cancel}, state}
         end
+
       [] ->
         {:reply, {:error, :not_found}, state}
     end
@@ -256,19 +273,25 @@ defmodule DSPex.PythonBridge.SessionMigrator do
   @impl true
   def handle_call(:get_migration_stats, _from, state) do
     total_migrations = :ets.info(state.table, :size)
-    active_count = length(:ets.select(state.table, [
-      {{:"$1", :"$2"},
-       [{:"/=", {:map_get, :status, :"$2"}, :completed},
-        {:"/=", {:map_get, :status, :"$2"}, :failed},
-        {:"/=", {:map_get, :status, :"$2"}, :rolled_back}],
-       [:"$1"]}
-    ]))
 
-    stats = Map.merge(state.stats, %{
-      total_migrations: total_migrations,
-      active_migrations: active_count,
-      table_info: :ets.info(state.table)
-    })
+    active_count =
+      length(
+        :ets.select(state.table, [
+          {{:"$1", :"$2"},
+           [
+             {:"/=", {:map_get, :status, :"$2"}, :completed},
+             {:"/=", {:map_get, :status, :"$2"}, :failed},
+             {:"/=", {:map_get, :status, :"$2"}, :rolled_back}
+           ], [:"$1"]}
+        ])
+      )
+
+    stats =
+      Map.merge(state.stats, %{
+        total_migrations: total_migrations,
+        active_migrations: active_count,
+        table_info: :ets.info(state.table)
+      })
 
     {:reply, stats, state}
   end
@@ -292,17 +315,20 @@ defmodule DSPex.PythonBridge.SessionMigrator do
   def handle_info({:migration_completed, migration_id, result}, state) do
     case :ets.lookup(state.table, migration_id) do
       [{^migration_id, migration_state}] ->
-        {status, error, new_stats} = case result do
-          :ok ->
-            {:completed, nil, Map.update(state.stats, :migrations_completed, 1, &(&1 + 1))}
-          {:error, reason} ->
-            {:failed, reason, Map.update(state.stats, :migrations_failed, 1, &(&1 + 1))}
-        end
+        {status, error, new_stats} =
+          case result do
+            :ok ->
+              {:completed, nil, Map.update(state.stats, :migrations_completed, 1, &(&1 + 1))}
 
-        updated_state = %{migration_state |
-          status: status,
-          completed_at: System.monotonic_time(:second),
-          error: error
+            {:error, reason} ->
+              {:failed, reason, Map.update(state.stats, :migrations_failed, 1, &(&1 + 1))}
+          end
+
+        updated_state = %{
+          migration_state
+          | status: status,
+            completed_at: System.monotonic_time(:second),
+            error: error
         }
 
         :ets.insert(state.table, {migration_id, updated_state})
@@ -371,20 +397,29 @@ defmodule DSPex.PythonBridge.SessionMigrator do
       case SessionStore.get_session(session_store, session_id) do
         {:ok, session} ->
           # Update session metadata to track migration
-          updated_session = Session.put_metadata(session, :last_migration, %{
-            migration_id: migration_state.migration_id,
-            from_worker: migration_state.from_worker,
-            to_worker: migration_state.to_worker,
-            migrated_at: System.monotonic_time(:second)
-          })
+          updated_session =
+            Session.put_metadata(session, :last_migration, %{
+              migration_id: migration_state.migration_id,
+              from_worker: migration_state.from_worker,
+              to_worker: migration_state.to_worker,
+              migrated_at: System.monotonic_time(:second)
+            })
 
-          case SessionStore.update_session(session_store, session_id, fn _session -> updated_session end) do
+          case SessionStore.update_session(session_store, session_id, fn _session ->
+                 updated_session
+               end) do
             {:ok, _} ->
-              Logger.info("Successfully migrated session #{session_id} from #{migration_state.from_worker} to #{migration_state.to_worker}")
+              Logger.info(
+                "Successfully migrated session #{session_id} from #{migration_state.from_worker} to #{migration_state.to_worker}"
+              )
+
               :ok
 
             {:error, reason} ->
-              Logger.error("Failed to update session #{session_id} during migration: #{inspect(reason)}")
+              Logger.error(
+                "Failed to update session #{session_id} during migration: #{inspect(reason)}"
+              )
+
               {:error, {:session_update_failed, reason}}
           end
 
@@ -403,24 +438,33 @@ defmodule DSPex.PythonBridge.SessionMigrator do
     end
   end
 
-  defp perform_rollback(%{migration_id: migration_id, session_id: session_id, status: status} = migration_state, table, session_store) do
+  defp perform_rollback(
+         %{migration_id: migration_id, session_id: session_id, status: status} = migration_state,
+         table,
+         session_store
+       ) do
     case status do
       :completed ->
         try do
           # Remove migration metadata from session
           case SessionStore.update_session(session_store, session_id, fn session ->
-            metadata = Map.delete(session.metadata, :last_migration)
-            %{session | metadata: metadata}
-          end) do
+                 metadata = Map.delete(session.metadata, :last_migration)
+                 %{session | metadata: metadata}
+               end) do
             {:ok, _} ->
               # Update migration state
-              updated_state = %{migration_state |
-                status: :rolled_back,
-                completed_at: System.monotonic_time(:second)
+              updated_state = %{
+                migration_state
+                | status: :rolled_back,
+                  completed_at: System.monotonic_time(:second)
               }
+
               :ets.insert(table, {migration_id, updated_state})
 
-              Logger.info("Successfully rolled back migration #{migration_id} for session #{session_id}")
+              Logger.info(
+                "Successfully rolled back migration #{migration_id} for session #{session_id}"
+              )
+
               :ok
 
             {:error, reason} ->
@@ -429,7 +473,10 @@ defmodule DSPex.PythonBridge.SessionMigrator do
           end
         rescue
           error ->
-            Logger.error("Exception during rollback of migration #{migration_id}: #{inspect(error)}")
+            Logger.error(
+              "Exception during rollback of migration #{migration_id}: #{inspect(error)}"
+            )
+
             {:error, {:rollback_exception, error}}
         end
 
@@ -443,17 +490,18 @@ defmodule DSPex.PythonBridge.SessionMigrator do
 
   defp cleanup_old_migrations(table) do
     # Clean up migrations older than 24 hours
-    cutoff_time = System.monotonic_time(:second) - (24 * 60 * 60)
+    cutoff_time = System.monotonic_time(:second) - 24 * 60 * 60
 
-    old_migrations = :ets.select(table, [
-      {{:"$1", :"$2"},
-       [{:"<", {:map_get, :started_at, :"$2"}, cutoff_time},
-        {:orelse,
-         {:==, {:map_get, :status, :"$2"}, :completed},
-         {:==, {:map_get, :status, :"$2"}, :failed},
-         {:==, {:map_get, :status, :"$2"}, :rolled_back}}],
-       [:"$1"]}
-    ])
+    old_migrations =
+      :ets.select(table, [
+        {{:"$1", :"$2"},
+         [
+           {:<, {:map_get, :started_at, :"$2"}, cutoff_time},
+           {:orelse, {:==, {:map_get, :status, :"$2"}, :completed},
+            {:==, {:map_get, :status, :"$2"}, :failed},
+            {:==, {:map_get, :status, :"$2"}, :rolled_back}}
+         ], [:"$1"]}
+      ])
 
     Enum.each(old_migrations, fn migration_id ->
       :ets.delete(table, migration_id)

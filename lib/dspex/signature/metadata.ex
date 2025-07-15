@@ -116,11 +116,20 @@ defmodule DSPex.Signature.Metadata do
   @spec normalize_signature_definition(map()) :: enhanced_metadata()
   def normalize_signature_definition(signature_def) when is_map(signature_def) do
     name = Map.get(signature_def, :name) || Map.get(signature_def, "name") || "DynamicSignature"
-    description = Map.get(signature_def, :description) || Map.get(signature_def, "description") || 
-                  "A dynamically generated DSPy signature."
 
-    inputs = normalize_field_list(Map.get(signature_def, :inputs) || Map.get(signature_def, "inputs") || [])
-    outputs = normalize_field_list(Map.get(signature_def, :outputs) || Map.get(signature_def, "outputs") || [])
+    description =
+      Map.get(signature_def, :description) || Map.get(signature_def, "description") ||
+        "A dynamically generated DSPy signature."
+
+    inputs =
+      normalize_field_list(
+        Map.get(signature_def, :inputs) || Map.get(signature_def, "inputs") || []
+      )
+
+    outputs =
+      normalize_field_list(
+        Map.get(signature_def, :outputs) || Map.get(signature_def, "outputs") || []
+      )
 
     %{
       name: name,
@@ -195,6 +204,7 @@ defmodule DSPex.Signature.Metadata do
         # Try to get description from compiled signature metadata first
         try do
           signature_data = signature_module.__signature__()
+
           case Map.get(signature_data, :description) do
             desc when is_binary(desc) and desc != "" -> desc
             _ -> get_module_doc_description(signature_module)
@@ -246,8 +256,10 @@ defmodule DSPex.Signature.Metadata do
   defp normalize_field_definition(field) when is_map(field) do
     name = Map.get(field, :name) || Map.get(field, "name")
     type = Map.get(field, :type) || Map.get(field, "type") || "string"
-    description = Map.get(field, :description) || Map.get(field, "description") || 
-                  "Field: #{name}"
+
+    description =
+      Map.get(field, :description) || Map.get(field, "description") ||
+        "Field: #{name}"
 
     %{
       name: to_string(name),
@@ -256,7 +268,8 @@ defmodule DSPex.Signature.Metadata do
     }
   end
 
-  defp normalize_field_definition(_), do: %{name: "unknown", type: "string", description: "Unknown field"}
+  defp normalize_field_definition(_),
+    do: %{name: "unknown", type: "string", description: "Unknown field"}
 
   defp convert_type_to_string(type, type_mapping) when is_atom(type) do
     case Map.get(type_mapping, type) do
@@ -286,16 +299,17 @@ defmodule DSPex.Signature.Metadata do
   defp convert_basic_type(:integer), do: "integer"
   defp convert_basic_type(:float), do: "float"
   defp convert_basic_type(:boolean), do: "boolean"
-  defp convert_basic_type(:atom), do: "string"  # Atoms become strings in Python
+  # Atoms become strings in Python
+  defp convert_basic_type(:atom), do: "string"
   defp convert_basic_type(:map), do: "dict"
   defp convert_basic_type(:any), do: "any"
-  
+
   # ML-specific types
   defp convert_basic_type(:embedding), do: "embedding"
   defp convert_basic_type(:probability), do: "float"
   defp convert_basic_type(:confidence_score), do: "float"
   defp convert_basic_type(:reasoning_chain), do: "list<string>"
-  
+
   defp convert_basic_type(other), do: to_string(other)
 
   defp generate_field_description(field_name, :input, _field_type) do
@@ -316,7 +330,6 @@ defmodule DSPex.Signature.Metadata do
 
   defp normalize_constraints(_), do: %{}
 
-
   defp convert_metadata_to_fields(field_metadata) do
     Enum.map(field_metadata, fn field ->
       field_name = String.to_atom(field.name)
@@ -334,6 +347,7 @@ defmodule DSPex.Signature.Metadata do
   defp convert_string_to_type("dict"), do: :map
   defp convert_string_to_type("any"), do: :any
   defp convert_string_to_type("embedding"), do: :embedding
+
   defp convert_string_to_type(type_string) when is_binary(type_string) do
     # Handle complex types
     cond do
@@ -363,16 +377,19 @@ defmodule DSPex.Signature.Metadata do
   defp extract_dict_types(type_string) do
     inner = extract_inner_type(type_string, "dict<", ">")
     # Handle both ", " and "," as separators
-    parts = case String.split(inner, ", ", parts: 2) do
-      [key_type, value_type] -> [key_type, value_type]
-      [single_part] -> String.split(single_part, ",", parts: 2)
-    end
-    
+    parts =
+      case String.split(inner, ", ", parts: 2) do
+        [key_type, value_type] -> [key_type, value_type]
+        [single_part] -> String.split(single_part, ",", parts: 2)
+      end
+
     case parts do
-      [key_type, value_type] -> 
+      [key_type, value_type] ->
         %{key: String.trim(key_type), value: String.trim(value_type)}
-      _ -> 
-        %{key: "string", value: "any"}  # Fallback for malformed dict types
+
+      _ ->
+        # Fallback for malformed dict types
+        %{key: "string", value: "any"}
     end
   end
 

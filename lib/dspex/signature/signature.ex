@@ -69,10 +69,10 @@ defmodule DSPex.Signature do
       Module.register_attribute(__MODULE__, :signature_ast, accumulate: false)
       Module.register_attribute(__MODULE__, :signature_compiled, accumulate: false)
       Module.register_attribute(__MODULE__, :signature_description, accumulate: false)
-      
+
       # Store options for use in compiler
       @signature_opts unquote(opts)
-      
+
       @before_compile DSPex.Signature.Compiler
     end
   end

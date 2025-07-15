@@ -1,17 +1,23 @@
 defmodule DSPex.Signature.IntegrationTest do
   use ExUnit.Case, async: true
-  
+
   alias DSPex.Signature.Metadata
 
   describe "Enhanced Signature Integration" do
     defmodule SentimentAnalysis do
       use DSPex.Signature
-      
-      description "Analyzes text sentiment and extracts confidence scores"
-      @signature_ast {:->, [], [
-        [{:text, :string}, {:style, :string}], 
-        [{:sentiment, :string}, {:confidence, :probability}, {:reasoning, {:list, :string}}]
-      ]}
+
+      description("Analyzes text sentiment and extracts confidence scores")
+
+      @signature_ast {:->, [],
+                      [
+                        [{:text, :string}, {:style, :string}],
+                        [
+                          {:sentiment, :string},
+                          {:confidence, :probability},
+                          {:reasoning, {:list, :string}}
+                        ]
+                      ]}
     end
 
     test "signature module generates enhanced metadata" do
@@ -24,36 +30,37 @@ defmodule DSPex.Signature.IntegrationTest do
       # Validate basic structure
       assert metadata.name == "SentimentAnalysis"
       assert metadata.description == "Analyzes text sentiment and extracts confidence scores"
-      
+
       # Validate inputs
       assert length(metadata.inputs) == 2
-      
+
       text_input = Enum.find(metadata.inputs, &(&1.name == "text"))
       assert text_input.type == "string"
       assert text_input.description == "Input field: text"
-      
+
       style_input = Enum.find(metadata.inputs, &(&1.name == "style"))
       assert style_input.type == "string"
 
       # Validate outputs
       assert length(metadata.outputs) == 3
-      
+
       sentiment_output = Enum.find(metadata.outputs, &(&1.name == "sentiment"))
       assert sentiment_output.type == "string"
-      
+
       confidence_output = Enum.find(metadata.outputs, &(&1.name == "confidence"))
-      assert confidence_output.type == "float"  # probability maps to float
-      
+      # probability maps to float
+      assert confidence_output.type == "float"
+
       reasoning_output = Enum.find(metadata.outputs, &(&1.name == "reasoning"))
       assert reasoning_output.type == "list<string>"
     end
 
     test "to_python_signature produces valid metadata" do
       python_signature = SentimentAnalysis.to_python_signature()
-      
+
       # Should be valid enhanced metadata
       assert Metadata.validate_metadata(python_signature) == :ok
-      
+
       # Should have expected structure for Python bridge
       assert Map.has_key?(python_signature, :name)
       assert Map.has_key?(python_signature, :description)
@@ -68,47 +75,59 @@ defmodule DSPex.Signature.IntegrationTest do
 
     test "signature without description gets default" do
       metadata = NoDescriptionSignature.to_enhanced_metadata()
-      
+
       assert metadata.description == "A dynamically generated DSPy signature."
     end
 
     test "signature with custom options" do
-      custom_metadata = SentimentAnalysis.to_enhanced_metadata(
-        description: "Custom description for testing",
-        name: "CustomSentimentAnalysis"
-      )
-      
+      custom_metadata =
+        SentimentAnalysis.to_enhanced_metadata(
+          description: "Custom description for testing",
+          name: "CustomSentimentAnalysis"
+        )
+
       assert custom_metadata.name == "CustomSentimentAnalysis"
       assert custom_metadata.description == "Custom description for testing"
     end
 
     defmodule ComplexTypesSignature do
       use DSPex.Signature
-      
-      description "Tests complex type conversion"
-      @signature_ast {:->, [], [
-        [{:query, :string}, {:context, {:list, :string}}, {:options, {:dict, :atom, :any}}], 
-        [{:results, {:list, :string}}, {:metadata, {:dict, :string, :float}}, {:scores, {:union, [:integer, :float]}}]
-      ]}
+
+      description("Tests complex type conversion")
+
+      @signature_ast {:->, [],
+                      [
+                        [
+                          {:query, :string},
+                          {:context, {:list, :string}},
+                          {:options, {:dict, :atom, :any}}
+                        ],
+                        [
+                          {:results, {:list, :string}},
+                          {:metadata, {:dict, :string, :float}},
+                          {:scores, {:union, [:integer, :float]}}
+                        ]
+                      ]}
     end
 
     test "complex types are properly converted" do
       metadata = ComplexTypesSignature.to_enhanced_metadata()
-      
+
       # Check complex input types
       context_input = Enum.find(metadata.inputs, &(&1.name == "context"))
       assert context_input.type == "list<string>"
-      
+
       options_input = Enum.find(metadata.inputs, &(&1.name == "options"))
-      assert options_input.type == "dict<string,any>"  # atom becomes string in Python
-      
+      # atom becomes string in Python
+      assert options_input.type == "dict<string,any>"
+
       # Check complex output types
       results_output = Enum.find(metadata.outputs, &(&1.name == "results"))
       assert results_output.type == "list<string>"
-      
+
       metadata_output = Enum.find(metadata.outputs, &(&1.name == "metadata"))
       assert metadata_output.type == "dict<string,float>"
-      
+
       scores_output = Enum.find(metadata.outputs, &(&1.name == "scores"))
       assert scores_output.type == "union<integer|float>"
     end
@@ -168,11 +187,11 @@ defmodule DSPex.Signature.IntegrationTest do
       # Should get defaults
       assert normalized.name == "DynamicSignature"
       assert normalized.description == "A dynamically generated DSPy signature."
-      
+
       # Should get field descriptions
       input = List.first(normalized.inputs)
       assert input.description == "Field: question"
-      
+
       output = List.first(normalized.outputs)
       assert output.description == "Field: answer"
     end
@@ -186,7 +205,7 @@ defmodule DSPex.Signature.IntegrationTest do
       }
 
       normalized = Metadata.normalize_signature_definition(string_key_signature)
-      
+
       assert normalized.name == "StringKeysSignature"
       assert normalized.description == "Uses string keys"
       assert List.first(normalized.inputs).name == "text"
@@ -199,7 +218,7 @@ defmodule DSPex.Signature.IntegrationTest do
       # Empty map
       empty_sig = %{}
       normalized = Metadata.normalize_signature_definition(empty_sig)
-      
+
       assert normalized.name == "DynamicSignature"
       assert normalized.inputs == []
       assert normalized.outputs == []
@@ -216,11 +235,12 @@ defmodule DSPex.Signature.IntegrationTest do
           "not a map",
           %{name: "valid_field", type: "string", description: "This one is valid"}
         ],
-        outputs: [%{type: "string"}]  # Missing name
+        # Missing name
+        outputs: [%{type: "string"}]
       }
 
       normalized = Metadata.normalize_signature_definition(malformed_signature)
-      
+
       # Should handle gracefully but fail validation
       assert {:error, errors} = Metadata.validate_metadata(normalized)
       assert length(errors) > 0
@@ -241,7 +261,7 @@ defmodule DSPex.Signature.IntegrationTest do
 
       normalized = Metadata.normalize_signature_definition(incompatible_signature)
       assert {:error, errors} = Metadata.validate_metadata(normalized)
-      
+
       # Should detect both reserved names and invalid identifiers
       error_types = Enum.map(errors, fn {type, _} -> type end)
       assert :reserved_name_conflict in error_types or :invalid_field_name in error_types

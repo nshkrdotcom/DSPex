@@ -1,14 +1,16 @@
 defmodule DSPex.Signature.MetadataTest do
   use ExUnit.Case, async: true
-  
+
   alias DSPex.Signature.Metadata
 
   describe "to_enhanced_metadata/2" do
     defmodule TestSignature do
       use DSPex.Signature
-      
-      description "A test signature for sentiment analysis"
-      @signature_ast {:->, [], [[{:text, :string}], [{:sentiment, :string}, {:confidence, :probability}]]}
+
+      description("A test signature for sentiment analysis")
+
+      @signature_ast {:->, [],
+                      [[{:text, :string}], [{:sentiment, :string}, {:confidence, :probability}]]}
     end
 
     test "converts signature module to enhanced metadata" do
@@ -16,7 +18,7 @@ defmodule DSPex.Signature.MetadataTest do
 
       assert metadata.name == "TestSignature"
       assert metadata.description == "A test signature for sentiment analysis"
-      
+
       # Check inputs
       assert length(metadata.inputs) == 1
       input = List.first(metadata.inputs)
@@ -28,9 +30,10 @@ defmodule DSPex.Signature.MetadataTest do
       assert length(metadata.outputs) == 2
       sentiment_output = Enum.find(metadata.outputs, &(&1.name == "sentiment"))
       assert sentiment_output.type == "string"
-      
+
       confidence_output = Enum.find(metadata.outputs, &(&1.name == "confidence"))
-      assert confidence_output.type == "float"  # probability converts to float
+      # probability converts to float
+      assert confidence_output.type == "float"
     end
 
     test "handles signature without description" do
@@ -40,26 +43,28 @@ defmodule DSPex.Signature.MetadataTest do
       end
 
       metadata = Metadata.to_enhanced_metadata(NoDescSignature)
-      
+
       assert metadata.name == "NoDescSignature"
       assert metadata.description == "A dynamically generated DSPy signature."
     end
 
     test "accepts custom description in options" do
-      metadata = Metadata.to_enhanced_metadata(
-        TestSignature, 
-        description: "Custom description from options"
-      )
-      
+      metadata =
+        Metadata.to_enhanced_metadata(
+          TestSignature,
+          description: "Custom description from options"
+        )
+
       assert metadata.description == "Custom description from options"
     end
 
     test "accepts custom name in options" do
-      metadata = Metadata.to_enhanced_metadata(
-        TestSignature, 
-        name: "CustomName"
-      )
-      
+      metadata =
+        Metadata.to_enhanced_metadata(
+          TestSignature,
+          name: "CustomName"
+        )
+
       assert metadata.name == "CustomName"
     end
   end
@@ -118,7 +123,7 @@ defmodule DSPex.Signature.MetadataTest do
 
       input = List.first(result.inputs)
       assert input.description == "Field: input1"
-      
+
       output = List.first(result.outputs)
       assert output.description == "Field: output1"
     end
@@ -209,7 +214,7 @@ defmodule DSPex.Signature.MetadataTest do
 
       assert length(result.inputs) == 1
       assert length(result.outputs) == 1
-      
+
       {input_name, input_type, input_constraints} = List.first(result.inputs)
       assert input_name == :text
       assert input_type == :string
@@ -226,7 +231,9 @@ defmodule DSPex.Signature.MetadataTest do
         name: "ComplexSignature",
         description: "Uses complex types",
         inputs: [%{name: "items", type: "list<string>", description: "List of items"}],
-        outputs: [%{name: "mapping", type: "dict<string,float>", description: "String to float mapping"}]
+        outputs: [
+          %{name: "mapping", type: "dict<string,float>", description: "String to float mapping"}
+        ]
       }
 
       result = Metadata.from_enhanced_metadata(enhanced_metadata)

@@ -76,7 +76,7 @@ defmodule DSPex.Signature.EnhancedValidator do
   """
   @spec validate_field_definitions([map()], atom()) :: validation_result()
   def validate_field_definitions(fields, field_type) when is_list(fields) do
-    errors = 
+    errors =
       fields
       |> Enum.with_index()
       |> Enum.reduce([], fn {field, index}, errors ->
@@ -97,7 +97,7 @@ defmodule DSPex.Signature.EnhancedValidator do
 
   defp validate_required_metadata_fields(metadata, errors) do
     required_fields = [:name, :description, :inputs, :outputs]
-    
+
     Enum.reduce(required_fields, errors, fn field, acc ->
       if Map.has_key?(metadata, field) do
         acc
@@ -115,7 +115,7 @@ defmodule DSPex.Signature.EnhancedValidator do
         else
           [{:invalid_name, "Name '#{name}' is not a valid Python identifier"} | errors]
         end
-      
+
       _ ->
         [{:invalid_name, "Name must be a non-empty string"} | errors]
     end
@@ -125,7 +125,7 @@ defmodule DSPex.Signature.EnhancedValidator do
     case Map.get(metadata, :description) do
       desc when is_binary(desc) ->
         errors
-      
+
       _ ->
         [{:invalid_description, "Description must be a string"} | errors]
     end
@@ -154,7 +154,7 @@ defmodule DSPex.Signature.EnhancedValidator do
 
   defp validate_single_field(field, field_type, index, errors) when is_map(field) do
     error_context = "#{field_type}[#{index}]"
-    
+
     errors = validate_field_name(field, error_context, errors)
     errors = validate_field_type(field, error_context, errors)
     validate_field_description(field, error_context, errors)
@@ -170,9 +170,13 @@ defmodule DSPex.Signature.EnhancedValidator do
         if valid_python_identifier?(name) do
           errors
         else
-          [{:invalid_field_name, "#{context}: Field name '#{name}' is not a valid Python identifier"} | errors]
+          [
+            {:invalid_field_name,
+             "#{context}: Field name '#{name}' is not a valid Python identifier"}
+            | errors
+          ]
         end
-      
+
       _ ->
         [{:invalid_field_name, "#{context}: Field name must be a non-empty string"} | errors]
     end
@@ -186,7 +190,7 @@ defmodule DSPex.Signature.EnhancedValidator do
         else
           [{:invalid_field_type, "#{context}: Unknown field type '#{type}'"} | errors]
         end
-      
+
       _ ->
         [{:invalid_field_type, "#{context}: Field type must be a non-empty string"} | errors]
     end
@@ -196,11 +200,11 @@ defmodule DSPex.Signature.EnhancedValidator do
     case Map.get(field, :description) do
       desc when is_binary(desc) ->
         errors
-      
+
       nil ->
         # Description is optional, but warn if missing
         errors
-      
+
       _ ->
         [{:invalid_field_description, "#{context}: Field description must be a string"} | errors]
     end
@@ -213,21 +217,24 @@ defmodule DSPex.Signature.EnhancedValidator do
   end
 
   defp validate_field_name_conflicts(metadata, errors) do
-    all_field_names = 
+    all_field_names =
       (Map.get(metadata, :inputs, []) ++ Map.get(metadata, :outputs, []))
-      |> Enum.filter(&is_map/1)  # Only process map entries
+      # Only process map entries
+      |> Enum.filter(&is_map/1)
       |> Enum.map(&Map.get(&1, :name))
       |> Enum.filter(&is_binary/1)
 
-    duplicate_names = 
+    duplicate_names =
       all_field_names
       |> Enum.frequencies()
       |> Enum.filter(fn {_name, count} -> count > 1 end)
       |> Enum.map(fn {name, _count} -> name end)
 
     case duplicate_names do
-      [] -> errors
-      names -> 
+      [] ->
+        errors
+
+      names ->
         duplicate_list = Enum.join(names, ", ")
         [{:field_name_conflict, "Duplicate field names: #{duplicate_list}"} | errors]
     end
@@ -240,21 +247,29 @@ defmodule DSPex.Signature.EnhancedValidator do
       True False None __init__ __call__ __str__ __repr__ self completions
     ]
 
-    all_field_names = 
+    all_field_names =
       (Map.get(metadata, :inputs, []) ++ Map.get(metadata, :outputs, []))
-      |> Enum.filter(&is_map/1)  # Only process map entries
+      # Only process map entries
+      |> Enum.filter(&is_map/1)
       |> Enum.map(&Map.get(&1, :name))
       |> Enum.filter(&is_binary/1)
 
-    reserved_conflicts = 
+    reserved_conflicts =
       all_field_names
       |> Enum.filter(&(&1 in reserved_python_names))
 
     case reserved_conflicts do
-      [] -> errors
+      [] ->
+        errors
+
       names ->
         conflict_list = Enum.join(names, ", ")
-        [{:reserved_name_conflict, "Field names conflict with Python reserved words: #{conflict_list}"} | errors]
+
+        [
+          {:reserved_name_conflict,
+           "Field names conflict with Python reserved words: #{conflict_list}"}
+          | errors
+        ]
     end
   end
 
@@ -266,12 +281,12 @@ defmodule DSPex.Signature.EnhancedValidator do
   defp valid_field_type?(type) when is_binary(type) do
     basic_types = ~w[string integer float boolean dict list any]
     ml_types = ~w[embedding probability confidence_score reasoning_chain]
-    
+
     # Also allow complex types like list<string>, dict<string,float>, etc.
-    type in basic_types || 
-    type in ml_types ||
-    String.match?(type, ~r/^list<.+>$/) ||
-    String.match?(type, ~r/^dict<.+,.+>$/) ||
-    String.match?(type, ~r/^union<.+>$/)
+    type in basic_types ||
+      type in ml_types ||
+      String.match?(type, ~r/^list<.+>$/) ||
+      String.match?(type, ~r/^dict<.+,.+>$/) ||
+      String.match?(type, ~r/^union<.+>$/)
   end
 end

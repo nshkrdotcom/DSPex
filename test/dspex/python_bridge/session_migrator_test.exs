@@ -13,12 +13,13 @@ defmodule DSPex.PythonBridge.SessionMigratorTest do
     {:ok, store_pid} = SessionStore.start_link(name: store_name)
 
     # Start SessionMigrator for testing
-    {:ok, migrator_pid} = SessionMigrator.start_link(
-      name: migrator_name,
-      migration_table: migration_table,
-      cleanup_interval: 1000,
-      session_store: store_name
-    )
+    {:ok, migrator_pid} =
+      SessionMigrator.start_link(
+        name: migrator_name,
+        migration_table: migration_table,
+        cleanup_interval: 1000,
+        session_store: store_name
+      )
 
     # Create a test session
     session_id = "test_session_#{System.unique_integer()}"
@@ -39,14 +40,18 @@ defmodule DSPex.PythonBridge.SessionMigratorTest do
   end
 
   describe "migrate_session/3" do
-    test "successfully migrates a session", %{session_id: session_id, migrator_name: migrator_name} do
+    test "successfully migrates a session", %{
+      session_id: session_id,
+      migrator_name: migrator_name
+    } do
       # Migrate session from worker1 to worker2
-      {:ok, migration_id} = SessionMigrator.migrate_session(
-        migrator_name,
-        session_id,
-        "worker1",
-        "worker2"
-      )
+      {:ok, migration_id} =
+        SessionMigrator.migrate_session(
+          migrator_name,
+          session_id,
+          "worker1",
+          "worker2"
+        )
 
       assert is_binary(migration_id)
       assert String.starts_with?(migration_id, "migration_")
@@ -64,12 +69,13 @@ defmodule DSPex.PythonBridge.SessionMigratorTest do
 
     test "fails to migrate non-existent session", %{migrator_name: migrator_name} do
       # Migration will start but fail during execution
-      {:ok, migration_id} = SessionMigrator.migrate_session(
-        migrator_name,
-        "non_existent_session",
-        "worker1",
-        "worker2"
-      )
+      {:ok, migration_id} =
+        SessionMigrator.migrate_session(
+          migrator_name,
+          "non_existent_session",
+          "worker1",
+          "worker2"
+        )
 
       # Wait for migration to fail
       :timer.sleep(200)
@@ -81,32 +87,38 @@ defmodule DSPex.PythonBridge.SessionMigratorTest do
     end
 
     test "fails to migrate to same worker", %{migrator_name: migrator_name} do
-      {:error, :same_worker} = SessionMigrator.migrate_session(
-        migrator_name,
-        "any_session",
-        "worker1",
-        "worker1"
-      )
+      {:error, :same_worker} =
+        SessionMigrator.migrate_session(
+          migrator_name,
+          "any_session",
+          "worker1",
+          "worker1"
+        )
     end
 
     test "fails with invalid session_id", %{migrator_name: migrator_name} do
-      {:error, :invalid_session_id} = SessionMigrator.migrate_session(
-        migrator_name,
-        "",
-        "worker1",
-        "worker2"
-      )
+      {:error, :invalid_session_id} =
+        SessionMigrator.migrate_session(
+          migrator_name,
+          "",
+          "worker1",
+          "worker2"
+        )
     end
   end
 
   describe "get_migration_status/2" do
-    test "returns migration status for existing migration", %{session_id: session_id, migrator_name: migrator_name} do
-      {:ok, migration_id} = SessionMigrator.migrate_session(
-        migrator_name,
-        session_id,
-        "worker1",
-        "worker2"
-      )
+    test "returns migration status for existing migration", %{
+      session_id: session_id,
+      migrator_name: migrator_name
+    } do
+      {:ok, migration_id} =
+        SessionMigrator.migrate_session(
+          migrator_name,
+          session_id,
+          "worker1",
+          "worker2"
+        )
 
       {:ok, migration_state} = SessionMigrator.get_migration_status(migrator_name, migration_id)
       assert migration_state.migration_id == migration_id
@@ -115,22 +127,24 @@ defmodule DSPex.PythonBridge.SessionMigratorTest do
     end
 
     test "returns not_found for non-existent migration", %{migrator_name: migrator_name} do
-      {:error, :not_found} = SessionMigrator.get_migration_status(
-        migrator_name,
-        "non_existent_migration"
-      )
+      {:error, :not_found} =
+        SessionMigrator.get_migration_status(
+          migrator_name,
+          "non_existent_migration"
+        )
     end
   end
 
   describe "list_active_migrations/1" do
     test "lists active migrations", %{session_id: session_id, migrator_name: migrator_name} do
       # Start a migration
-      {:ok, migration_id} = SessionMigrator.migrate_session(
-        migrator_name,
-        session_id,
-        "worker1",
-        "worker2"
-      )
+      {:ok, migration_id} =
+        SessionMigrator.migrate_session(
+          migrator_name,
+          session_id,
+          "worker1",
+          "worker2"
+        )
 
       active_migrations = SessionMigrator.list_active_migrations(migrator_name)
 
@@ -146,14 +160,18 @@ defmodule DSPex.PythonBridge.SessionMigratorTest do
   end
 
   describe "rollback_migration/2" do
-    test "successfully rolls back completed migration", %{session_id: session_id, migrator_name: migrator_name} do
+    test "successfully rolls back completed migration", %{
+      session_id: session_id,
+      migrator_name: migrator_name
+    } do
       # Start and complete a migration
-      {:ok, migration_id} = SessionMigrator.migrate_session(
-        migrator_name,
-        session_id,
-        "worker1",
-        "worker2"
-      )
+      {:ok, migration_id} =
+        SessionMigrator.migrate_session(
+          migrator_name,
+          session_id,
+          "worker1",
+          "worker2"
+        )
 
       # Wait for migration to complete
       :timer.sleep(200)
@@ -171,22 +189,27 @@ defmodule DSPex.PythonBridge.SessionMigratorTest do
     end
 
     test "fails to rollback non-existent migration", %{migrator_name: migrator_name} do
-      {:error, :not_found} = SessionMigrator.rollback_migration(
-        migrator_name,
-        "non_existent_migration"
-      )
+      {:error, :not_found} =
+        SessionMigrator.rollback_migration(
+          migrator_name,
+          "non_existent_migration"
+        )
     end
   end
 
   describe "cancel_migration/2" do
-    test "successfully cancels pending migration", %{session_id: session_id, migrator_name: migrator_name} do
+    test "successfully cancels pending migration", %{
+      session_id: session_id,
+      migrator_name: migrator_name
+    } do
       # Start a migration
-      {:ok, migration_id} = SessionMigrator.migrate_session(
-        migrator_name,
-        session_id,
-        "worker1",
-        "worker2"
-      )
+      {:ok, migration_id} =
+        SessionMigrator.migrate_session(
+          migrator_name,
+          session_id,
+          "worker1",
+          "worker2"
+        )
 
       # Cancel immediately (should be pending or in_progress)
       :ok = SessionMigrator.cancel_migration(migrator_name, migration_id)
@@ -198,10 +221,11 @@ defmodule DSPex.PythonBridge.SessionMigratorTest do
     end
 
     test "fails to cancel non-existent migration", %{migrator_name: migrator_name} do
-      {:error, :not_found} = SessionMigrator.cancel_migration(
-        migrator_name,
-        "non_existent_migration"
-      )
+      {:error, :not_found} =
+        SessionMigrator.cancel_migration(
+          migrator_name,
+          "non_existent_migration"
+        )
     end
   end
 
@@ -220,14 +244,19 @@ defmodule DSPex.PythonBridge.SessionMigratorTest do
   end
 
   describe "session metadata tracking" do
-    test "migration updates session metadata", %{session_id: session_id, migrator_name: migrator_name, store_name: store_name} do
+    test "migration updates session metadata", %{
+      session_id: session_id,
+      migrator_name: migrator_name,
+      store_name: store_name
+    } do
       # Start migration
-      {:ok, migration_id} = SessionMigrator.migrate_session(
-        migrator_name,
-        session_id,
-        "worker1",
-        "worker2"
-      )
+      {:ok, migration_id} =
+        SessionMigrator.migrate_session(
+          migrator_name,
+          session_id,
+          "worker1",
+          "worker2"
+        )
 
       # Wait for migration to complete
       :timer.sleep(200)
@@ -243,14 +272,19 @@ defmodule DSPex.PythonBridge.SessionMigratorTest do
       assert is_integer(last_migration.migrated_at)
     end
 
-    test "rollback removes migration metadata", %{session_id: session_id, migrator_name: migrator_name, store_name: store_name} do
+    test "rollback removes migration metadata", %{
+      session_id: session_id,
+      migrator_name: migrator_name,
+      store_name: store_name
+    } do
       # Start and complete migration
-      {:ok, migration_id} = SessionMigrator.migrate_session(
-        migrator_name,
-        session_id,
-        "worker1",
-        "worker2"
-      )
+      {:ok, migration_id} =
+        SessionMigrator.migrate_session(
+          migrator_name,
+          session_id,
+          "worker1",
+          "worker2"
+        )
 
       # Wait for migration to complete
       :timer.sleep(200)
@@ -267,17 +301,22 @@ defmodule DSPex.PythonBridge.SessionMigratorTest do
   end
 
   describe "error handling" do
-    test "handles session store errors gracefully", %{session_id: session_id, migrator_name: migrator_name, store_pid: store_pid} do
+    test "handles session store errors gracefully", %{
+      session_id: session_id,
+      migrator_name: migrator_name,
+      store_pid: store_pid
+    } do
       # Stop the session store to simulate failure
       GenServer.stop(store_pid)
 
       # Try to migrate - should handle the error
-      {:ok, migration_id} = SessionMigrator.migrate_session(
-        migrator_name,
-        session_id,
-        "worker1",
-        "worker2"
-      )
+      {:ok, migration_id} =
+        SessionMigrator.migrate_session(
+          migrator_name,
+          session_id,
+          "worker1",
+          "worker2"
+        )
 
       # Wait for migration to fail
       :timer.sleep(200)

@@ -71,7 +71,7 @@ defmodule DSPex.Signature.Compiler do
         # Get additional attributes for enhanced metadata
         description = Module.get_attribute(env.module, :signature_description)
         opts = Module.get_attribute(env.module, :signature_opts) || []
-        
+
         case compile_signature(ast, env.module, description, opts) do
           {:ok, quoted_code} -> quoted_code
           {:error, reason} -> raise_compilation_error(reason, ast, env.module)
@@ -96,11 +96,13 @@ defmodule DSPex.Signature.Compiler do
     compile_signature(ast, module, nil, [])
   end
 
-  @spec compile_signature(Macro.t(), module(), String.t() | nil, keyword()) :: {:ok, Macro.t()} | {:error, String.t()}
+  @spec compile_signature(Macro.t(), module(), String.t() | nil, keyword()) ::
+          {:ok, Macro.t()} | {:error, String.t()}
   def compile_signature(ast, module, description, opts) do
     with {:ok, {inputs, outputs}} <- parse_signature_ast(ast),
          :ok <- validate_field_types(inputs ++ outputs),
-         signature_metadata <- build_signature_metadata(inputs, outputs, module, description, opts) do
+         signature_metadata <-
+           build_signature_metadata(inputs, outputs, module, description, opts) do
       quoted_code = generate_signature_code(signature_metadata, opts)
       {:ok, quoted_code}
     end

@@ -502,13 +502,13 @@ defmodule DSPex.Adapters.PythonPort do
       # Try to use enhanced metadata first (Stage 2 implementation)
       if function_exported?(signature, :to_enhanced_metadata, 0) do
         enhanced_metadata = signature.to_enhanced_metadata()
-        
+
         # Ensure the metadata is in the format expected by Python bridge
         case DSPex.Signature.Metadata.validate_metadata(enhanced_metadata) do
-          :ok -> 
+          :ok ->
             # Convert to string keys for JSON serialization
             convert_enhanced_metadata_to_bridge_format(enhanced_metadata)
-          
+
           {:error, _reason} ->
             # Fall back to legacy format
             convert_signature_legacy(signature)
@@ -530,9 +530,11 @@ defmodule DSPex.Adapters.PythonPort do
       # This looks like enhanced metadata, validate and convert
       try do
         normalized = DSPex.Signature.Metadata.normalize_signature_definition(signature)
+
         case DSPex.Signature.Metadata.validate_metadata(normalized) do
           :ok ->
             convert_enhanced_metadata_to_bridge_format(normalized)
+
           {:error, _reason} ->
             # Fall back to legacy conversion
             convert_signature_legacy_map(signature)

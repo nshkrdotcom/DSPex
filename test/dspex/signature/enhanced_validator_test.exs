@@ -1,6 +1,6 @@
 defmodule DSPex.Signature.EnhancedValidatorTest do
   use ExUnit.Case, async: true
-  
+
   alias DSPex.Signature.EnhancedValidator
 
   describe "validate_enhanced_metadata/1" do
@@ -22,8 +22,8 @@ defmodule DSPex.Signature.EnhancedValidatorTest do
     end
 
     test "rejects non-map metadata" do
-      assert {:error, [structure: "Metadata must be a map"]} = 
-             EnhancedValidator.validate_enhanced_metadata("not a map")
+      assert {:error, [structure: "Metadata must be a map"]} =
+               EnhancedValidator.validate_enhanced_metadata("not a map")
     end
 
     test "rejects metadata missing required fields" do
@@ -33,7 +33,7 @@ defmodule DSPex.Signature.EnhancedValidatorTest do
       }
 
       assert {:error, errors} = EnhancedValidator.validate_enhanced_metadata(metadata)
-      
+
       error_types = Enum.map(errors, fn {type, _msg} -> type end)
       assert :missing_field in error_types
     end
@@ -46,11 +46,12 @@ defmodule DSPex.Signature.EnhancedValidatorTest do
         inputs: [%{name: "input1", type: "string", description: "Test"}],
         outputs: [%{name: "output1", type: "string", description: "Test"}]
       }
+
       assert EnhancedValidator.validate_enhanced_metadata(valid_metadata) == :ok
 
       # Invalid names
       invalid_names = ["123Invalid", "Invalid-Name", "Invalid.Name", "", " "]
-      
+
       for invalid_name <- invalid_names do
         invalid_metadata = %{valid_metadata | name: invalid_name}
         assert {:error, errors} = EnhancedValidator.validate_enhanced_metadata(invalid_metadata)
@@ -74,12 +75,12 @@ defmodule DSPex.Signature.EnhancedValidatorTest do
 
       # Invalid field names
       invalid_names = ["123invalid", "invalid-name", "invalid.name", "", " ", "class", "def"]
-      
+
       for invalid_name <- invalid_names do
         invalid_field = %{name: invalid_name, type: "string", description: "Invalid field"}
         invalid_metadata = %{base_metadata | inputs: [invalid_field]}
         assert {:error, errors} = EnhancedValidator.validate_enhanced_metadata(invalid_metadata)
-        
+
         # Should have either invalid_field_name or reserved_name_conflict error
         error_types = Enum.map(errors, fn {type, _} -> type end)
         assert :invalid_field_name in error_types or :reserved_name_conflict in error_types
@@ -95,9 +96,20 @@ defmodule DSPex.Signature.EnhancedValidatorTest do
       }
 
       # Valid field types
-      valid_types = ["string", "integer", "float", "boolean", "list", "dict", "any", 
-                     "embedding", "probability", "list<string>", "dict<string,float>"]
-      
+      valid_types = [
+        "string",
+        "integer",
+        "float",
+        "boolean",
+        "list",
+        "dict",
+        "any",
+        "embedding",
+        "probability",
+        "list<string>",
+        "dict<string,float>"
+      ]
+
       for valid_type <- valid_types do
         valid_field = %{name: "test_field", type: valid_type, description: "Test field"}
         valid_output = %{name: "test_output", type: "string", description: "Test output"}
@@ -107,7 +119,7 @@ defmodule DSPex.Signature.EnhancedValidatorTest do
 
       # Invalid field types
       invalid_types = ["unknown_type", "", " "]
-      
+
       for invalid_type <- invalid_types do
         invalid_field = %{name: "test_field", type: invalid_type, description: "Test field"}
         invalid_metadata = %{base_metadata | inputs: [invalid_field]}
@@ -134,8 +146,20 @@ defmodule DSPex.Signature.EnhancedValidatorTest do
     end
 
     test "detects reserved Python names" do
-      reserved_names = ["class", "def", "if", "for", "while", "try", "except", 
-                        "True", "False", "None", "__init__", "self"]
+      reserved_names = [
+        "class",
+        "def",
+        "if",
+        "for",
+        "while",
+        "try",
+        "except",
+        "True",
+        "False",
+        "None",
+        "__init__",
+        "self"
+      ]
 
       base_metadata = %{
         name: "ReservedSignature",
@@ -147,7 +171,7 @@ defmodule DSPex.Signature.EnhancedValidatorTest do
       for reserved_name <- reserved_names do
         reserved_field = %{name: reserved_name, type: "string", description: "Reserved field"}
         metadata = %{base_metadata | inputs: [reserved_field]}
-        
+
         assert {:error, errors} = EnhancedValidator.validate_enhanced_metadata(metadata)
         assert Enum.any?(errors, fn {type, _} -> type == :reserved_name_conflict end)
       end
@@ -161,6 +185,7 @@ defmodule DSPex.Signature.EnhancedValidatorTest do
         inputs: [],
         outputs: [%{name: "output1", type: "string", description: "Output"}]
       }
+
       assert {:error, errors} = EnhancedValidator.validate_enhanced_metadata(no_inputs)
       assert Enum.any?(errors, fn {type, _} -> type == :inputs end)
 
@@ -171,6 +196,7 @@ defmodule DSPex.Signature.EnhancedValidatorTest do
         inputs: [%{name: "input1", type: "string", description: "Input"}],
         outputs: []
       }
+
       assert {:error, errors} = EnhancedValidator.validate_enhanced_metadata(no_outputs)
       assert Enum.any?(errors, fn {type, _} -> type == :outputs end)
     end
@@ -213,8 +239,8 @@ defmodule DSPex.Signature.EnhancedValidatorTest do
     end
 
     test "rejects non-list field definitions" do
-      assert {:error, [{:input, "Field list must be a list"}]} = 
-             EnhancedValidator.validate_field_definitions("not a list", :input)
+      assert {:error, [{:input, "Field list must be a list"}]} =
+               EnhancedValidator.validate_field_definitions("not a list", :input)
     end
 
     test "validates individual field definitions" do
@@ -222,18 +248,25 @@ defmodule DSPex.Signature.EnhancedValidatorTest do
       valid_fields = [
         %{name: "valid_field", type: "string", description: "Valid field"}
       ]
+
       assert EnhancedValidator.validate_field_definitions(valid_fields, :input) == :ok
 
       # Invalid field (not a map)
       invalid_fields = ["not a map"]
-      assert {:error, errors} = EnhancedValidator.validate_field_definitions(invalid_fields, :input)
+
+      assert {:error, errors} =
+               EnhancedValidator.validate_field_definitions(invalid_fields, :input)
+
       assert Enum.any?(errors, fn {type, _} -> type == :input end)
 
       # Invalid field name
       invalid_name_fields = [
         %{name: "123invalid", type: "string", description: "Invalid name"}
       ]
-      assert {:error, errors} = EnhancedValidator.validate_field_definitions(invalid_name_fields, :input)
+
+      assert {:error, errors} =
+               EnhancedValidator.validate_field_definitions(invalid_name_fields, :input)
+
       assert Enum.any?(errors, fn {type, _} -> type == :invalid_field_name end)
     end
   end
