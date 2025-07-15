@@ -344,16 +344,6 @@ defmodule DSPex.EnhancedPoolTestHelpers do
     end
   end
   
-  defp find_genserver_for_pool(pool_name) do
-    # Try to find the GenServer that manages this pool
-    # This is a simplified implementation that would need to be enhanced
-    # based on actual pool name mapping logic
-    if is_atom(pool_name) and Process.whereis(pool_name) do
-      {:ok, pool_name}
-    else
-      {:error, :genserver_not_found}
-    end
-  end
   
   defp collect_performance_samples(pool_info, start_time, end_time, interval_ms, acc) do
     current_time = :erlang.monotonic_time(:millisecond)

@@ -368,7 +368,7 @@ defmodule DSPex.PoolPerformanceFramework do
     {operation_metrics, system_metrics}
   end
   
-  defp collect_operation_metrics(pool_info, operation_generator, start_time, end_time_us) do
+  defp collect_operation_metrics(pool_info, operation_generator, _start_time, end_time_us) do
     operation_metrics = collect_operations_until_time(pool_info, operation_generator, end_time_us, [])
     
     %{
@@ -389,7 +389,7 @@ defmodule DSPex.PoolPerformanceFramework do
     end
   end
   
-  defp collect_system_metrics(pool_info, start_time, end_time_us, sample_interval_ms) do
+  defp collect_system_metrics(pool_info, _start_time, end_time_us, sample_interval_ms) do
     samples = collect_system_samples(pool_info, end_time_us, sample_interval_ms, [])
     
     %{

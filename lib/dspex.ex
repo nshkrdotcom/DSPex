@@ -9,9 +9,9 @@ defmodule DSPex do
   alias DSPex.Adapters.Registry
 
   @supported_models %{
-    "gemini-2.0-flash-exp" => %{
+    "gemini-1.5-flash" => %{
       provider: :google,
-      display_name: "Gemini 2.0 Flash (Experimental)",
+      display_name: "Gemini 1.5 Flash",
       default_temperature: 0.7
     },
     "gemini-1.5-pro" => %{
@@ -19,9 +19,9 @@ defmodule DSPex do
       display_name: "Gemini 1.5 Pro",
       default_temperature: 0.7
     },
-    "gemini-1.5-flash" => %{
+    "gemini-2.0-flash-exp" => %{
       provider: :google,
-      display_name: "Gemini 1.5 Flash",
+      display_name: "Gemini 2.0 Flash (Experimental)",
       default_temperature: 0.7
     }
   }

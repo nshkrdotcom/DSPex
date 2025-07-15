@@ -66,9 +66,8 @@ defmodule DSPex.PythonBridge.SessionAffinity do
   """
   @spec bind_session(String.t(), String.t()) :: :ok
   def bind_session(session_id, worker_id) do
-    ensure_table_exists()
     timestamp = System.monotonic_time(:millisecond)
-    :ets.insert(@table_name, {session_id, worker_id, timestamp})
+    safe_ets_insert(@table_name, {session_id, worker_id, timestamp})
     
     Logger.debug("Session #{session_id} bound to worker #{worker_id}")
     :ok
@@ -105,8 +104,7 @@ defmodule DSPex.PythonBridge.SessionAffinity do
   """
   @spec unbind_session(String.t()) :: :ok
   def unbind_session(session_id) do
-    ensure_table_exists()
-    :ets.delete(@table_name, session_id)
+    safe_ets_delete(@table_name, session_id)
     
     Logger.debug("Session #{session_id} unbound")
     :ok
@@ -127,15 +125,13 @@ defmodule DSPex.PythonBridge.SessionAffinity do
   """
   @spec remove_worker_sessions(String.t()) :: :ok
   def remove_worker_sessions(worker_id) do
-    ensure_table_exists()
-    
     # Find all sessions for this worker
-    sessions = :ets.select(@table_name, [
+    sessions = safe_ets_select(@table_name, [
       {{:"$1", worker_id, :"$3"}, [], [:"$1"]}
     ])
     
     # Remove them
-    Enum.each(sessions, &:ets.delete(@table_name, &1))
+    Enum.each(sessions, &safe_ets_delete(@table_name, &1))
     
     if length(sessions) > 0 do
       Logger.info("Removed #{length(sessions)} session bindings for worker #{worker_id}")
@@ -156,9 +152,7 @@ defmodule DSPex.PythonBridge.SessionAffinity do
   """
   @spec get_stats() :: map()
   def get_stats do
-    ensure_table_exists()
-    
-    all_sessions = :ets.tab2list(@table_name)
+    all_sessions = safe_ets_tab2list(@table_name)
     now = System.monotonic_time(:millisecond)
     
     {active, expired} = Enum.split_with(all_sessions, fn {_, _, timestamp} ->
@@ -184,8 +178,21 @@ defmodule DSPex.PythonBridge.SessionAffinity do
     cleanup_interval = Keyword.get(opts, :cleanup_interval, @cleanup_interval)
     session_timeout = Keyword.get(opts, :session_timeout, @session_timeout)
     
-    # Create ETS table
-    ensure_table_exists()
+    # Create ETS table safely in init (single-threaded)
+    case :ets.whereis(@table_name) do
+      :undefined ->
+        :ets.new(@table_name, [
+          :named_table, 
+          :public, 
+          :set, 
+          {:read_concurrency, true},
+          {:write_concurrency, true}
+        ])
+        Logger.debug("Created session affinity ETS table")
+        
+      _tid ->
+        Logger.debug("Session affinity ETS table already exists")
+    end
     
     # Schedule first cleanup
     schedule_cleanup(cleanup_interval)
@@ -230,16 +237,14 @@ defmodule DSPex.PythonBridge.SessionAffinity do
   end
 
   def handle_call({:get_worker, session_id}, _from, state) do
-    ensure_table_exists()
-    
-    result = case :ets.lookup(@table_name, session_id) do
+    result = case safe_ets_lookup(@table_name, session_id) do
       [{^session_id, worker_id, timestamp}] ->
         if not_expired_with_timeout?(timestamp, state.session_timeout) do
           Logger.debug("Session #{session_id} found bound to worker #{worker_id}")
           {:ok, worker_id}
         else
           Logger.debug("Session #{session_id} expired, removing binding")
-          :ets.delete(@table_name, session_id)
+          safe_ets_delete(@table_name, session_id)
           {:error, :session_expired}
         end
         
@@ -253,25 +258,58 @@ defmodule DSPex.PythonBridge.SessionAffinity do
   
   ## Private Functions
   
-  defp ensure_table_exists do
-    case :ets.whereis(@table_name) do
-      :undefined ->
-        :ets.new(@table_name, [
-          :named_table, 
-          :public, 
-          :set, 
-          {:read_concurrency, true},
-          {:write_concurrency, true}
-        ])
-        Logger.debug("Created session affinity ETS table")
-        
-      _tid ->
-        :ok
+  # Safe ETS operations that handle table not existing
+  defp safe_ets_insert(table, data) do
+    try do
+      :ets.insert(table, data)
+    rescue
+      ArgumentError ->
+        Logger.warning("Session affinity table #{table} not available, operation skipped")
+        false
     end
   end
   
-  defp not_expired?(timestamp, now \\ nil) do
-    now = now || System.monotonic_time(:millisecond)
+  defp safe_ets_delete(table, key) do
+    try do
+      :ets.delete(table, key)
+    rescue
+      ArgumentError ->
+        Logger.warning("Session affinity table #{table} not available, operation skipped")
+        false
+    end
+  end
+  
+  defp safe_ets_lookup(table, key) do
+    try do
+      :ets.lookup(table, key)
+    rescue
+      ArgumentError ->
+        Logger.warning("Session affinity table #{table} not available, returning empty result")
+        []
+    end
+  end
+  
+  defp safe_ets_select(table, pattern) do
+    try do
+      :ets.select(table, pattern)
+    rescue
+      ArgumentError ->
+        Logger.warning("Session affinity table #{table} not available, returning empty result")
+        []
+    end
+  end
+  
+  defp safe_ets_tab2list(table) do
+    try do
+      :ets.tab2list(table)
+    rescue
+      ArgumentError ->
+        Logger.warning("Session affinity table #{table} not available, returning empty result")
+        []
+    end
+  end
+  
+  defp not_expired?(timestamp, now) do
     now - timestamp < @session_timeout
   end
 
@@ -281,20 +319,18 @@ defmodule DSPex.PythonBridge.SessionAffinity do
   end
   
   defp cleanup_expired_sessions(session_timeout) do
-    ensure_table_exists()
-    
     now = System.monotonic_time(:millisecond)
     expired_threshold = now - session_timeout
     
     # Find expired sessions
-    expired = :ets.select(@table_name, [
+    expired = safe_ets_select(@table_name, [
       {{:"$1", :"$2", :"$3"}, 
        [{:<, :"$3", expired_threshold}],
        [:"$1"]}
     ])
     
     # Remove expired sessions
-    Enum.each(expired, &:ets.delete(@table_name, &1))
+    Enum.each(expired, &safe_ets_delete(@table_name, &1))
     
     if length(expired) > 0 do
       Logger.info("Cleaned up #{length(expired)} expired session affinity bindings")

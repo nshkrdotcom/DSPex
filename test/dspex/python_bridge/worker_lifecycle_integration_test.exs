@@ -18,8 +18,8 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
       pool_opts = [
         name: :"test_pool_#{:erlang.unique_integer([:positive])}",
         worker_module: PoolWorkerV2Enhanced,
-        pool_size: 2,
-        overflow: 1,
+        pool_size: 5,
+        overflow: 2,
         lazy: false
       ]
       
@@ -41,7 +41,7 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
       
       # Check pool status
       status = GenServer.call(pool_name, :get_status)
-      assert status.pool_size == 2
+      assert status.pool_size == 5
       assert Map.has_key?(status, :session_affinity)
       
       # Execute a simple operation to trigger worker lifecycle

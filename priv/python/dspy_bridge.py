@@ -228,13 +228,40 @@ class DSPyBridge:
             # Configure based on provider
             if provider == 'google' and model.startswith('gemini'):
                 import dspy
-                # Configure Google/Gemini LM
-                lm = dspy.Google(
-                    model=model,
-                    api_key=api_key,
-                    temperature=temperature
-                )
-                dspy.settings.configure(lm=lm)
+                import os
+                
+                # Set the API key in environment (DSPy often reads from environment)
+                os.environ['GOOGLE_API_KEY'] = api_key
+                
+                # Configure with proper LiteLLM format for Google AI Studio API (not Vertex AI)
+                try:
+                    # Method 1: Force Google AI Studio with gemini/ prefix
+                    lm = dspy.LM(
+                        model=f"gemini/{model}",
+                        api_key=api_key,
+                        temperature=temperature
+                    )
+                    dspy.settings.configure(lm=lm)
+                except Exception as e1:
+                    try:
+                        # Method 2: Try direct model name
+                        lm = dspy.LM(
+                            model=model,
+                            api_key=api_key,
+                            temperature=temperature
+                        )
+                        dspy.settings.configure(lm=lm)
+                    except Exception as e2:
+                        try:
+                            # Method 3: Try with explicit google/ prefix
+                            lm = dspy.LM(
+                                model=f"google/{model}",
+                                api_key=api_key,
+                                temperature=temperature
+                            )
+                            dspy.settings.configure(lm=lm)
+                        except Exception as e3:
+                            raise ValueError(f"Failed to configure Gemini model with any format. Google AI Studio requires API key authentication. Errors: {str(e1)}, {str(e2)}, {str(e3)}")
                 
                 self.lm_configured = True
                 self.current_lm_config = args
@@ -244,6 +271,27 @@ class DSPyBridge:
                     if not hasattr(self, 'session_lms'):
                         self.session_lms = {}
                     self.session_lms[self.current_session] = args
+                
+                # Test the LM configuration with a simple call
+                try:
+                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                        f.write(f"[{time.time()}] DEBUG: Testing LM with simple call\n")
+                        f.flush()
+                    
+                    # Try a simple DSPy call to verify the LM is working
+                    simple_test = dspy.Predict("question -> answer")
+                    test_result = simple_test(question="What is 1+1?")
+                    
+                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                        f.write(f"[{time.time()}] DEBUG: LM test result: {test_result}\n")
+                        f.write(f"[{time.time()}] DEBUG: LM test type: {type(test_result)}\n")
+                        if hasattr(test_result, '__dict__'):
+                            f.write(f"[{time.time()}] DEBUG: LM test dict: {test_result.__dict__}\n")
+                        f.flush()
+                except Exception as e:
+                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                        f.write(f"[{time.time()}] DEBUG: LM test failed: {e}\n")
+                        f.flush()
                 
                 return {
                     "status": "configured",
@@ -339,16 +387,23 @@ class DSPyBridge:
         Returns:
             Dynamic signature class
         """
-        class DynamicSignature(dspy.Signature):
-            pass
-        
         inputs = signature_def.get('inputs', [])
         outputs = signature_def.get('outputs', [])
+        
+        # Create instruction text
+        input_names = [field.get('name') for field in inputs if field.get('name')]
+        output_names = [field.get('name') for field in outputs if field.get('name')]
+        
+        instruction_text = f"Given the fields {', '.join(input_names)}, produce the fields {', '.join(output_names)}."
+        
+        class DynamicSignature(dspy.Signature):
+            """Dynamic signature for DSPy program execution."""
+            __doc__ = instruction_text
         
         # Add input fields
         for field in inputs:
             field_name = field.get('name')
-            field_desc = field.get('description', '')
+            field_desc = field.get('description', field_name)
             
             if not field_name:
                 raise ValueError("Input field must have a name")
@@ -358,12 +413,16 @@ class DSPyBridge:
         # Add output fields
         for field in outputs:
             field_name = field.get('name')
-            field_desc = field.get('description', '')
+            field_desc = field.get('description', field_name)
             
             if not field_name:
                 raise ValueError("Output field must have a name")
             
             setattr(DynamicSignature, field_name, dspy.OutputField(desc=field_desc))
+        
+        # Set the instructions manually
+        if hasattr(DynamicSignature, '_signature'):
+            DynamicSignature._signature = instruction_text
         
         return DynamicSignature
     
@@ -378,15 +437,40 @@ class DSPyBridge:
         Returns:
             DSPy program instance
         """
+        # For now, let's use string signatures which we know work
+        # Get the signature definition to create a string signature
+        if hasattr(signature_class, '_signature_inputs') and hasattr(signature_class, '_signature_outputs'):
+            inputs = signature_class._signature_inputs
+            outputs = signature_class._signature_outputs
+        else:
+            # Fallback: try to extract from class attributes
+            inputs = []
+            outputs = []
+            for attr_name in dir(signature_class):
+                attr = getattr(signature_class, attr_name)
+                if hasattr(attr, '__class__') and 'InputField' in str(attr.__class__):
+                    inputs.append(attr_name)
+                elif hasattr(attr, '__class__') and 'OutputField' in str(attr.__class__):
+                    outputs.append(attr_name)
+        
+        # Create string signature
+        input_str = ', '.join(inputs) if inputs else 'question'
+        output_str = ', '.join(outputs) if outputs else 'answer'
+        string_signature = f"{input_str} -> {output_str}"
+        
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] DEBUG: Creating program with string signature: {string_signature}\n")
+            f.flush()
+        
         if program_type == 'predict':
-            return dspy.Predict(signature_class)
+            return dspy.Predict(string_signature)
         elif program_type == 'chain_of_thought':
-            return dspy.ChainOfThought(signature_class)
+            return dspy.ChainOfThought(string_signature)
         elif program_type == 'react':
-            return dspy.ReAct(signature_class)
+            return dspy.ReAct(string_signature)
         else:
             # Default to Predict for unknown types
-            return dspy.Predict(signature_class)
+            return dspy.Predict(string_signature)
     
     def execute_program(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -449,18 +533,164 @@ class DSPyBridge:
         
         try:
             # Execute the program
+            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                f.write(f"[{time.time()}] DEBUG: About to execute program with inputs: {inputs}\n")
+                f.write(f"[{time.time()}] DEBUG: Program type: {type(program)}\n")
+                f.write(f"[{time.time()}] DEBUG: Program: {program}\n")
+                f.flush()
+            
             result = program(**inputs)
+            
+            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                f.write(f"[{time.time()}] DEBUG: Program execution returned successfully\n")
+                f.flush()
             
             # Update execution statistics
             program_info['execution_count'] += 1
             program_info['last_executed'] = time.time()
             
-            # Convert result to dictionary
+            # Debug: Write what we got from DSPy to debug log
+            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                f.write(f"[{time.time()}] DEBUG: DSPy result type: {type(result)}\n")
+                f.write(f"[{time.time()}] DEBUG: DSPy result class: {result.__class__.__name__}\n")
+                f.flush()
+            
+            # Convert result to dictionary - handle DSPy Prediction objects
+            output = {}
+            
             if hasattr(result, '__dict__'):
-                output = {k: v for k, v in result.__dict__.items() 
-                         if not k.startswith('_')}
-            else:
-                output = {"result": str(result)}
+                # For DSPy Prediction objects, extract the actual output fields
+                result_dict = result.__dict__
+                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                    f.write(f"[{time.time()}] DEBUG: Raw result dict: {list(result_dict.keys())}\n")
+                    f.flush()
+                
+                # Look for output fields (exclude private fields and completions)
+                for k, v in result_dict.items():
+                    if not k.startswith('_') and k != 'completions':
+                        output[k] = v
+                        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                            f.write(f"[{time.time()}] DEBUG: Found output field {k}: {v}\n")
+                            f.flush()
+                
+                # If no output fields found, try to extract from the actual signature fields
+                if not output:
+                    # Get the signature output fields from program_info
+                    signature_def = program_info.get('signature', {})
+                    output_fields = signature_def.get('outputs', [])
+                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                        f.write(f"[{time.time()}] DEBUG: No dict fields, trying signature fields: {[f.get('name') for f in output_fields]}\n")
+                        f.flush()
+                    
+                    for field in output_fields:
+                        field_name = field.get('name')
+                        
+                        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                            f.write(f"[{time.time()}] DEBUG: Attempting to extract field: {field_name}\n")
+                            # Debug the actual structure of the result object
+                            f.write(f"[{time.time()}] DEBUG: result.__dict__: {result.__dict__}\n")
+                            if hasattr(result, '_store'):
+                                f.write(f"[{time.time()}] DEBUG: result._store: {result._store}\n")
+                                f.write(f"[{time.time()}] DEBUG: _store type: {type(result._store)}\n")
+                            if hasattr(result, '_completions'):
+                                f.write(f"[{time.time()}] DEBUG: result._completions: {result._completions}\n")
+                                try:
+                                    completions_len = len(result._completions) if result._completions else 0
+                                    f.write(f"[{time.time()}] DEBUG: _completions length: {completions_len}\n")
+                                except:
+                                    f.write(f"[{time.time()}] DEBUG: _completions length: failed to get length\n")
+                            f.flush()
+                        
+                        # Try multiple methods to extract the field value from DSPy Prediction
+                        field_value = None
+                        
+                        # Method 1: Direct attribute access
+                        try:
+                            if hasattr(result, field_name):
+                                field_value = getattr(result, field_name)
+                                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                                    f.write(f"[{time.time()}] DEBUG: Method 1 - Direct attr {field_name}: {field_value}\n")
+                                    f.flush()
+                        except Exception as e:
+                            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                                f.write(f"[{time.time()}] DEBUG: Method 1 error: {e}\n")
+                                f.flush()
+                        
+                        # Method 2: Check if it's in _store (common DSPy pattern)
+                        if field_value is None and hasattr(result, '_store') and isinstance(result._store, dict) and field_name in result._store:
+                            field_value = result._store[field_name]
+                            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                                f.write(f"[{time.time()}] DEBUG: Method 2 - _store {field_name}: {field_value}\n")
+                                f.flush()
+                        
+                        # Method 3: Try accessing as dict-like object
+                        if field_value is None and hasattr(result, '__getitem__'):
+                            try:
+                                field_value = result[field_name]
+                                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                                    f.write(f"[{time.time()}] DEBUG: Method 3 - dict access {field_name}: {field_value}\n")
+                                    f.flush()
+                            except (KeyError, TypeError):
+                                pass
+                        
+                        # Method 4: Try getting from completions if available
+                        if field_value is None and hasattr(result, '_completions') and result._completions is not None:
+                            try:
+                                # DSPy often stores the final output in the last completion
+                                last_completion = result._completions[-1]
+                                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                                    f.write(f"[{time.time()}] DEBUG: Method 4 - last_completion: {last_completion}\n")
+                                    f.write(f"[{time.time()}] DEBUG: last_completion type: {type(last_completion)}\n")
+                                    if hasattr(last_completion, '__dict__'):
+                                        f.write(f"[{time.time()}] DEBUG: last_completion.__dict__: {last_completion.__dict__}\n")
+                                    f.flush()
+                                
+                                if hasattr(last_completion, field_name):
+                                    field_value = getattr(last_completion, field_name)
+                                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                                        f.write(f"[{time.time()}] DEBUG: Method 4 - completion {field_name}: {field_value}\n")
+                                        f.flush()
+                            except (IndexError, AttributeError):
+                                pass
+                        
+                        # Method 5: Try accessing via result.answer (dynamic attribute access)
+                        if field_value is None and field_name == 'answer':
+                            try:
+                                # Many DSPy programs return result.answer directly
+                                field_value = result.answer
+                                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                                    f.write(f"[{time.time()}] DEBUG: Method 5 - result.answer: {field_value}\n")
+                                    f.flush()
+                            except AttributeError:
+                                pass
+                            except Exception as e:
+                                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                                    f.write(f"[{time.time()}] DEBUG: Method 5 error: {e}\n")
+                                    f.flush()
+                        
+                        if field_value is not None:
+                            output[field_name] = field_value
+                        else:
+                            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                                f.write(f"[{time.time()}] DEBUG: Could not extract field {field_name}\n")
+                                f.flush()
+            
+            if not output:
+                # Fallback: convert to string
+                try:
+                    output = {"result": str(result)}
+                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                        f.write(f"[{time.time()}] DEBUG: Using str() fallback: {str(result)}\n")
+                        f.flush()
+                except:
+                    output = {"result": "Unable to extract result"}
+                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                        f.write(f"[{time.time()}] DEBUG: str() failed, using fallback\n")
+                        f.flush()
+            
+            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                f.write(f"[{time.time()}] DEBUG: Final output: {output}\n")
+                f.flush()
             
             return {
                 "program_id": program_id,

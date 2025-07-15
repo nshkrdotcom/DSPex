@@ -34,15 +34,17 @@ defmodule DSPex.PythonBridge.PoolSupervisor do
   use Supervisor
   require Logger
 
-  @default_config %{
-    enabled: true,
-    pool_size: System.schedulers_online() * 2,
-    overflow: 2,
-    checkout_timeout: 5_000,
-    operation_timeout: 30_000,
-    health_check_interval: 30_000,
-    session_cleanup_interval: 300_000
-  }
+  defp default_config do
+    %{
+      enabled: true,
+      pool_size: Application.get_env(:dspex, :pool_size, 3),
+      overflow: Application.get_env(:dspex, :pool_overflow, 1),
+      checkout_timeout: 5_000,
+      operation_timeout: 30_000,
+      health_check_interval: 30_000,
+      session_cleanup_interval: 300_000
+    }
+  end
 
   @doc """
   Starts the pool supervisor.
@@ -66,7 +68,7 @@ defmodule DSPex.PythonBridge.PoolSupervisor do
   """
   def get_config do
     config = Application.get_env(:dspex, __MODULE__, %{})
-    Map.merge(@default_config, Map.new(config))
+    Map.merge(default_config(), Map.new(config))
   end
 
   @doc """
@@ -94,7 +96,7 @@ defmodule DSPex.PythonBridge.PoolSupervisor do
 
       children = [
         # Session pool manager with NimblePool
-        {DSPex.PythonBridge.SessionPool,
+        {DSPex.PythonBridge.SessionPoolV2,
          [
            pool_size: config.pool_size,
            overflow: config.overflow,
@@ -120,7 +122,7 @@ defmodule DSPex.PythonBridge.PoolSupervisor do
   defp build_config(opts) do
     app_config = Application.get_env(:dspex, __MODULE__, %{})
 
-    @default_config
+    default_config()
     |> Map.merge(Map.new(app_config))
     |> Map.merge(Map.new(opts))
   end
@@ -136,7 +138,7 @@ defmodule DSPex.PythonBridge.PoolMonitor do
   use GenServer
   require Logger
 
-  alias DSPex.PythonBridge.SessionPool
+  alias DSPex.PythonBridge.SessionPoolV2
 
   defstruct [
     :health_check_interval,
@@ -225,15 +227,8 @@ defmodule DSPex.PythonBridge.PoolMonitor do
 
   @impl true
   def handle_info(:cleanup_sessions, state) do
-    # Trigger session cleanup in pool
-    Task.start(fn ->
-      try do
-        SessionPool.cleanup_stale_sessions()
-      catch
-        :exit, reason ->
-          Logger.error("Session cleanup failed: #{inspect(reason)}")
-      end
-    end)
+    # Trigger session cleanup in pool via internal message
+    send(SessionPoolV2, :cleanup_stale_sessions)
 
     # Reschedule
     cleanup_ref = schedule_cleanup(state.session_cleanup_interval)
@@ -263,10 +258,10 @@ defmodule DSPex.PythonBridge.PoolMonitor do
   defp perform_health_check(_state) do
     try do
       # Get pool status
-      pool_status = SessionPool.get_pool_status()
+      pool_status = SessionPoolV2.get_pool_status()
 
       # Perform test operation
-      test_result = SessionPool.execute_anonymous(:ping, %{health_check: true}, timeout: 5000)
+      test_result = SessionPoolV2.execute_anonymous(:ping, %{health_check: true}, timeout: 5000)
 
       %{
         status: determine_health_status(pool_status, test_result),

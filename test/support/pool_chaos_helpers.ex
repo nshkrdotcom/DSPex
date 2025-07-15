@@ -17,9 +17,8 @@ defmodule DSPex.PoolChaosHelpers do
   
   # Import existing helpers to extend them
   import DSPex.SupervisionTestHelpers
-  import DSPex.EnhancedPoolTestHelpers
   
-  alias DSPex.PythonBridge.{SessionPoolV2, SessionAffinity, WorkerMetrics}
+  alias DSPex.PythonBridge.SessionPoolV2
   
   @doc """
   Injects worker failures by killing specific workers.
@@ -428,7 +427,7 @@ defmodule DSPex.PoolChaosHelpers do
   
   defp create_memory_pressure_loop(pressure_mb, duration_ms) do
     # Create memory pressure by allocating large binaries
-    end_time = :erlang.system_time(:millisecond) + duration_ms
+    _end_time = :erlang.system_time(:millisecond) + duration_ms
     pressure_data = create_pressure_data(pressure_mb)
     
     # Hold the memory for the duration
