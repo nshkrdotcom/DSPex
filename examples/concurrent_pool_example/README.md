@@ -83,20 +83,34 @@ You can also run the examples interactively:
    ```
 
 This will launch three concurrent operations:
-- **Text Classification**: Sentiment analysis of sample text
-- **Translation**: English to French translation
-- **Summarization**: Text summarization with length constraints
+- **Text Classification**: Sentiment analysis via Q&A format ("What is the sentiment...")
+- **Translation**: English to French translation via Q&A format ("Translate this English text...")
+- **Summarization**: Text summarization via Q&A format ("Summarize this text...")
 
 Expected output:
 ```
 [info] Starting concurrent pool operations demonstration...
-[info] Starting text classification in session classification_1234
-[info] Starting translation in session translation_5678
-[info] Starting summarization in session summarization_9012
-[info] Classification completed in 1234ms
-[info] Translation completed in 987ms
-[info] Summarization completed in 1567ms
+[info] Starting text classification in session classification_1577
+[info] Starting translation in session translation_852
+[info] Starting summarization in session summarization_8327
+[info] Classification completed in 785ms
+[info] Translation completed in 883ms
+[info] Summarization completed in 1138ms
 [info] All concurrent operations completed successfully!
+
+✅ All operations completed successfully!
+Total execution time: 1138ms
+
+Results by operation:
+  text_classification:
+    Time: 785ms
+    Result: "positive"
+  translation:
+    Time: 883ms
+    Result: "Bonjour le monde, ceci est un message test pour la traduction."
+  summarization:
+    Time: 1138ms
+    Result: "DSPex's SessionPoolV2 improves worker lifecycle management..."
 ```
 
 ### Session Affinity Demo
@@ -131,20 +145,24 @@ This intentionally triggers error conditions to show the robust error handling c
 
 ## Key APIs Demonstrated
 
-### SessionPoolV2.execute_in_session/3
+### DSPex.create_program/1 and DSPex.execute_program/2
 
-Execute operations with session affinity:
-
-```elixir
-SessionPoolV2.execute_in_session(session_id, :predict, args)
-```
-
-### SessionPoolV2.execute_anonymous/2
-
-Execute operations without session binding:
+The example uses the standard DSPex workflow with Q&A format:
 
 ```elixir
-SessionPoolV2.execute_anonymous(:predict, args)
+# Create a program with QuestionAnswer signature
+signature = %{
+  name: "QuestionAnswer",
+  inputs: [%{name: "question", type: "string"}],
+  outputs: [%{name: "answer", type: "string"}]
+}
+
+program_config = %{signature: signature, id: "example_program"}
+{:ok, program_id} = DSPex.create_program(program_config)
+
+# Execute with task-specific questions
+inputs = %{question: "What is the sentiment of this text: 'I love this!' Answer: positive, negative, or neutral."}
+{:ok, result} = DSPex.execute_program(program_id, inputs)
 ```
 
 ## Architecture Benefits
