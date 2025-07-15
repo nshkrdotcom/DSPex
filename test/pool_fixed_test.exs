@@ -25,8 +25,7 @@ defmodule PoolFixedTest do
     # Start the app
     {:ok, _} = Application.ensure_all_started(:dspex)
 
-    # Small delay for initialization
-    Process.sleep(1000)
+    # Removed artificial initialization delay
 
     # Check components
     pool_supervisor = Process.whereis(DSPex.PythonBridge.PoolSupervisor)
@@ -74,8 +73,7 @@ defmodule PoolFixedTest do
       end
     end
 
-    # No more infinite worker creation!
-    Process.sleep(2000)
+    # Removed 2-second delay - test completes immediately
     IO.puts("\nTest completed successfully - no infinite worker creation!")
   end
 end

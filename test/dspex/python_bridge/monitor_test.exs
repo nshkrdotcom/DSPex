@@ -27,7 +27,14 @@ defmodule DSPex.PythonBridge.MonitorTest do
       assert Map.has_key?(status, :config)
 
       # Clean up
-      GenServer.stop(pid)
+      if Process.alive?(pid) do
+        ref = Process.monitor(pid)
+        GenServer.stop(pid, :normal, 1000)
+        receive do
+          {:DOWN, ^ref, :process, ^pid, _} -> :ok
+        after 100 -> :ok
+        end
+      end
     end
 
     test "starts with custom configuration" do
@@ -56,7 +63,14 @@ defmodule DSPex.PythonBridge.MonitorTest do
       assert status.config.failure_threshold == 3
 
       # Clean up
-      GenServer.stop(pid)
+      if Process.alive?(pid) do
+        ref = Process.monitor(pid)
+        GenServer.stop(pid, :normal, 1000)
+        receive do
+          {:DOWN, ^ref, :process, ^pid, _} -> :ok
+        after 100 -> :ok
+        end
+      end
     end
   end
 

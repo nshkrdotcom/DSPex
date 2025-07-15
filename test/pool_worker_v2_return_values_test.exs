@@ -31,7 +31,22 @@ defmodule PoolWorkerV2ReturnValuesTest do
         {:ok, pool_pid} = NimblePool.start_link(pool_config)
         
         on_exit(fn ->
-          if Process.alive?(pool_pid), do: GenServer.stop(pool_pid)
+          if Process.alive?(pool_pid) do
+            ref = Process.monitor(pool_pid)
+            # Use NimblePool.stop for proper pool shutdown
+            try do
+              NimblePool.stop(:test_return_values_pool, :shutdown, 2000)
+            catch
+              :exit, _ -> 
+                # If NimblePool.stop fails, force stop the process
+                Process.exit(pool_pid, :kill)
+            end
+            
+            receive do
+              {:DOWN, ^ref, :process, ^pool_pid, _} -> :ok
+            after 100 -> :ok  # Short timeout for cleanup
+            end
+          end
         end)
 
         {:ok, pool_pid: pool_pid}

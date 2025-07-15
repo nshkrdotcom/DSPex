@@ -15,7 +15,16 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   use GenServer
   require Logger
 
-  alias DSPex.PythonBridge.{PoolWorkerV2, PoolWorkerV2Enhanced, Protocol, SessionAffinity}
+  alias DSPex.PythonBridge.{
+    PoolWorkerV2, 
+    PoolWorkerV2Enhanced, 
+    Protocol, 
+    SessionAffinity,
+    PoolErrorHandler,
+    CircuitBreaker,
+    RetryLogic,
+    ErrorRecoveryOrchestrator
+  }
 
   # Configuration defaults
   @default_pool_size System.schedulers_online() * 2
@@ -42,12 +51,71 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   ## Public API - Client Functions
 
   @doc """
-  Executes a command within a session context.
+  Executes a command within a session context with comprehensive error handling.
 
   This function runs in the CLIENT process, not the pool manager.
-  It checks out a worker, performs the operation, and returns the worker.
+  It uses RetryLogic and PoolErrorHandler for robust error handling.
   """
   def execute_in_session(session_id, command, args, opts \\ []) do
+    # Normalize opts to handle both maps and keyword lists
+    normalized_opts = normalize_opts(opts)
+    
+    context = %{
+      session_id: session_id,
+      command: command,
+      args: args,
+      operation: :execute_command,
+      adapter: __MODULE__
+    }
+    
+    # Wrap entire operation in retry logic with circuit breaker protection
+    retry_opts = [
+      max_attempts: Keyword.get(normalized_opts, :max_retries, 3),
+      circuit: :pool_operations,
+      base_delay: 1_000,
+      context: context
+    ]
+    
+    RetryLogic.with_retry(
+      fn -> do_execute_with_error_handling(session_id, command, args, normalized_opts, context) end,
+      retry_opts
+    )
+  end
+
+  @doc """
+  Executes a command without session binding with error handling.
+
+  This function runs in the CLIENT process for anonymous operations.
+  """
+  def execute_anonymous(command, args, opts \\ []) do
+    # Normalize opts to handle both maps and keyword lists
+    normalized_opts = normalize_opts(opts)
+    
+    context = %{
+      command: command,
+      args: args,
+      operation: :execute_anonymous,
+      adapter: __MODULE__
+    }
+    
+    # Use retry logic for anonymous operations too
+    retry_opts = [
+      max_attempts: Keyword.get(normalized_opts, :max_retries, 2),
+      circuit: :anonymous_operations,
+      base_delay: 500,
+      context: context
+    ]
+    
+    RetryLogic.with_retry(
+      fn -> do_execute_anonymous_with_error_handling(command, args, normalized_opts, context) end,
+      retry_opts
+    )
+  end
+
+  ## Private Error Handling Functions
+
+  @spec do_execute_with_error_handling(String.t(), atom(), map(), keyword(), map()) :: {:ok, term()} | {:error, term()}
+  defp do_execute_with_error_handling(session_id, command, args, opts, context) do
     opts = normalize_opts(opts)
     pool_name = Keyword.get(opts, :pool_name, get_default_pool_name())
     pool_timeout = Keyword.get(opts, :pool_timeout, @default_checkout_timeout)
@@ -56,162 +124,264 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     # Track session
     track_session(session_id)
 
-    # Generate request ID
-    request_id = System.unique_integer([:positive, :monotonic])
-
-    # Add session context to args
-    enhanced_args = Map.put(args, :session_id, session_id)
-
-    # Encode request once before checkout
-    request_payload = Protocol.encode_request(request_id, command, enhanced_args)
-
-    # Checkout and execute - THIS RUNS IN THE CLIENT PROCESS
-    Logger.debug("Attempting to checkout from pool: #{inspect(pool_name)}")
-
     try do
       NimblePool.checkout!(
         pool_name,
         {:session, session_id},
-        fn _from, worker_state ->
-          Logger.debug("Successfully checked out worker: #{inspect(worker_state.worker_id)}")
-          
-          # Record session affinity for enhanced workers
-          if Map.has_key?(worker_state, :state_machine) do
-            try do
-              SessionAffinity.bind_session(session_id, worker_state.worker_id)
-            rescue
-              _ -> 
-                # SessionAffinity might not be running, that's ok for basic workers
-                :ok
-            end
-          end
-          
-          # Get the port from worker state
-          port = worker_state.port
-
-          # Send command to port using Port.command/2 for packet mode
-          unless Port.command(port, request_payload) do
-            raise "Port.command/2 failed during session execution"
-          end
-
-          # Wait for response IN THE CLIENT PROCESS
-          receive do
-            {^port, {:data, data}} ->
-              case Protocol.decode_response(data) do
-                {:ok, ^request_id, response} ->
-                  # Protocol.decode_response returns the content of "result" field
-                  # so response is already the result
-                  case response do
-                    result when is_map(result) ->
-                      {{:ok, result}, :ok}
-
-                    _ ->
-                      Logger.error("Malformed response: #{inspect(response)}")
-                      {{:error, :malformed_response}, :close}
-                  end
-
-                {:ok, other_id, _} ->
-                  Logger.error("Response ID mismatch: expected #{request_id}, got #{other_id}")
-                  {{:error, :response_mismatch}, :close}
-
-                {:error, _id, reason} ->
-                  {{:error, reason}, :ok}
-
-                {:error, reason} ->
-                  Logger.error("Failed to decode response: #{inspect(reason)}")
-                  {{:error, {:decode_error, reason}}, :close}
-              end
-
-            {^port, {:exit_status, status}} ->
-              Logger.error("Port exited during operation with status: #{status}")
-              exit({:port_died, status})
-          after
-            operation_timeout ->
-              # Operation timed out - exit to trigger worker removal
-              Logger.error("Operation timed out after #{operation_timeout}ms")
-              exit({:timeout, "Operation timed out after #{operation_timeout}ms"})
-          end
+        fn from, worker ->
+          execute_with_worker_error_handling(worker, command, args, operation_timeout, 
+            Map.merge(context, %{session_id: session_id, from: from}))
         end,
         pool_timeout
       )
     catch
-      :exit, {:timeout, _} = reason ->
-        {:error, {:pool_timeout, reason}}
-
+      :exit, {:timeout, _} ->
+        handle_pool_error({:timeout, :checkout_timeout}, context)
+        
+      :exit, {:noproc, _} ->
+        handle_pool_error({:resource_error, :pool_not_available}, context)
+        
       :exit, reason ->
-        Logger.error("Checkout failed: #{inspect(reason)}")
-        {:error, {:checkout_failed, reason}}
+        handle_pool_error({:system_error, reason}, context)
+        
+      kind, error ->
+        handle_pool_error({:unexpected_error, {kind, error}}, context)
     end
   end
 
-  @doc """
-  Executes a command without session binding.
-
-  This function runs in the CLIENT process for anonymous operations.
-  """
-  def execute_anonymous(command, args, opts \\ []) do
+  @spec do_execute_anonymous_with_error_handling(atom(), map(), keyword(), map()) :: {:ok, term()} | {:error, term()}
+  defp do_execute_anonymous_with_error_handling(command, args, opts, context) do
     opts = normalize_opts(opts)
     pool_name = Keyword.get(opts, :pool_name, get_default_pool_name())
     pool_timeout = Keyword.get(opts, :pool_timeout, @default_checkout_timeout)
     operation_timeout = Keyword.get(opts, :timeout, @default_operation_timeout)
 
-    # Generate request ID
-    request_id = System.unique_integer([:positive, :monotonic])
-
-    # Encode request
-    request_payload = Protocol.encode_request(request_id, command, args)
-
-    # Checkout and execute
     try do
       NimblePool.checkout!(
         pool_name,
         :anonymous,
-        fn _from, worker_state ->
-          Logger.debug("Checking out worker for anonymous execution")
-          port = worker_state.port
-
-          # Send command using Port.command/2 for packet mode
-          Logger.debug("Sending command to port: #{inspect(port)}")
-
-          unless Port.command(port, request_payload) do
-            raise "Port.command/2 failed during anonymous execution"
-          end
-
-          Logger.debug("Waiting for response...")
-          # Wait for response
-          receive do
-            {^port, {:data, data}} ->
-              case Protocol.decode_response(data) do
-                {:ok, ^request_id, response} ->
-                  Logger.debug("Decoded response for request #{request_id}")
-                  # Protocol.decode_response returns the content of "result" field
-                  # so response is already the result, not the full response
-                  case response do
-                    result when is_map(result) ->
-                      Logger.debug("Returning success result: #{inspect(result)}")
-                      {{:ok, result}, :ok}
-
-                    _ ->
-                      Logger.error("Unexpected response format: #{inspect(response)}")
-                      {{:error, :malformed_response}, :close}
-                  end
-
-                {:error, reason} ->
-                  {{:error, reason}, :close}
-              end
-
-            {^port, {:exit_status, status}} ->
-              exit({:port_died, status})
-          after
-            operation_timeout ->
-              exit({:timeout, "Operation timed out"})
-          end
+        fn from, worker ->
+          execute_with_worker_error_handling(worker, command, args, operation_timeout,
+            Map.merge(context, %{from: from}))
         end,
         pool_timeout
       )
     catch
+      :exit, {:timeout, _} ->
+        handle_pool_error({:timeout, :checkout_timeout}, context)
+        
       :exit, reason ->
-        {:error, reason}
+        handle_pool_error({:system_error, reason}, context)
+        
+      kind, error ->
+        handle_pool_error({:unexpected_error, {kind, error}}, context)
+    end
+  end
+
+  @spec execute_with_worker_error_handling(map(), atom(), map(), pos_integer(), map()) :: {{:ok, term()} | {:error, term()}, atom()}
+  defp execute_with_worker_error_handling(worker, command, args, timeout, context) do
+    enhanced_context = Map.merge(context, %{
+      worker_id: worker.worker_id,
+      worker_state: get_worker_state(worker)
+    })
+
+    # Generate request ID and encode
+    request_id = System.unique_integer([:positive, :monotonic])
+    enhanced_args = if session_id = Map.get(context, :session_id) do
+      Map.put(args, :session_id, session_id)
+    else
+      args
+    end
+
+    try do
+      request_payload = Protocol.encode_request(request_id, command, enhanced_args)
+      
+      # Record session affinity for enhanced workers
+      if session_id = Map.get(context, :session_id) do
+        bind_session_if_enhanced(session_id, worker)
+      end
+      
+      # Send command to port
+      port = worker.port
+      unless Port.command(port, request_payload) do
+        error = PoolErrorHandler.wrap_pool_error(
+          {:command_send_failed, "Port.command/2 failed"},
+          enhanced_context
+        )
+        {{:error, error}, :close}
+      end
+
+      # Wait for response with comprehensive error handling
+      receive do
+        {^port, {:data, data}} ->
+          case Protocol.decode_response(data) do
+            {:ok, ^request_id, response} when is_map(response) ->
+              {{:ok, response}, :ok}
+
+            {:ok, other_id, _} ->
+              error = handle_response_mismatch(request_id, other_id, enhanced_context)
+              {{:error, error}, :close}
+
+            {:error, _id, reason} ->
+              error = PoolErrorHandler.wrap_pool_error(
+                {:python_error, reason},
+                enhanced_context
+              )
+              {{:error, error}, :ok}
+
+            {:error, reason} ->
+              error = handle_decode_error(reason, enhanced_context)
+              {{:error, error}, :close}
+
+            _ ->
+              error = PoolErrorHandler.wrap_pool_error(
+                {:malformed_response, "Unexpected response format"},
+                enhanced_context
+              )
+              {{:error, error}, :close}
+          end
+
+        {^port, {:exit_status, status}} ->
+          error = handle_port_exit(status, enhanced_context)
+          {{:error, error}, :close}
+
+      after
+        timeout ->
+          error = handle_command_timeout(worker, command, timeout, enhanced_context)
+          {{:error, error}, :close}
+      end
+
+    catch
+      :exit, {:timeout, _} ->
+        error = handle_command_timeout(worker, command, timeout, enhanced_context)
+        {{:error, error}, :close}
+        
+      kind, error ->
+        wrapped = handle_command_error(kind, error, enhanced_context)
+        {{:error, wrapped}, :close}
+    end
+  end
+
+  @spec handle_pool_error(term(), map()) :: {:error, term()}
+  defp handle_pool_error(error, context) do
+    wrapped = PoolErrorHandler.wrap_pool_error(error, context)
+    
+    # Attempt recovery through orchestrator for critical errors
+    case wrapped.severity do
+      :critical ->
+        case ErrorRecoveryOrchestrator.handle_error(wrapped, context) do
+          {:ok, {:recovered, result}} ->
+            Logger.info("Pool error recovered: #{wrapped.error_category}")
+            {:ok, result}
+            
+          {:ok, {:failover, result}} ->
+            Logger.warning("Pool operation succeeded through failover")
+            {:ok, result}
+            
+          {:error, _recovery_error} ->
+            Logger.error("Pool error recovery failed: #{PoolErrorHandler.format_for_logging(wrapped)}")
+            {:error, wrapped}
+        end
+        
+      _ ->
+        Logger.warning("Pool error: #{PoolErrorHandler.format_for_logging(wrapped)}")
+        {:error, wrapped}
+    end
+  end
+
+  @spec handle_response_mismatch(integer(), integer(), map()) :: map()
+  defp handle_response_mismatch(expected_id, actual_id, context) do
+    PoolErrorHandler.wrap_pool_error(
+      {:response_mismatch, "Expected ID #{expected_id}, got #{actual_id}"},
+      Map.merge(context, %{expected_id: expected_id, actual_id: actual_id})
+    )
+  end
+
+  @spec handle_decode_error(term(), map()) :: map()
+  defp handle_decode_error(reason, context) do
+    PoolErrorHandler.wrap_pool_error(
+      {:decode_error, reason},
+      Map.merge(context, %{decode_reason: reason})
+    )
+  end
+
+  @spec handle_port_exit(integer(), map()) :: map()
+  defp handle_port_exit(status, context) do
+    # Record circuit breaker failure for port exits if available
+    if circuit_breaker_available?() do
+      CircuitBreaker.record_failure(:worker_ports, {:port_exit, status})
+    end
+    
+    PoolErrorHandler.wrap_pool_error(
+      {:port_exited, status},
+      Map.merge(context, %{exit_status: status})
+    )
+  end
+
+  @spec handle_command_timeout(map(), atom(), pos_integer(), map()) :: map()
+  defp handle_command_timeout(worker, command, timeout, context) do
+    Logger.error("Command timeout for worker #{worker.worker_id}: #{command} (#{timeout}ms)")
+    
+    # Record circuit breaker failure for timeouts if available
+    if circuit_breaker_available?() do
+      CircuitBreaker.record_failure(:worker_commands, :timeout)
+    end
+    
+    PoolErrorHandler.wrap_pool_error(
+      {:timeout, :command_timeout},
+      Map.merge(context, %{
+        worker_health: get_worker_health(worker),
+        command_duration: timeout,
+        timeout_ms: timeout
+      })
+    )
+  end
+
+  @spec handle_command_error(atom(), term(), map()) :: map()
+  defp handle_command_error(kind, error, context) do
+    Logger.error("Command error: #{kind} - #{inspect(error)}")
+    
+    PoolErrorHandler.wrap_pool_error(
+      {:command_error, {kind, error}},
+      Map.merge(context, %{error_kind: kind})
+    )
+  end
+
+  @spec get_worker_state(map()) :: atom()
+  defp get_worker_state(worker) do
+    case Map.get(worker, :state_machine) do
+      %{state: state} -> state
+      _ -> :unknown
+    end
+  end
+
+  @spec get_worker_health(map()) :: atom()
+  defp get_worker_health(worker) do
+    case Map.get(worker, :state_machine) do
+      %{health: health} -> health
+      _ -> :unknown
+    end
+  end
+
+  @spec bind_session_if_enhanced(String.t(), map()) :: :ok
+  defp bind_session_if_enhanced(session_id, worker) do
+    if Map.has_key?(worker, :state_machine) do
+      try do
+        SessionAffinity.bind_session(session_id, worker.worker_id)
+      rescue
+        _ -> 
+          # SessionAffinity might not be running, that's ok for basic workers
+          :ok
+      end
+    end
+    :ok
+  end
+
+  @spec circuit_breaker_available?() :: boolean()
+  defp circuit_breaker_available? do
+    case Process.whereis(CircuitBreaker) do
+      nil -> false
+      _pid -> true
     end
   end
 
@@ -487,7 +657,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   end
 
   defp normalize_opts(opts) when is_map(opts) do
-    Enum.map(opts, fn {k, v} -> {k, v} end)
+    Enum.to_list(opts)
   end
 
   defp normalize_opts(opts) when is_list(opts), do: opts

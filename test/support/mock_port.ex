@@ -63,7 +63,14 @@ defmodule DSPex.Test.MockPort do
   end
 
   def close(port) when is_pid(port) do
-    GenServer.stop(port)
+    if Process.alive?(port) do
+      ref = Process.monitor(port)
+      GenServer.stop(port, :normal, 1000)
+      receive do
+        {:DOWN, ^ref, :process, ^port, _} -> :ok
+      after 100 -> :ok
+      end
+    end
   end
 
   # GenServer callbacks

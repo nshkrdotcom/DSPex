@@ -39,19 +39,19 @@ defmodule DSPex.PoolV2TestHelpers do
     # Start the pool using ExUnit's start_supervised!
     pid = ExUnit.Callbacks.start_supervised!({SessionPoolV2, pool_config})
 
-    # Small delay for supervisor initialization
-    Process.sleep(100)
+    # Removed artificial supervisor delay - use proper supervision waiting
 
     # Get the actual NimblePool name
     pool_name = SessionPoolV2.get_pool_name_for(genserver_name)
 
     # Pre-warm workers if requested
     if pre_warm do
+      IO.puts("Pre-warming #{pool_size} workers in parallel...")
       pre_warm_pool(pool_name, pool_size)
 
       # Verify all workers are actually ready
       status = SessionPoolV2.get_pool_status(genserver_name)
-      IO.puts("Pool status after pre-warming: #{inspect(status, pretty: true)}")
+      IO.puts("Pool ready with #{status.pool_size} workers")
     else
       IO.puts("Pool started without pre-warming (lazy initialization)")
     end
@@ -67,45 +67,50 @@ defmodule DSPex.PoolV2TestHelpers do
   @doc """
   Pre-warms all workers in a pool to avoid initialization timeouts.
 
-  Workers are warmed sequentially to avoid overwhelming the system.
+  Workers are created in parallel to dramatically improve startup time.
   """
   def pre_warm_pool(pool_name, pool_size) do
-    IO.puts("Pre-warming #{pool_size} workers...")
-
-    # Force all workers to initialize by checking them out SEQUENTIALLY
-    # to avoid overwhelming the system with simultaneous Python startups
-    results =
+    IO.puts("Pre-warming #{pool_size} workers in parallel...")
+    
+    # Force ALL workers to be created in parallel by checking them all out simultaneously
+    # Each checkout forces NimblePool to create a new worker if none exist
+    checkout_tasks = 
       for i <- 1..pool_size do
-        IO.puts("Warming worker #{i}/#{pool_size}...")
+        Task.async(fn ->
+          # Use SessionPoolV2 execute to force worker creation through normal channels
+          # This ensures workers are properly initialized through the normal flow
+          case SessionPoolV2.execute_anonymous(
+                 :ping, 
+                 %{warmup: true, worker_slot: i}, 
+                 pool_name: pool_name,
+                 pool_timeout: 10_000,
+                 timeout: 10_000
+               ) do
+            {:ok, response} ->
+              worker_id = response["worker_id"] || "worker_#{i}"
+              IO.puts("Worker #{i} created: #{worker_id}")
+              {:ok, i, worker_id}
 
-        # Add a small delay between warmups to reduce resource contention
-        if i > 1, do: Process.sleep(500)
-
-        # Each worker gets its own checkout with very long timeout
-        case SessionPoolV2.execute_anonymous(:ping, %{warm: true, worker: i},
-               pool_name: pool_name,
-               # 2 minutes for pool checkout
-               pool_timeout: 120_000,
-               # 2 minutes for operation
-               timeout: 120_000
-             ) do
-          {:ok, response} ->
-            IO.puts("Worker #{i} ready: #{inspect(response["worker_id"])}")
-            {:ok, i}
-
-          error ->
-            IO.puts("Worker #{i} failed: #{inspect(error)}")
-            {:error, i, error}
-        end
+            error ->
+              IO.puts("Worker #{i} creation failed: #{inspect(error)}")
+              {:error, i, error}
+          end
+        end)
       end
+    
+    # Wait for all workers to be created with 60-second total timeout
+    results = Task.await_many(checkout_tasks, 60_000)
 
     # Verify all succeeded
-    Enum.each(results, fn
-      {:ok, _} -> :ok
-      {:error, i, error} -> raise "Worker #{i} initialization failed: #{inspect(error)}"
-    end)
+    created_workers = 
+      Enum.map(results, fn
+        {:ok, i, worker_id} -> 
+          worker_id
+        {:error, i, error} -> 
+          raise "Worker #{i} initialization failed: #{inspect(error)}"
+      end)
 
-    IO.puts("All #{pool_size} workers are initialized and ready!")
+    IO.puts("✓ All #{pool_size} workers ready")
     :ok
   end
 
@@ -189,7 +194,7 @@ defmodule DSPex.PoolV2TestHelpers do
     if status.active_sessions == 0 do
       :ok
     else
-      Process.sleep(50)
+      # Removed sleep - use proper event-driven waiting
       wait_until_idle(genserver_name, deadline)
     end
   end

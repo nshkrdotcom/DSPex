@@ -82,7 +82,14 @@ defmodule DSPex.PythonBridge.BridgeTest do
         assert Map.has_key?(status.stats, :errors)
 
         # Clean up
-        GenServer.stop(pid)
+        if Process.alive?(pid) do
+          ref = Process.monitor(pid)
+          GenServer.stop(pid, :normal, 2000)
+          receive do
+            {:DOWN, ^ref, :process, ^pid, _} -> :ok
+          after 200 -> :ok
+          end
+        end
       else
         # Skip test if bridge couldn't start
         :ok
@@ -121,7 +128,14 @@ defmodule DSPex.PythonBridge.BridgeTest do
         end
 
         # Clean up
-        GenServer.stop(pid)
+        if Process.alive?(pid) do
+          ref = Process.monitor(pid)
+          GenServer.stop(pid, :normal, 2000)
+          receive do
+            {:DOWN, ^ref, :process, ^pid, _} -> :ok
+          after 200 -> :ok
+          end
+        end
       else
         # Skip test if bridge couldn't start
         :ok

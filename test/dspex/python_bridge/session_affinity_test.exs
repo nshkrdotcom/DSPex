@@ -11,7 +11,12 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
     
     on_exit(fn ->
       if Process.alive?(pid) do
-        GenServer.stop(pid)
+        ref = Process.monitor(pid)
+        GenServer.stop(pid, :normal, 1000)
+        receive do
+          {:DOWN, ^ref, :process, ^pid, _} -> :ok
+        after 100 -> :ok
+        end
       end
     end)
     
