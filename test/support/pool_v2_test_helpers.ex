@@ -57,7 +57,8 @@ defmodule DSPex.PoolV2TestHelpers do
     end
 
     %{
-      pool_pid: pid,  # Changed to match test expectations
+      # Changed to match test expectations
+      pool_pid: pid,
       genserver_name: genserver_name,
       pool_name: pool_name,
       pool_size: pool_size
@@ -71,17 +72,17 @@ defmodule DSPex.PoolV2TestHelpers do
   """
   def pre_warm_pool(pool_name, pool_size) do
     IO.puts("Pre-warming #{pool_size} workers in parallel...")
-    
+
     # Force ALL workers to be created in parallel by checking them all out simultaneously
     # Each checkout forces NimblePool to create a new worker if none exist
-    checkout_tasks = 
+    checkout_tasks =
       for i <- 1..pool_size do
         Task.async(fn ->
           # Use SessionPoolV2 execute to force worker creation through normal channels
           # This ensures workers are properly initialized through the normal flow
           case SessionPoolV2.execute_anonymous(
-                 :ping, 
-                 %{warmup: true, worker_slot: i}, 
+                 :ping,
+                 %{warmup: true, worker_slot: i},
                  pool_name: pool_name,
                  pool_timeout: 10_000,
                  timeout: 10_000
@@ -97,16 +98,17 @@ defmodule DSPex.PoolV2TestHelpers do
           end
         end)
       end
-    
+
     # Wait for all workers to be created with 60-second total timeout
     results = Task.await_many(checkout_tasks, 60_000)
 
     # Verify all succeeded
-    _created_workers = 
+    _created_workers =
       Enum.map(results, fn
-        {:ok, _i, worker_id} -> 
+        {:ok, _i, worker_id} ->
           worker_id
-        {:error, i, error} -> 
+
+        {:error, i, error} ->
           raise "Worker #{i} initialization failed: #{inspect(error)}"
       end)
 

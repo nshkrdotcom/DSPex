@@ -190,20 +190,26 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
         {:ok, updated_state, updated_state, pool_state}
 
       {:error, :not_a_pid} ->
-        Logger.error("[#{worker_state.worker_id}] Invalid PID type during checkout: #{inspect(pid)}")
+        Logger.error(
+          "[#{worker_state.worker_id}] Invalid PID type during checkout: #{inspect(pid)}"
+        )
+
         {:remove, {:checkout_failed, :invalid_pid}, pool_state}
 
       {:error, :process_not_alive} ->
-        Logger.error("[#{worker_state.worker_id}] Target process not alive during checkout: #{inspect(pid)}")
+        Logger.error(
+          "[#{worker_state.worker_id}] Target process not alive during checkout: #{inspect(pid)}"
+        )
+
         {:remove, {:checkout_failed, :process_not_alive}, pool_state}
 
-      {:error, :port_closed} ->
+      {:error, :port_closed_during_connect} ->
         Logger.error("[#{worker_state.worker_id}] Port closed during checkout")
-        {:remove, {:checkout_failed, :port_closed}, pool_state}
+        {:remove, {:checkout_failed, :port_closed_during_connect}, pool_state}
 
-      {:error, :port_not_owned} ->
-        Logger.error("[#{worker_state.worker_id}] Port not owned by worker during checkout")
-        {:remove, {:checkout_failed, :port_not_owned}, pool_state}
+      {:error, {:connect_failed, reason}} ->
+        Logger.error("[#{worker_state.worker_id}] Port connection failed: #{inspect(reason)}")
+        {:remove, {:checkout_failed, {:connect_failed, reason}}, pool_state}
 
       {:error, reason} ->
         Logger.error("[#{worker_state.worker_id}] Port connection failed: #{inspect(reason)}")
@@ -225,23 +231,35 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
         {:ok, updated_state, updated_state, pool_state}
 
       {:error, :not_a_pid} ->
-        Logger.error("[#{worker_state.worker_id}] Invalid PID type during anonymous checkout: #{inspect(pid)}")
+        Logger.error(
+          "[#{worker_state.worker_id}] Invalid PID type during anonymous checkout: #{inspect(pid)}"
+        )
+
         {:remove, {:checkout_failed, :invalid_pid}, pool_state}
 
       {:error, :process_not_alive} ->
-        Logger.error("[#{worker_state.worker_id}] Target process not alive during anonymous checkout: #{inspect(pid)}")
+        Logger.error(
+          "[#{worker_state.worker_id}] Target process not alive during anonymous checkout: #{inspect(pid)}"
+        )
+
         {:remove, {:checkout_failed, :process_not_alive}, pool_state}
 
-      {:error, :port_closed} ->
+      {:error, :port_closed_during_connect} ->
         Logger.error("[#{worker_state.worker_id}] Port closed during anonymous checkout")
-        {:remove, {:checkout_failed, :port_closed}, pool_state}
+        {:remove, {:checkout_failed, :port_closed_during_connect}, pool_state}
 
-      {:error, :port_not_owned} ->
-        Logger.error("[#{worker_state.worker_id}] Port not owned by worker during anonymous checkout")
-        {:remove, {:checkout_failed, :port_not_owned}, pool_state}
+      {:error, {:connect_failed, reason}} ->
+        Logger.error(
+          "[#{worker_state.worker_id}] Port connection failed during anonymous checkout: #{inspect(reason)}"
+        )
+
+        {:remove, {:checkout_failed, {:connect_failed, reason}}, pool_state}
 
       {:error, reason} ->
-        Logger.error("[#{worker_state.worker_id}] Port connection failed during anonymous checkout: #{inspect(reason)}")
+        Logger.error(
+          "[#{worker_state.worker_id}] Port connection failed during anonymous checkout: #{inspect(reason)}"
+        )
+
         {:remove, {:checkout_failed, reason}, pool_state}
     end
   end
@@ -266,10 +284,6 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
       # Use Port.command/2 for packet mode ports, not send/2
       result = Port.command(worker_state.port, request)
       Logger.info("Port.command result: #{inspect(result)}")
-
-      unless result do
-        raise "Port.command/2 failed, port may be closed"
-      end
 
       # Wait for response with proper message filtering
       wait_for_init_response(worker_state, request_id)

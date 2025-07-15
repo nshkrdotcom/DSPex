@@ -25,11 +25,12 @@ defmodule PortCommunicationTest do
     Logger.info("Port opened: #{inspect(port)}")
 
     # Create a ping request using Protocol to add packet header
-    request = DSPex.PythonBridge.Protocol.encode_request(
-      0,
-      :ping,
-      %{initialization: true, worker_id: "test123"}
-    )
+    request =
+      DSPex.PythonBridge.Protocol.encode_request(
+        0,
+        :ping,
+        %{initialization: true, worker_id: "test123"}
+      )
 
     Logger.info("Request with packet header: #{inspect(request)}")
     Logger.info("Request byte size: #{byte_size(request)}")
@@ -48,7 +49,10 @@ defmodule PortCommunicationTest do
         # Try to decode using Protocol
         case DSPex.PythonBridge.Protocol.decode_response(data) do
           {:ok, request_id, response} ->
-            Logger.info("Decoded response for request #{request_id}: #{inspect(response, pretty: true)}")
+            Logger.info(
+              "Decoded response for request #{request_id}: #{inspect(response, pretty: true)}"
+            )
+
             assert request_id == 0
             assert response["status"] == "ok"
 

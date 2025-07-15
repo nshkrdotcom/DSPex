@@ -29,7 +29,7 @@ defmodule PoolWorkerV2ReturnValuesTest do
         ]
 
         {:ok, pool_pid} = NimblePool.start_link(pool_config)
-        
+
         on_exit(fn ->
           if Process.alive?(pool_pid) do
             ref = Process.monitor(pool_pid)
@@ -37,14 +37,16 @@ defmodule PoolWorkerV2ReturnValuesTest do
             try do
               NimblePool.stop(:test_return_values_pool, :shutdown, 2000)
             catch
-              :exit, _ -> 
+              :exit, _ ->
                 # If NimblePool.stop fails, force stop the process
                 Process.exit(pool_pid, :kill)
             end
-            
+
+            # Short timeout for cleanup
             receive do
               {:DOWN, ^ref, :process, ^pool_pid, _} -> :ok
-            after 100 -> :ok  # Short timeout for cleanup
+            after
+              100 -> :ok
             end
           end
         end)
@@ -57,34 +59,35 @@ defmodule PoolWorkerV2ReturnValuesTest do
     test "successful checkout returns proper tuple", %{pool_pid: pool_pid} do
       # Test successful checkout
       test_pid = self()
-      
+
       # Use NimblePool checkout! to test the return values
-      assert {:ok, result} = 
-        NimblePool.checkout!(
-          :test_return_values_pool,
-          :anonymous,
-          fn _from, worker_state ->
-            # This simulates what handle_checkout should return
-            assert %PoolWorkerV2{} = worker_state
-            assert is_port(worker_state.port)
-            
-            # Return result and checkin status
-            {{:ok, worker_state}, :ok}
-          end,
-          5000
-        )
-      
+      assert {:ok, result} =
+               NimblePool.checkout!(
+                 :test_return_values_pool,
+                 :anonymous,
+                 fn _from, worker_state ->
+                   # This simulates what handle_checkout should return
+                   assert %PoolWorkerV2{} = worker_state
+                   assert is_port(worker_state.port)
+
+                   # Return result and checkin status
+                   {{:ok, worker_state}, :ok}
+                 end,
+                 5000
+               )
+
       assert %PoolWorkerV2{} = result
     end
 
     test "connection failure returns remove tuple", %{pool_pid: pool_pid} do
       # We'll test this by creating a scenario where the checkout fails
       # This is harder to test directly, but we can verify the structure
-      
+
       # Create a mock checkout that simulates failure
       dead_pid = spawn(fn -> :ok end)
-      Process.sleep(10)  # Ensure process is dead
-      
+      # Ensure process is dead
+      Process.sleep(10)
+
       # The actual handle_checkout would return {:remove, reason, pool_state}
       # We can't easily trigger this in a unit test, but we've verified
       # the code structure returns the correct format
@@ -94,7 +97,7 @@ defmodule PoolWorkerV2ReturnValuesTest do
     test "invalid checkout type returns remove tuple", %{pool_pid: pool_pid} do
       # Test with invalid checkout type
       # This would trigger the catch-all case in handle_checkout
-      
+
       # We can't directly call handle_checkout, but we've verified
       # the code returns {:remove, {:invalid_checkout_type, type}, pool_state}
       assert true

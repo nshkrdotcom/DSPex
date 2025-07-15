@@ -155,7 +155,7 @@ defmodule PoolV2ConcurrentTest do
       # The response is a map with "programs" key
       assert is_map(response)
       assert Map.has_key?(response, "programs") or Map.has_key?(response, :programs)
-      
+
       programs = Map.get(response, "programs") || Map.get(response, :programs)
       assert is_list(programs)
       assert length(programs) > 0

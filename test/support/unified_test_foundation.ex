@@ -264,14 +264,16 @@ defmodule DSPex.UnifiedTestFoundation do
               worker_module: DSPex.PythonBridge.PoolWorkerV2Enhanced
             ]
 
-            pool_result = ExUnit.Callbacks.start_supervised({DSPex.PythonBridge.SessionPoolV2, pool_config})
-            
-            pool_pid = case pool_result do
-              {:ok, pid} -> pid
-              pid when is_pid(pid) -> pid
-              error -> error
-            end
-            
+            pool_result =
+              ExUnit.Callbacks.start_supervised({DSPex.PythonBridge.SessionPoolV2, pool_config})
+
+            pool_pid =
+              case pool_result do
+                {:ok, pid} -> pid
+                pid when is_pid(pid) -> pid
+                error -> error
+              end
+
             case pool_pid do
               pid when is_pid(pid) ->
                 # Get actual pool name for operations

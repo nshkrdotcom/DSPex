@@ -66,9 +66,11 @@ defmodule DSPex.Test.MockPort do
     if Process.alive?(port) do
       ref = Process.monitor(port)
       GenServer.stop(port, :normal, 1000)
+
       receive do
         {:DOWN, ^ref, :process, ^port, _} -> :ok
-      after 100 -> :ok
+      after
+        100 -> :ok
       end
     end
   end

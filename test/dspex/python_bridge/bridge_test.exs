@@ -85,9 +85,11 @@ defmodule DSPex.PythonBridge.BridgeTest do
         if Process.alive?(pid) do
           ref = Process.monitor(pid)
           GenServer.stop(pid, :normal, 2000)
+
           receive do
             {:DOWN, ^ref, :process, ^pid, _} -> :ok
-          after 200 -> :ok
+          after
+            200 -> :ok
           end
         end
       else
@@ -131,9 +133,11 @@ defmodule DSPex.PythonBridge.BridgeTest do
         if Process.alive?(pid) do
           ref = Process.monitor(pid)
           GenServer.stop(pid, :normal, 2000)
+
           receive do
             {:DOWN, ^ref, :process, ^pid, _} -> :ok
-          after 200 -> :ok
+          after
+            200 -> :ok
           end
         end
       else

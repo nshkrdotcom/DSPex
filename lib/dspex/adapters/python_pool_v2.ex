@@ -14,6 +14,7 @@ defmodule DSPex.Adapters.PythonPoolV2 do
   @behaviour DSPex.Adapters.Adapter
 
   alias DSPex.PythonBridge.SessionPoolV2
+  alias DSPex.PythonBridge.PoolErrorHandler
 
   require Logger
 
@@ -403,24 +404,28 @@ defmodule DSPex.Adapters.PythonPoolV2 do
     "pool_#{:erlang.unique_integer([:positive])}_#{System.system_time(:microsecond)}"
   end
 
-  defp handle_pool_error({:pool_timeout, reason}) do
-    {:error, "Pool timeout: #{inspect(reason)}"}
+  defp handle_pool_error(%PoolErrorHandler{error_category: :timeout_error} = error) do
+    {:error, PoolErrorHandler.format_for_logging(error)}
   end
 
-  defp handle_pool_error({:checkout_failed, reason}) do
-    {:error, "Checkout failed: #{inspect(reason)}"}
+  defp handle_pool_error(%PoolErrorHandler{error_category: :resource_error} = error) do
+    {:error, PoolErrorHandler.format_for_logging(error)}
   end
 
-  defp handle_pool_error({:decode_error, reason}) do
-    {:error, "Response decode error: #{inspect(reason)}"}
+  defp handle_pool_error(%PoolErrorHandler{error_category: :communication_error} = error) do
+    {:error, PoolErrorHandler.format_for_logging(error)}
   end
 
-  defp handle_pool_error(:response_mismatch) do
-    {:error, "Response ID mismatch - possible concurrent operation conflict"}
+  defp handle_pool_error(%PoolErrorHandler{type: :response_mismatch} = error) do
+    {:error, PoolErrorHandler.format_for_logging(error)}
   end
 
-  defp handle_pool_error(:malformed_response) do
-    {:error, "Malformed response from Python worker"}
+  defp handle_pool_error(%PoolErrorHandler{type: :malformed_response} = error) do
+    {:error, PoolErrorHandler.format_for_logging(error)}
+  end
+
+  defp handle_pool_error(%PoolErrorHandler{} = error) do
+    {:error, PoolErrorHandler.format_for_logging(error)}
   end
 
   defp handle_pool_error(reason) do
