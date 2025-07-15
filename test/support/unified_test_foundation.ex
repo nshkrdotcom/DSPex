@@ -9,6 +9,7 @@ defmodule DSPex.UnifiedTestFoundation do
   - :full_isolation - Complete service isolation
   - :contamination_detection - Full isolation + contamination monitoring
   - :supervision_testing - Isolated supervision trees for crash recovery tests
+  - :pool_testing - Isolated pools with supervision tree and performance monitoring
 
   Each mode provides appropriate setup and teardown for test independence.
   """
@@ -51,6 +52,7 @@ defmodule DSPex.UnifiedTestFoundation do
   def isolation_allows_async?(:supervision_testing), do: false
   def isolation_allows_async?(:contamination_detection), do: false
   def isolation_allows_async?(:full_isolation), do: false
+  def isolation_allows_async?(:pool_testing), do: false
   def isolation_allows_async?(_), do: true
 
   @doc """
@@ -62,6 +64,7 @@ defmodule DSPex.UnifiedTestFoundation do
   def isolation_timeout(:supervision_testing), do: 30_000
   def isolation_timeout(:contamination_detection), do: 60_000
   def isolation_timeout(:full_isolation), do: 20_000
+  def isolation_timeout(:pool_testing), do: 60_000
   def isolation_timeout(_), do: 10_000
 
   @doc """
@@ -78,6 +81,7 @@ defmodule DSPex.UnifiedTestFoundation do
       :full_isolation -> setup_full_isolation(context)
       :contamination_detection -> setup_contamination_detection(context)
       :supervision_testing -> setup_supervision_testing(context)
+      :pool_testing -> setup_pool_testing(context)
       _ -> {:error, {:unknown_isolation_type, isolation_type}}
     end
   end
@@ -233,6 +237,90 @@ defmodule DSPex.UnifiedTestFoundation do
     end
   end
 
+  defp setup_pool_testing(context) do
+    unique_id = :erlang.unique_integer([:positive])
+
+    # Create unique names for all pool components
+    pool_name = :"test_pool_#{unique_id}"
+    supervisor_name = :"test_supervisor_#{unique_id}"
+    bridge_name = :"test_bridge_#{unique_id}"
+    monitor_name = :"test_monitor_#{unique_id}"
+    registry_name = :"test_registry_#{unique_id}"
+
+    # Start isolated registry for pool components
+    {:ok, registry_pid} = Registry.start_link(keys: :unique, name: registry_name)
+
+    # Start isolated supervision tree
+    case start_isolated_supervisor(supervisor_name, bridge_name, monitor_name) do
+      {:ok, supervisor_pid} ->
+        # Wait for supervision tree to be ready
+        case wait_for_supervision_tree_ready(supervisor_pid, 30_000) do
+          result when result in [{:ok, :ready}, :ok] ->
+            # Start isolated pool using the SessionPoolV2
+            pool_config = [
+              pool_size: 4,
+              overflow: 2,
+              name: pool_name,
+              worker_module: DSPex.PythonBridge.PoolWorkerV2Enhanced
+            ]
+
+            pool_result = ExUnit.Callbacks.start_supervised({DSPex.PythonBridge.SessionPoolV2, pool_config})
+            
+            pool_pid = case pool_result do
+              {:ok, pid} -> pid
+              pid when is_pid(pid) -> pid
+              error -> error
+            end
+            
+            case pool_pid do
+              pid when is_pid(pid) ->
+                # Get actual pool name for operations
+                actual_pool_name = DSPex.PythonBridge.SessionPoolV2.get_pool_name_for(pool_name)
+
+                # Setup cleanup
+                on_exit(fn ->
+                  cleanup_pool_testing(pid, supervisor_pid, registry_pid)
+                end)
+
+                test_context =
+                  Map.merge(context, %{
+                    test_id: unique_id,
+                    pool_pid: pid,
+                    pool_name: pool_name,
+                    actual_pool_name: actual_pool_name,
+                    supervision_tree: supervisor_pid,
+                    supervisor_name: supervisor_name,
+                    bridge_name: bridge_name,
+                    monitor_name: monitor_name,
+                    registry: registry_name,
+                    registry_pid: registry_pid,
+                    isolation_type: :pool_testing,
+                    pool_config: pool_config
+                  })
+
+                {:ok, test_context}
+
+              error ->
+                graceful_supervisor_shutdown(supervisor_pid, 10_000)
+                cleanup_full_isolation(registry_pid)
+                Logger.error("Failed to start isolated pool: #{inspect(error)}")
+                {:error, error}
+            end
+
+          {:error, reason} ->
+            graceful_supervisor_shutdown(supervisor_pid, 10_000)
+            cleanup_full_isolation(registry_pid)
+            Logger.error("Supervision tree not ready: #{inspect(reason)}")
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        cleanup_full_isolation(registry_pid)
+        Logger.error("Failed to start isolated supervisor: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
   ## Helper Functions
 
   defp start_isolated_supervisor(supervisor_name, bridge_name, monitor_name) do
@@ -264,6 +352,21 @@ defmodule DSPex.UnifiedTestFoundation do
       # Stop the registry
       GenServer.stop(registry_pid, :normal, 1000)
     end
+  end
+
+  defp cleanup_pool_testing(pool_pid, supervisor_pid, registry_pid) do
+    # Stop pool first
+    if Process.alive?(pool_pid) do
+      try do
+        GenServer.stop(pool_pid, :normal, 5000)
+      catch
+        :exit, _ -> :ok
+      end
+    end
+
+    # Then cleanup supervision tree and registry
+    graceful_supervisor_shutdown(supervisor_pid, 10_000)
+    cleanup_full_isolation(registry_pid)
   end
 
   defp contamination_monitor_loop(contaminations) do

@@ -56,12 +56,46 @@
 **Files Created:** `pool_error_handler.ex`, `circuit_breaker.ex`, `retry_logic.ex`, `error_recovery_orchestrator.ex`, `error_reporter.ex`
 **Test Status:** 33 tests for PoolErrorHandler, integration tests passing
 
+## Phase 4: Test Infrastructure Enhancement (COMPLETED) ✅
+
+**Components Implemented:**
+1. **Enhanced UnifiedTestFoundation** - Added :pool_testing isolation mode with comprehensive pool setup
+2. **EnhancedPoolTestHelpers** - Extended existing helpers with performance monitoring and session affinity testing
+3. **PoolPerformanceFramework** - Complete performance testing framework with benchmarks and regression detection
+4. **Enhanced SupervisionTestHelpers** - Pool-specific wait functions and deterministic coordination
+5. **PoolChaosHelpers** - Comprehensive chaos engineering for pool resilience testing
+
+**Key Features:**
+- :pool_testing isolation mode with isolated pools, supervision trees, and registries
+- Performance benchmarking with latency, throughput, and success rate thresholds
+- Automated performance regression detection against historical baselines
+- Pool chaos engineering with worker failures, resource exhaustion, and recovery verification
+- Multi-layer testing across mock, bridge mock, and full integration layers
+- Session affinity testing and verification
+- Event-driven wait functions for deterministic pool testing
+
+**Files Created:** 
+- `test/support/enhanced_pool_test_helpers.ex`
+- `test/support/pool_performance_framework.ex` 
+- `test/support/pool_chaos_helpers.ex`
+- `test/dspex/python_bridge/pool_performance_test.exs`
+- `test/dspex/python_bridge/pool_multi_layer_test.exs`
+- `test/dspex/python_bridge/pool_chaos_test.exs`
+
+**Enhanced Files:** 
+- `test/support/unified_test_foundation.ex` (added :pool_testing mode)
+- `test/support/supervision_test_helpers.ex` (added pool-specific wait functions)
+
+**Test Coverage:** Performance benchmarks, chaos engineering, multi-layer integration, session affinity verification
+**Framework Features:** Automated performance regression detection, comprehensive chaos scenarios, load testing coordination
+
 ## Current Implementation Status
 
 ### ✅ Completed Features
 - **Phase 1:** All immediate NimblePool and port handling fixes
 - **Phase 2:** Complete worker lifecycle management with health monitoring
 - **Phase 3:** Comprehensive error handling and recovery system
+- **Phase 4:** Enhanced test infrastructure with performance testing and chaos engineering
 
 ### 🔧 Enhanced Pool Capabilities
 - **Basic Workers:** `PoolWorkerV2` with essential functionality
@@ -74,7 +108,8 @@
 - **Phase 1:** Port communication, worker initialization, concurrent operations
 - **Phase 2:** State machine transitions, session affinity, worker lifecycle
 - **Phase 3:** Error classification, circuit breaker operations, retry strategies
-- **Integration:** End-to-end pool operations with error handling
+- **Phase 4:** Performance benchmarks, chaos engineering, multi-layer integration, session affinity verification
+- **Integration:** End-to-end pool operations with error handling and performance monitoring
 
 ### ⚙️ Configuration Examples
 
@@ -130,6 +165,22 @@ TEST_MODE=full_integration mix test test/pool_*
 mix test test/dspex/python_bridge/pool_error_handler_test.exs
 mix test test/dspex/python_bridge/worker_state_machine_test.exs
 
+# Phase 4: Enhanced test infrastructure
+TEST_MODE=full_integration mix test test/dspex/python_bridge/pool_performance_test.exs
+TEST_MODE=full_integration mix test test/dspex/python_bridge/pool_multi_layer_test.exs
+TEST_MODE=full_integration mix test test/dspex/python_bridge/pool_chaos_test.exs
+
+# Run performance benchmarks only
+mix test --only pool_performance
+
+# Run chaos tests only  
+mix test --only pool_chaos
+
+# Run multi-layer tests by layer
+mix test --only layer_1
+mix test --only layer_2
+mix test --only layer_3
+
 # Compile and validate
 mix compile
 mix test --only layer_3
@@ -147,6 +198,11 @@ mix test --only layer_3
 - `:layer_1` - Mock adapter tests (fast)
 - `:layer_2` - Bridge mock tests (medium)
 - `:layer_3` - Full integration tests (slow)
+
+**Phase 4 Test Tags:**
+- `:pool_testing` - Enhanced pool testing isolation mode
+- `:pool_performance` - Performance benchmarks and regression tests
+- `:pool_chaos` - Chaos engineering and resilience tests
 
 No specific lint or typecheck commands found. All implementation follows Elixir best practices with comprehensive documentation and type specifications.
 

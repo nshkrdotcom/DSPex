@@ -87,25 +87,9 @@ defmodule DSPex.PythonBridge.SessionAffinity do
   - `{:error, :session_expired}` if session exists but has expired
   - `{:error, :no_affinity}` if no binding exists
   """
-  @spec get_worker(String.t()) :: {:ok, String.t()} | {:error, :session_expired | :no_affinity}
-  def get_worker(session_id) do
-    ensure_table_exists()
-    
-    case :ets.lookup(@table_name, session_id) do
-      [{^session_id, worker_id, timestamp}] ->
-        if not_expired?(timestamp) do
-          Logger.debug("Session #{session_id} found bound to worker #{worker_id}")
-          {:ok, worker_id}
-        else
-          Logger.debug("Session #{session_id} expired, removing binding")
-          :ets.delete(@table_name, session_id)
-          {:error, :session_expired}
-        end
-        
-      [] ->
-        Logger.debug("No affinity found for session #{session_id}")
-        {:error, :no_affinity}
-    end
+  @spec get_worker(String.t(), atom()) :: {:ok, String.t()} | {:error, :session_expired | :no_affinity}
+  def get_worker(session_id, process_name \\ __MODULE__) do
+    GenServer.call(process_name, {:get_worker, session_id})
   end
   
   @doc """
@@ -244,6 +228,28 @@ defmodule DSPex.PythonBridge.SessionAffinity do
     
     {:reply, stats, state}
   end
+
+  def handle_call({:get_worker, session_id}, _from, state) do
+    ensure_table_exists()
+    
+    result = case :ets.lookup(@table_name, session_id) do
+      [{^session_id, worker_id, timestamp}] ->
+        if not_expired_with_timeout?(timestamp, state.session_timeout) do
+          Logger.debug("Session #{session_id} found bound to worker #{worker_id}")
+          {:ok, worker_id}
+        else
+          Logger.debug("Session #{session_id} expired, removing binding")
+          :ets.delete(@table_name, session_id)
+          {:error, :session_expired}
+        end
+        
+      [] ->
+        Logger.debug("No affinity found for session #{session_id}")
+        {:error, :no_affinity}
+    end
+    
+    {:reply, result, state}
+  end
   
   ## Private Functions
   
@@ -267,6 +273,11 @@ defmodule DSPex.PythonBridge.SessionAffinity do
   defp not_expired?(timestamp, now \\ nil) do
     now = now || System.monotonic_time(:millisecond)
     now - timestamp < @session_timeout
+  end
+
+  defp not_expired_with_timeout?(timestamp, session_timeout, now \\ nil) do
+    now = now || System.monotonic_time(:millisecond)
+    now - timestamp < session_timeout
   end
   
   defp cleanup_expired_sessions(session_timeout) do

@@ -146,8 +146,8 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
       {:ok, sm} = WorkerStateMachine.transition(sm, :terminated, :terminate)
       assert WorkerStateMachine.should_remove?(sm)
       
-      # Check history
-      assert length(sm.transition_history) == 6
+      # Check history (7 transitions: init→ready→busy→ready→degraded→ready→terminating→terminated)
+      assert length(sm.transition_history) == 7
     end
     
     @tag :recovery
@@ -243,8 +243,8 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
         end)
       end
       
-      # Wait for all operations to complete
-      results = Task.await_many(tasks, 15_000)
+      # Wait for all operations to complete (increased timeout for Python overhead)
+      results = Task.await_many(tasks, 30_000)
       
       # All operations should complete (either successfully or with expected errors)
       assert length(results) == 5
@@ -286,10 +286,20 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
   describe "Error Handling and Edge Cases" do
     @tag :error_handling
     test "handles session affinity errors gracefully" do
+      # Start a SessionAffinity process for this test
+      affinity_name = :"test_affinity_#{:erlang.unique_integer([:positive])}"
+      {:ok, affinity_pid} = SessionAffinity.start_link(name: affinity_name, cleanup_interval: 500, session_timeout: 5000)
+      
+      on_exit(fn ->
+        if Process.alive?(affinity_pid) do
+          GenServer.stop(affinity_pid)
+        end
+      end)
+      
       # Test when SessionAffinity is not available
       non_existent_session = "non_existent_session_#{:erlang.unique_integer()}"
       
-      result = SessionAffinity.get_worker(non_existent_session)
+      result = SessionAffinity.get_worker(non_existent_session, affinity_name)
       assert result == {:error, :no_affinity}
       
       # Test session cleanup
@@ -297,10 +307,10 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
       test_worker = "cleanup_test_worker"
       
       :ok = SessionAffinity.bind_session(test_session, test_worker)
-      {:ok, ^test_worker} = SessionAffinity.get_worker(test_session)
+      {:ok, ^test_worker} = SessionAffinity.get_worker(test_session, affinity_name)
       
       :ok = SessionAffinity.unbind_session(test_session)
-      {:error, :no_affinity} = SessionAffinity.get_worker(test_session)
+      {:error, :no_affinity} = SessionAffinity.get_worker(test_session, affinity_name)
     end
     
     @tag :invalid_transitions

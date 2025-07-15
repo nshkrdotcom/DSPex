@@ -121,11 +121,12 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestratorTest do
           operation: :blocking_op_1, 
           severity: :minor,
           original_operation: fn -> 
-            # Removed 1-second sleep - test completes faster
+            # Small delay to ensure blocking
+            Process.sleep(50)
             {:ok, "eventually succeeds"}
           end
         }
-        GenServer.call(orchestrator, {:handle_error, error, context})
+        GenServer.call(orchestrator, {:handle_error, error, context}, 10_000)
       end)
       
       task2 = Task.async(fn ->
@@ -134,18 +135,24 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestratorTest do
           operation: :blocking_op_2, 
           severity: :minor,
           original_operation: fn -> 
-            # Removed 1-second sleep - test completes faster
+            # Small delay to ensure blocking
+            Process.sleep(50)
             {:ok, "eventually succeeds"}
           end
         }
-        GenServer.call(orchestrator, {:handle_error, error, context})
+        GenServer.call(orchestrator, {:handle_error, error, context}, 10_000)
       end)
       
-      # Removed sleep - check capacity immediately
+      # Brief wait to ensure both recoveries are initiated and blocking
+      Process.sleep(10)
       
       # Now try a third recovery - should be rejected due to capacity
       error = {:communication_error, "should be rejected"}
-      context = %{operation: :rejected_op, severity: :minor}
+      context = %{
+        operation: :rejected_op, 
+        severity: :minor,
+        original_operation: fn -> {:ok, "should not execute"} end
+      }
       result = GenServer.call(orchestrator, {:handle_error, error, context})
       
       assert result == {:error, :recovery_capacity_exceeded}

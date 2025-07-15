@@ -7,7 +7,7 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
     # Use a unique name for each test to avoid conflicts
     test_name = :"session_affinity_#{:erlang.unique_integer([:positive])}"
     
-    {:ok, pid} = SessionAffinity.start_link(name: test_name, cleanup_interval: 100, session_timeout: 200)
+    {:ok, pid} = SessionAffinity.start_link(name: test_name, cleanup_interval: 500, session_timeout: 200)
     
     on_exit(fn ->
       if Process.alive?(pid) do
@@ -24,33 +24,33 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
   end
   
   describe "bind_session/2 and get_worker/1" do
-    test "can bind and retrieve session-worker mappings" do
+    test "can bind and retrieve session-worker mappings", %{affinity: affinity_name} do
       session_id = "test_session_123"
       worker_id = "test_worker_456"
       
       assert :ok = SessionAffinity.bind_session(session_id, worker_id)
-      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_id)
+      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_id, affinity_name)
     end
     
-    test "returns error for non-existent sessions" do
-      assert {:error, :no_affinity} = SessionAffinity.get_worker("non_existent_session")
+    test "returns error for non-existent sessions", %{affinity: affinity_name} do
+      assert {:error, :no_affinity} = SessionAffinity.get_worker("non_existent_session", affinity_name)
     end
     
-    test "can rebind sessions to different workers" do
+    test "can rebind sessions to different workers", %{affinity: affinity_name} do
       session_id = "test_session_123"
       worker_id_1 = "test_worker_456"
       worker_id_2 = "test_worker_789"
       
       # Bind to first worker
       assert :ok = SessionAffinity.bind_session(session_id, worker_id_1)
-      assert {:ok, ^worker_id_1} = SessionAffinity.get_worker(session_id)
+      assert {:ok, ^worker_id_1} = SessionAffinity.get_worker(session_id, affinity_name)
       
       # Rebind to second worker
       assert :ok = SessionAffinity.bind_session(session_id, worker_id_2)
-      assert {:ok, ^worker_id_2} = SessionAffinity.get_worker(session_id)
+      assert {:ok, ^worker_id_2} = SessionAffinity.get_worker(session_id, affinity_name)
     end
     
-    test "multiple sessions can bind to same worker" do
+    test "multiple sessions can bind to same worker", %{affinity: affinity_name} do
       worker_id = "test_worker_456"
       session_1 = "session_1"
       session_2 = "session_2"
@@ -58,22 +58,22 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
       assert :ok = SessionAffinity.bind_session(session_1, worker_id)
       assert :ok = SessionAffinity.bind_session(session_2, worker_id)
       
-      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_1)
-      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_2)
+      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_1, affinity_name)
+      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_2, affinity_name)
     end
   end
   
   describe "unbind_session/1" do
-    test "can unbind sessions" do
+    test "can unbind sessions", %{affinity: affinity_name} do
       session_id = "test_session_123"
       worker_id = "test_worker_456"
       
       # Bind then unbind
       assert :ok = SessionAffinity.bind_session(session_id, worker_id)
-      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_id)
+      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_id, affinity_name)
       
       assert :ok = SessionAffinity.unbind_session(session_id)
-      assert {:error, :no_affinity} = SessionAffinity.get_worker(session_id)
+      assert {:error, :no_affinity} = SessionAffinity.get_worker(session_id, affinity_name)
     end
     
     test "unbinding non-existent session is safe" do
@@ -82,7 +82,7 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
   end
   
   describe "remove_worker_sessions/1" do
-    test "removes all sessions for a worker" do
+    test "removes all sessions for a worker", %{affinity: affinity_name} do
       worker_id = "test_worker_456"
       session_1 = "session_1"
       session_2 = "session_2"
@@ -97,19 +97,19 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
       assert :ok = SessionAffinity.bind_session(session_3, other_worker)
       
       # Verify bindings exist
-      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_1)
-      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_2)
-      assert {:ok, ^other_worker} = SessionAffinity.get_worker(session_3)
+      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_1, affinity_name)
+      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_2, affinity_name)
+      assert {:ok, ^other_worker} = SessionAffinity.get_worker(session_3, affinity_name)
       
       # Remove target worker's sessions
       assert :ok = SessionAffinity.remove_worker_sessions(worker_id)
       
       # Verify target worker sessions are gone
-      assert {:error, :no_affinity} = SessionAffinity.get_worker(session_1)
-      assert {:error, :no_affinity} = SessionAffinity.get_worker(session_2)
+      assert {:error, :no_affinity} = SessionAffinity.get_worker(session_1, affinity_name)
+      assert {:error, :no_affinity} = SessionAffinity.get_worker(session_2, affinity_name)
       
       # Verify other worker's session remains
-      assert {:ok, ^other_worker} = SessionAffinity.get_worker(session_3)
+      assert {:ok, ^other_worker} = SessionAffinity.get_worker(session_3, affinity_name)
     end
     
     test "removing sessions for non-existent worker is safe" do
@@ -119,26 +119,27 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
   
   describe "session expiration" do
     @tag :skip_in_ci
-    test "expired sessions are automatically removed", %{affinity: _affinity} do
+    test "expired sessions are automatically removed", %{affinity: affinity_name} do
       session_id = "test_session_123"
       worker_id = "test_worker_456"
       
       # Bind session
       assert :ok = SessionAffinity.bind_session(session_id, worker_id)
-      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_id)
+      assert {:ok, ^worker_id} = SessionAffinity.get_worker(session_id, affinity_name)
       
-      # Wait for expiration (session_timeout is 200ms in setup)
+      # Wait for expiration (session_timeout is 200ms in setup)  
+      # Wait longer than session_timeout to ensure expiration
       Process.sleep(250)
       
       # Session should be expired when accessed
-      assert {:error, :session_expired} = SessionAffinity.get_worker(session_id)
+      assert {:error, :session_expired} = SessionAffinity.get_worker(session_id, affinity_name)
       
       # Accessing again should return no_affinity (cleaned up)
-      assert {:error, :no_affinity} = SessionAffinity.get_worker(session_id)
+      assert {:error, :no_affinity} = SessionAffinity.get_worker(session_id, affinity_name)
     end
     
     @tag :skip_in_ci
-    test "cleanup process removes expired sessions", %{affinity: _affinity} do
+    test "cleanup process removes expired sessions", %{affinity: affinity_name} do
       session_id = "test_session_123"
       worker_id = "test_worker_456"
       
@@ -146,11 +147,11 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
       assert :ok = SessionAffinity.bind_session(session_id, worker_id)
       
       # Wait for session to expire and cleanup to run
-      # session_timeout is 200ms, cleanup_interval is 100ms in setup
-      Process.sleep(450)  # Wait for expiration + multiple cleanup cycles
+      # session_timeout is 200ms, cleanup_interval is 500ms in setup
+      Process.sleep(750)  # Wait for expiration + cleanup cycle
       
-      # Session should be completely gone
-      assert {:error, :no_affinity} = SessionAffinity.get_worker(session_id)
+      # Session should be completely gone by background cleanup
+      assert {:error, :no_affinity} = SessionAffinity.get_worker(session_id, affinity_name)
     end
   end
   
@@ -190,7 +191,7 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
   end
   
   describe "concurrent access" do
-    test "handles concurrent bind/get operations" do
+    test "handles concurrent bind/get operations", %{affinity: affinity_name} do
       worker_base = "worker"
       session_base = "session"
       
@@ -204,13 +205,13 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
           :ok = SessionAffinity.bind_session(session_id, worker_id)
           
           # Verify binding
-          {:ok, ^worker_id} = SessionAffinity.get_worker(session_id)
+          {:ok, ^worker_id} = SessionAffinity.get_worker(session_id, affinity_name)
           
           # Unbind
           :ok = SessionAffinity.unbind_session(session_id)
           
           # Verify unbinding
-          {:error, :no_affinity} = SessionAffinity.get_worker(session_id)
+          {:error, :no_affinity} = SessionAffinity.get_worker(session_id, affinity_name)
           
           :ok
         end)
@@ -227,7 +228,7 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
       assert stats.total_sessions == 0
     end
     
-    test "handles concurrent worker removal" do
+    test "handles concurrent worker removal", %{affinity: affinity_name} do
       worker_id = "shared_worker"
       
       # Bind many sessions to the same worker
@@ -245,7 +246,7 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
       # Start concurrent get tasks
       get_tasks = for i <- 1..10 do
         Task.async(fn ->
-          SessionAffinity.get_worker("session_#{i}")
+          SessionAffinity.get_worker("session_#{i}", affinity_name)
         end)
       end
       
@@ -259,7 +260,7 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
   end
   
   describe "performance" do
-    test "handles large number of sessions efficiently" do
+    test "handles large number of sessions efficiently", %{affinity: affinity_name} do
       num_sessions = 1000
       num_workers = 10
       
@@ -276,7 +277,7 @@ defmodule DSPex.PythonBridge.SessionAffinityTest do
       {get_time, _} = :timer.tc(fn ->
         for i <- 1..num_sessions do
           session_id = "session_#{i}"
-          {:ok, _} = SessionAffinity.get_worker(session_id)
+          {:ok, _} = SessionAffinity.get_worker(session_id, affinity_name)
         end
       end)
       

@@ -12,6 +12,9 @@ Code.require_file("support/test_data_generators.ex", __DIR__)
 Code.require_file("support/lm_test_setup.ex", __DIR__)
 Code.require_file("support/integration_case.ex", __DIR__)
 Code.require_file("support/pool_v2_test_helpers.ex", __DIR__)
+Code.require_file("support/enhanced_pool_test_helpers.ex", __DIR__)
+Code.require_file("support/pool_performance_framework.ex", __DIR__)
+Code.require_file("support/pool_chaos_helpers.ex", __DIR__)
 
 # Enable Python bridge for tests when GEMINI_API_KEY is available
 gemini_key = System.get_env("GEMINI_API_KEY")

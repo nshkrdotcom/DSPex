@@ -45,7 +45,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     :overflow,
     :health_check_ref,
     :cleanup_ref,
-    :started_at
+    :started_at,
+    :worker_module
   ]
 
   ## Public API - Client Functions
@@ -529,7 +530,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
           overflow: overflow,
           health_check_ref: health_check_ref,
           cleanup_ref: cleanup_ref,
-          started_at: System.monotonic_time(:millisecond)
+          started_at: System.monotonic_time(:millisecond),
+          worker_module: worker_module
         }
 
         worker_type = if worker_module == PoolWorkerV2Enhanced, do: "enhanced", else: "basic"
@@ -545,11 +547,15 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   def handle_call(:get_status, _from, state) do
     sessions = get_session_info()
     
-    # Try to get session affinity stats if available
-    affinity_stats = try do
-      SessionAffinity.get_stats()
-    rescue
-      _ -> %{}
+    # Only get session affinity stats for enhanced workers
+    affinity_stats = if state.worker_module == PoolWorkerV2Enhanced do
+      try do
+        SessionAffinity.get_stats()
+      rescue
+        _ -> %{}
+      end
+    else
+      %{}
     end
 
     status = %{
