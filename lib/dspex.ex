@@ -160,7 +160,7 @@ defmodule DSPex do
       current_lm = Application.get_env(:dspex, :current_lm)
 
       try do
-        set_lm(lm_override, api_key: current_lm[:api_key])
+        _result = set_lm(lm_override, api_key: current_lm[:api_key])
 
         with {:ok, adapter} <- get_adapter() do
           adapter.execute_program(program_id, inputs, opts)

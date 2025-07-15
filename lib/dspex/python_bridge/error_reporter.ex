@@ -297,7 +297,10 @@ defmodule DSPex.PythonBridge.ErrorReporter do
   @impl true
   def terminate(_reason, _state) do
     try do
-      _result = :telemetry.detach("error-reporter")
+      case :telemetry.detach("error-reporter") do
+        :ok -> :ok
+        {:error, :not_found} -> :ok
+      end
     rescue
       _ -> :ok
     end
@@ -341,15 +344,17 @@ defmodule DSPex.PythonBridge.ErrorReporter do
     ]
 
     try do
-      _result =
-        :telemetry.attach_many(
-          "error-reporter",
-          events,
-          fn event_name, measurements, metadata, _config ->
-            send(__MODULE__, {:telemetry_event, event_name, measurements, metadata})
-          end,
-          nil
-        )
+      case :telemetry.attach_many(
+             "error-reporter",
+             events,
+             fn event_name, measurements, metadata, _config ->
+               send(__MODULE__, {:telemetry_event, event_name, measurements, metadata})
+             end,
+             nil
+           ) do
+        :ok -> :ok
+        {:error, :already_exists} -> :ok
+      end
     rescue
       error ->
         Logger.error("Failed to attach telemetry handlers: #{inspect(error)}")

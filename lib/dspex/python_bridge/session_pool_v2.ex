@@ -277,7 +277,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     end
   end
 
-  @spec handle_pool_error(term(), map()) :: {:error, DSPex.PythonBridge.PoolErrorHandler.t()}
+  @spec handle_pool_error(term(), map()) ::
+          {:ok, term()} | {:error, DSPex.PythonBridge.PoolErrorHandler.t()}
   defp handle_pool_error(error, context) do
     wrapped = PoolErrorHandler.wrap_pool_error(error, context)
 
@@ -307,8 +308,16 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     end
   end
 
-  @spec handle_response_mismatch(non_neg_integer(), non_neg_integer(), map()) ::
-          PoolErrorHandler.t()
+  @spec handle_response_mismatch(non_neg_integer(), non_neg_integer(), %{
+          adapter: DSPex.PythonBridge.SessionPoolV2,
+          args: term(),
+          command: term(),
+          from: term(),
+          operation: :execute_anonymous | :execute_command,
+          worker_id: term(),
+          worker_state: atom(),
+          session_id: term()
+        }) :: PoolErrorHandler.t()
   defp handle_response_mismatch(expected_id, actual_id, context) do
     PoolErrorHandler.wrap_pool_error(
       {:response_mismatch, "Expected ID #{expected_id}, got #{actual_id}"},
@@ -316,8 +325,16 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     )
   end
 
-  @spec handle_decode_error(:binary_data | :decode_error | :malformed_response, map()) ::
-          PoolErrorHandler.t()
+  @spec handle_decode_error(:binary_data | :decode_error | :malformed_response, %{
+          adapter: DSPex.PythonBridge.SessionPoolV2,
+          args: term(),
+          command: term(),
+          from: term(),
+          operation: :execute_anonymous | :execute_command,
+          worker_id: term(),
+          worker_state: atom(),
+          session_id: term()
+        }) :: PoolErrorHandler.t()
   defp handle_decode_error(reason, context) do
     PoolErrorHandler.wrap_pool_error(
       {:decode_error, reason},

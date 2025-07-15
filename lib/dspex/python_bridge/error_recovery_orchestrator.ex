@@ -506,7 +506,7 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestrator do
   end
 
   @spec execute_retry_recovery(PoolErrorHandler.t(), recovery_strategy()) ::
-          {:ok, term()} | {:error, :no_original_operation | term()}
+          {:ok, term()} | {:error, :no_original_operation | PoolErrorHandler.t()}
   defp execute_retry_recovery(error, strategy) do
     context = error.context
 
@@ -526,7 +526,8 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestrator do
   end
 
   @spec execute_failover_recovery(PoolErrorHandler.t(), recovery_strategy()) ::
-          {:ok, {:failover, term()}} | {:error, {:failover_failed, term()}}
+          {:ok, {:failover, term()}}
+          | {:error, {:failover_failed, DSPex.Adapters.ErrorHandler.adapter_error()}}
   defp execute_failover_recovery(error, strategy) do
     adapter = strategy.fallback_adapter
     context = error.context

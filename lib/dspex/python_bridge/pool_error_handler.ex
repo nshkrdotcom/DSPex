@@ -316,7 +316,7 @@ defmodule DSPex.PythonBridge.PoolErrorHandler do
           optional(:user_facing) => boolean(),
           optional(:metadata) => map(),
           optional(atom()) => term()
-        }) :: error_severity()
+        }) :: :critical | :major | :minor
   defp determine_base_severity(category, context) do
     base_severity =
       case category do
