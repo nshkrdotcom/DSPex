@@ -277,8 +277,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     end
   end
 
-  @spec handle_pool_error(term(), map()) ::
-          {:ok, term()} | {:error, DSPex.PythonBridge.PoolErrorHandler.t()}
+  @spec handle_pool_error(term(), map()) :: {:ok, term()} | {:error, PoolErrorHandler.t()}
   defp handle_pool_error(error, context) do
     wrapped = PoolErrorHandler.wrap_pool_error(error, context)
 
