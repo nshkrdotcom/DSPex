@@ -97,6 +97,11 @@ class DSPyBridge:
         # NEW: Cache for dynamically generated signature classes
         self.signature_cache = {}
         
+        # NEW: Feature flags for dynamic signatures
+        self.feature_flags = {
+            "dynamic_signatures": os.environ.get("DSPEX_DYNAMIC_SIGNATURES", "true").lower() == "true"
+        }
+        
         # Initialize DSPy if available
         if DSPY_AVAILABLE:
             self._initialize_dspy()
@@ -352,21 +357,37 @@ class DSPyBridge:
                 raise ValueError(f"Program with ID '{program_id}' already exists")
         
         try:
-            # Use the cached signature class generator with resilient fallback
-            try:
-                signature_class, field_mapping = self._get_or_create_signature_class(signature_def)
-                program = dspy.Predict(signature_class)
-                fallback_used = False
-            except Exception:
-                # RESILIENT FALLBACK
-                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                    f.write(f"[{time.time()}] Dynamic signature creation failed. Falling back to Q/A.\n")
-                    f.write(traceback.format_exc() + "\n")
-                    f.flush()
+            # Check feature flag and signature definition to determine approach
+            use_dynamic = args.get('use_dynamic_signature', self.feature_flags['dynamic_signatures'])
+            
+            if use_dynamic and signature_def and signature_def.get('inputs') and signature_def.get('outputs'):
+                # NEW: Dynamic signature path
+                try:
+                    signature_class, field_mapping = self._get_or_create_signature_class(signature_def)
+                    program = dspy.Predict(signature_class)
+                    fallback_used = False
+                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                        f.write(f"[{time.time()}] Created dynamic program with signature: {signature_class.__name__}\n")
+                        f.flush()
+                except Exception as e:
+                    # RESILIENT FALLBACK
+                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                        f.write(f"[{time.time()}] Dynamic signature creation failed: {e}. Falling back to Q/A.\n")
+                        f.write(traceback.format_exc() + "\n")
+                        f.flush()
+                    program = dspy.Predict("question -> answer")
+                    signature_class = None  # Indicate fallback was used
+                    field_mapping = {}
+                    fallback_used = True
+            else:
+                # EXISTING: Legacy Q&A path
                 program = dspy.Predict("question -> answer")
-                signature_class = None  # Indicate fallback was used
+                signature_class = None
                 field_mapping = {}
-                fallback_used = True
+                fallback_used = False
+                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                    f.write(f"[{time.time()}] Using legacy Q&A signature (dynamic disabled or incomplete signature)\n")
+                    f.flush()
             
             # Store program based on mode
             program_info = {
@@ -419,7 +440,7 @@ class DSPyBridge:
         
         return self.signature_cache[signature_key]
 
-    def _create_signature_class(self, signature_def: Dict[str, Any]) -> type:
+    def _create_signature_class(self, signature_def: Dict[str, Any]) -> tuple:
         """
         Dynamically builds a dspy.Signature class from a detailed definition.
         
@@ -427,10 +448,36 @@ class DSPyBridge:
             signature_def: Dictionary containing inputs and outputs
             
         Returns:
-            Dynamic signature class
+            Tuple of (signature_class, field_mapping)
+            
+        Raises:
+            ValueError: If signature definition is invalid
         """
+        # Validate signature definition
+        if not isinstance(signature_def, dict):
+            raise ValueError("Signature definition must be a dictionary")
+        
+        inputs = signature_def.get('inputs', [])
+        outputs = signature_def.get('outputs', [])
+        
+        if not inputs:
+            raise ValueError("Signature must have at least one input field")
+        if not outputs:
+            raise ValueError("Signature must have at least one output field")
+        
+        # Validate field definitions
+        for field_list, field_type in [(inputs, 'input'), (outputs, 'output')]:
+            for i, field_def in enumerate(field_list):
+                if not isinstance(field_def, dict):
+                    raise ValueError(f"Field definition {i} in {field_type}s must be a dictionary")
+                if not field_def.get('name'):
+                    raise ValueError(f"Field definition {i} in {field_type}s must have a 'name'")
+        
         raw_class_name = signature_def.get('name', 'DynamicSignature').split('.')[-1]
         class_name = re.sub(r'\W|^(?=\d)', '_', raw_class_name)  # Sanitize class name
+        if not class_name or class_name.startswith('_'):
+            class_name = f"Dynamic_{int(time.time())}"
+        
         docstring = signature_def.get('description', 'A dynamically generated DSPy signature.')
         
         attrs = {'__doc__': docstring}
@@ -439,23 +486,43 @@ class DSPyBridge:
         field_mapping = {}
         
         # Dynamically create InputField and OutputField attributes
-        for field_def in signature_def.get('inputs', []):
+        for field_def in inputs:
             raw_field_name = field_def.get('name')
             if raw_field_name:
                 field_name = re.sub(r'\W|^(?=\d)', '_', raw_field_name)  # Sanitize field name
+                if not field_name or field_name.startswith('_'):
+                    field_name = f"field_{len(field_mapping)}"
                 field_mapping[raw_field_name] = field_name
-                attrs[field_name] = dspy.InputField(desc=field_def.get('description', ''))
+                attrs[field_name] = dspy.InputField(
+                    desc=field_def.get('description', f'Input field: {raw_field_name}')
+                )
         
-        for field_def in signature_def.get('outputs', []):
+        for field_def in outputs:
             raw_field_name = field_def.get('name')
             if raw_field_name:
                 field_name = re.sub(r'\W|^(?=\d)', '_', raw_field_name)  # Sanitize field name
+                if not field_name or field_name.startswith('_'):
+                    field_name = f"field_{len(field_mapping)}"
                 field_mapping[raw_field_name] = field_name
-                attrs[field_name] = dspy.OutputField(desc=field_def.get('description', ''))
+                attrs[field_name] = dspy.OutputField(
+                    desc=field_def.get('description', f'Output field: {raw_field_name}')
+                )
         
-        # Store the field mapping on the class for later use
-        # Note: We can't store this as a regular attribute due to DSPy/pydantic conflicts
-        # Instead, we'll store it in the program_info directly
+        # Ensure we have at least one input and output field after sanitization
+        # Check for DSPy InputField and OutputField by looking at the json_schema_extra
+        input_field_count = sum(1 for k, v in attrs.items() 
+                              if hasattr(v, 'json_schema_extra') and 
+                              v.json_schema_extra and 
+                              v.json_schema_extra.get('__dspy_field_type') == 'input')
+        output_field_count = sum(1 for k, v in attrs.items() 
+                               if hasattr(v, 'json_schema_extra') and 
+                               v.json_schema_extra and 
+                               v.json_schema_extra.get('__dspy_field_type') == 'output')
+        
+        if input_field_count == 0:
+            raise ValueError("No valid input fields after sanitization")
+        if output_field_count == 0:
+            raise ValueError("No valid output fields after sanitization")
         
         # Use type() to create the class dynamically
         signature_class = type(class_name, (dspy.Signature,), attrs)
@@ -527,27 +594,34 @@ class DSPyBridge:
                 self.configure_lm(self.session_lms[session_id])
         
         try:
-            # Execute the program using dynamic I/O with **inputs unpacking
+            # Determine execution mode based on signature and fallback status
+            is_dynamic = program_info.get('signature_class') is not None and not program_info.get('fallback_used', False)
+            
             with open('/tmp/dspy_bridge_debug.log', 'a') as f:
                 f.write(f"[{time.time()}] DEBUG: About to execute program with inputs: {inputs}\n")
+                f.write(f"[{time.time()}] DEBUG: Is dynamic: {is_dynamic}\n")
                 f.write(f"[{time.time()}] DEBUG: Program type: {type(program)}\n")
-                f.write(f"[{time.time()}] DEBUG: Program: {program}\n")
                 f.flush()
             
-            # Handle field name sanitization for inputs if needed
-            field_mapping = program_info.get('field_mapping', {})
-            if field_mapping:
-                # Convert original input names to sanitized names
-                sanitized_inputs = {}
-                for original_name, value in inputs.items():
-                    sanitized_name = field_mapping.get(original_name, original_name)
-                    sanitized_inputs[sanitized_name] = value
-                
-                # This is the magic: **sanitized_inputs unpacks the dict into named arguments
-                result = program(**sanitized_inputs)
+            if is_dynamic:
+                # Dynamic execution with field mapping
+                field_mapping = program_info.get('field_mapping', {})
+                if field_mapping:
+                    # Convert original input names to sanitized names
+                    sanitized_inputs = {}
+                    for original_name, value in inputs.items():
+                        sanitized_name = field_mapping.get(original_name, original_name)
+                        sanitized_inputs[sanitized_name] = value
+                    
+                    # This is the magic: **sanitized_inputs unpacks the dict into named arguments
+                    result = program(**sanitized_inputs)
+                else:
+                    # This is the magic: **inputs unpacks the dict into named arguments
+                    result = program(**inputs)
             else:
-                # This is the magic: **inputs unpacks the dict into named arguments
-                result = program(**inputs)
+                # Legacy Q&A execution
+                question = inputs.get('question', list(inputs.values())[0] if inputs else '')
+                result = program(question=question)
             
             with open('/tmp/dspy_bridge_debug.log', 'a') as f:
                 f.write(f"[{time.time()}] DEBUG: Program execution returned successfully\n")
@@ -563,70 +637,69 @@ class DSPyBridge:
                 f.write(f"[{time.time()}] DEBUG: DSPy result class: {result.__class__.__name__}\n")
                 f.flush()
             
-            # Dynamically extract outputs based on the signature definition
+            # Extract outputs based on execution mode
             signature_def = program_info.get('signature_def', program_info.get('signature', {}))
             field_mapping = program_info.get('field_mapping', {})
             outputs = {}
             
-            # If we have field mapping, use it
-            if field_mapping:
-                for original_name, sanitized_name in field_mapping.items():
-                    # Only extract output fields
-                    if any(field['name'] == original_name for field in signature_def.get('outputs', [])):
-                        if hasattr(result, sanitized_name):
-                            outputs[original_name] = getattr(result, sanitized_name)
-                        else:
-                            # Fallback for safety
-                            outputs[original_name] = f"Field '{sanitized_name}' not found in prediction."
-            else:
-                # Fallback to original field names for backward compatibility
-                output_fields = [field['name'] for field in signature_def.get('outputs', [])]
-                
-                for field_name in output_fields:
-                    if hasattr(result, field_name):
-                        outputs[field_name] = getattr(result, field_name)
-                    else:
-                        # Fallback for safety, but this indicates a potential issue
-                        outputs[field_name] = f"Field '{field_name}' not found in prediction."
-            
-            # If no output fields defined or found, use legacy extraction
-            if not outputs:
-                # Convert result to dictionary - handle DSPy Prediction objects
-                if hasattr(result, '__dict__'):
-                    # For DSPy Prediction objects, extract the actual output fields
-                    result_dict = result.__dict__
-                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                        f.write(f"[{time.time()}] DEBUG: Raw result dict: {list(result_dict.keys())}\n")
-                        f.flush()
+            if is_dynamic:
+                # Dynamic output extraction with field mapping
+                if field_mapping:
+                    for original_name, sanitized_name in field_mapping.items():
+                        # Only extract output fields
+                        if any(field['name'] == original_name for field in signature_def.get('outputs', [])):
+                            if hasattr(result, sanitized_name):
+                                outputs[original_name] = getattr(result, sanitized_name)
+                            else:
+                                # Fallback for safety
+                                outputs[original_name] = f"Field '{sanitized_name}' not found in prediction."
+                                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                                    f.write(f"[{time.time()}] Warning: Output field '{sanitized_name}' not found in result\n")
+                                    f.flush()
+                else:
+                    # Fallback to original field names for backward compatibility
+                    output_fields = [field['name'] for field in signature_def.get('outputs', [])]
                     
-                    # Look for output fields (exclude private fields and completions)
+                    for field_name in output_fields:
+                        if hasattr(result, field_name):
+                            outputs[field_name] = getattr(result, field_name)
+                        else:
+                            # Fallback for safety, but this indicates a potential issue
+                            outputs[field_name] = f"Field '{field_name}' not found in prediction."
+            else:
+                # Legacy Q&A output extraction
+                try:
+                    outputs["answer"] = result.answer
+                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                        f.write(f"[{time.time()}] DEBUG: Using legacy Q&A output: {result.answer}\n")
+                        f.flush()
+                except AttributeError:
+                    # Try to extract from result object
+                    if hasattr(result, '__dict__'):
+                        result_dict = result.__dict__
+                        for k, v in result_dict.items():
+                            if not k.startswith('_') and k != 'completions':
+                                outputs[k] = v
+                                break
+                    if not outputs:
+                        outputs["answer"] = str(result)
+            
+            # Final validation - ensure we have some outputs
+            if not outputs:
+                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                    f.write(f"[{time.time()}] WARNING: No outputs extracted, using emergency fallback\n")
+                    f.flush()
+                
+                # Emergency fallback for unexpected cases
+                if hasattr(result, '__dict__'):
+                    result_dict = result.__dict__
                     for k, v in result_dict.items():
                         if not k.startswith('_') and k != 'completions':
                             outputs[k] = v
-                            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                                f.write(f"[{time.time()}] DEBUG: Found output field {k}: {v}\n")
-                                f.flush()
+                            break
                 
-                # If still no outputs, try fallback methods
                 if not outputs:
-                    # Try accessing via result.answer (common DSPy pattern)
-                    try:
-                        outputs["answer"] = result.answer
-                        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                            f.write(f"[{time.time()}] DEBUG: Using result.answer fallback: {result.answer}\n")
-                            f.flush()
-                    except AttributeError:
-                        # Final fallback: convert to string
-                        try:
-                            outputs["result"] = str(result)
-                            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                                f.write(f"[{time.time()}] DEBUG: Using str() fallback: {str(result)}\n")
-                                f.flush()
-                        except:
-                            outputs["result"] = "Unable to extract result"
-                            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                                f.write(f"[{time.time()}] DEBUG: str() failed, using fallback\n")
-                                f.flush()
+                    outputs["result"] = str(result) if result else "No result"
             
             with open('/tmp/dspy_bridge_debug.log', 'a') as f:
                 f.write(f"[{time.time()}] DEBUG: Final outputs: {outputs}\n")

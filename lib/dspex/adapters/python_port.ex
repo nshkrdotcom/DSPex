@@ -473,7 +473,92 @@ defmodule DSPex.Adapters.PythonPort do
   end
 
   defp convert_signature(signature) when is_atom(signature) do
-    # Convert signature module to dictionary format
+    # Convert signature module to enhanced metadata format
+    try do
+      # Try to use enhanced metadata first (Stage 2 implementation)
+      if function_exported?(signature, :to_enhanced_metadata, 0) do
+        enhanced_metadata = signature.to_enhanced_metadata()
+        
+        # Ensure the metadata is in the format expected by Python bridge
+        case DSPex.Signature.Metadata.validate_metadata(enhanced_metadata) do
+          :ok -> 
+            # Convert to string keys for JSON serialization
+            convert_enhanced_metadata_to_bridge_format(enhanced_metadata)
+          
+          {:error, _reason} ->
+            # Fall back to legacy format
+            convert_signature_legacy(signature)
+        end
+      else
+        # Fall back to legacy conversion
+        convert_signature_legacy(signature)
+      end
+    rescue
+      _ ->
+        # Final fallback
+        convert_signature_legacy(signature)
+    end
+  end
+
+  defp convert_signature(signature) when is_map(signature) do
+    # Check if this is already enhanced metadata format
+    if Map.has_key?(signature, :name) || Map.has_key?(signature, "name") do
+      # This looks like enhanced metadata, validate and convert
+      try do
+        normalized = DSPex.Signature.Metadata.normalize_signature_definition(signature)
+        case DSPex.Signature.Metadata.validate_metadata(normalized) do
+          :ok ->
+            convert_enhanced_metadata_to_bridge_format(normalized)
+          {:error, _reason} ->
+            # Fall back to legacy conversion
+            convert_signature_legacy_map(signature)
+        end
+      rescue
+        _ ->
+          convert_signature_legacy_map(signature)
+      end
+    else
+      # Legacy map format
+      convert_signature_legacy_map(signature)
+    end
+  end
+
+  defp convert_signature_legacy_map(signature) do
+    # Ensure signature format is compatible with Python bridge
+    signature
+    |> Map.new(fn
+      {:inputs, value} -> {"inputs", convert_io_list(value)}
+      {"inputs", value} -> {"inputs", convert_io_list(value)}
+      {:outputs, value} -> {"outputs", convert_io_list(value)}
+      {"outputs", value} -> {"outputs", convert_io_list(value)}
+      {key, value} -> {to_string(key), value}
+    end)
+  end
+
+  defp convert_signature(signature), do: signature
+
+  # Enhanced metadata conversion for Stage 2 implementation
+  defp convert_enhanced_metadata_to_bridge_format(enhanced_metadata) do
+    %{
+      "name" => enhanced_metadata.name,
+      "description" => enhanced_metadata.description,
+      "inputs" => convert_enhanced_field_list(enhanced_metadata.inputs),
+      "outputs" => convert_enhanced_field_list(enhanced_metadata.outputs)
+    }
+  end
+
+  defp convert_enhanced_field_list(fields) when is_list(fields) do
+    Enum.map(fields, fn field ->
+      %{
+        "name" => field.name,
+        "type" => field.type,
+        "description" => field.description
+      }
+    end)
+  end
+
+  # Legacy signature conversion (backward compatibility)
+  defp convert_signature_legacy(signature) do
     case signature.__signature__() do
       %{inputs: inputs, outputs: outputs} ->
         %{
@@ -492,20 +577,6 @@ defmodule DSPex.Adapters.PythonPort do
       DSPex.Adapters.TypeConverter.convert_signature_to_format(signature, :python)
       |> convert_signature()
   end
-
-  defp convert_signature(signature) when is_map(signature) do
-    # Ensure signature format is compatible with Python bridge
-    signature
-    |> Map.new(fn
-      {:inputs, value} -> {"inputs", convert_io_list(value)}
-      {"inputs", value} -> {"inputs", convert_io_list(value)}
-      {:outputs, value} -> {"outputs", convert_io_list(value)}
-      {"outputs", value} -> {"outputs", convert_io_list(value)}
-      {key, value} -> {to_string(key), value}
-    end)
-  end
-
-  defp convert_signature(signature), do: signature
 
   defp convert_io_list(io_list) when is_list(io_list) do
     Enum.map(io_list, fn item ->

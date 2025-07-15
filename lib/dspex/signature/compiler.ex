@@ -60,7 +60,7 @@ defmodule DSPex.Signature.Compiler do
   `@before_compile DSPex.Signature.Compiler` in its module definition.
 
   It extracts the signature AST, parses it, validates types, and generates
-  the necessary runtime functions.
+  the necessary runtime functions including enhanced metadata support.
   """
   defmacro __before_compile__(env) do
     case Module.get_attribute(env.module, :signature_ast) do
@@ -68,7 +68,11 @@ defmodule DSPex.Signature.Compiler do
         raise_missing_signature_error(env.module)
 
       ast ->
-        case compile_signature(ast, env.module) do
+        # Get additional attributes for enhanced metadata
+        description = Module.get_attribute(env.module, :signature_description)
+        opts = Module.get_attribute(env.module, :signature_opts) || []
+        
+        case compile_signature(ast, env.module, description, opts) do
           {:ok, quoted_code} -> quoted_code
           {:error, reason} -> raise_compilation_error(reason, ast, env.module)
         end
@@ -83,15 +87,21 @@ defmodule DSPex.Signature.Compiler do
   2. Validates all type definitions
   3. Generates the signature metadata
   4. Creates quoted code for runtime functions
+  5. Generates enhanced metadata for Python bridge compatibility
 
   Returns `{:ok, quoted_code}` on success or `{:error, reason}` on failure.
   """
   @spec compile_signature(Macro.t(), module()) :: {:ok, Macro.t()} | {:error, String.t()}
   def compile_signature(ast, module) do
+    compile_signature(ast, module, nil, [])
+  end
+
+  @spec compile_signature(Macro.t(), module(), String.t() | nil, keyword()) :: {:ok, Macro.t()} | {:error, String.t()}
+  def compile_signature(ast, module, description, opts) do
     with {:ok, {inputs, outputs}} <- parse_signature_ast(ast),
          :ok <- validate_field_types(inputs ++ outputs),
-         signature_metadata <- build_signature_metadata(inputs, outputs, module) do
-      quoted_code = generate_signature_code(signature_metadata)
+         signature_metadata <- build_signature_metadata(inputs, outputs, module, description, opts) do
+      quoted_code = generate_signature_code(signature_metadata, opts)
       {:ok, quoted_code}
     end
   end
@@ -173,16 +183,26 @@ defmodule DSPex.Signature.Compiler do
   # Metadata Generation
 
   defp build_signature_metadata(inputs, outputs, module) do
+    build_signature_metadata(inputs, outputs, module, nil, [])
+  end
+
+  defp build_signature_metadata(inputs, outputs, module, description, opts) do
     %{
       inputs: inputs,
       outputs: outputs,
-      module: module
+      module: module,
+      description: description,
+      opts: opts
     }
   end
 
   # Code Generation
 
   defp generate_signature_code(signature_metadata) do
+    generate_signature_code(signature_metadata, [])
+  end
+
+  defp generate_signature_code(signature_metadata, opts) do
     quote do
       @signature_compiled unquote(Macro.escape(signature_metadata))
 
@@ -262,6 +282,28 @@ defmodule DSPex.Signature.Compiler do
           "#{name}: #{DSPex.Signature.TypeParser.describe_type(type)}"
         end)
         |> Enum.join(", ")
+      end
+
+      @doc """
+      Returns enhanced metadata for Python bridge integration.
+
+      This generates the rich metadata format required by the Python bridge
+      for dynamic signature class generation.
+      """
+      @spec to_enhanced_metadata(keyword()) :: map()
+      def to_enhanced_metadata(opts \\ []) do
+        DSPex.Signature.Metadata.to_enhanced_metadata(__MODULE__, opts)
+      end
+
+      @doc """
+      Returns enhanced metadata compatible with current signature definitions.
+
+      This method ensures the signature can be used directly with the Python
+      bridge without additional conversion steps.
+      """
+      @spec to_python_signature() :: map()
+      def to_python_signature do
+        to_enhanced_metadata()
       end
     end
   end
