@@ -19,7 +19,6 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     PoolWorkerV2,
     PoolWorkerV2Enhanced,
     Protocol,
-    SessionAffinity,
     PoolErrorHandler,
     CircuitBreaker,
     RetryLogic,
@@ -125,13 +124,15 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     pool_timeout = Keyword.get(opts, :pool_timeout, @default_checkout_timeout)
     operation_timeout = Keyword.get(opts, :timeout, @default_operation_timeout)
 
-    # Track session
+    # Track session for monitoring (but not for affinity)
     track_session(session_id)
 
     try do
+      # In stateless architecture, we don't need session-specific checkout
+      # Any available worker can handle any session by fetching data from centralized store
       NimblePool.checkout!(
         pool_name,
-        {:session, session_id},
+        :any_worker,  # Changed from {:session, session_id} to :any_worker
         fn from, worker ->
           execute_with_worker_error_handling(
             worker,
@@ -400,17 +401,9 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   end
 
   @spec bind_session_if_enhanced(String.t(), map()) :: :ok
-  defp bind_session_if_enhanced(session_id, worker) do
-    if Map.has_key?(worker, :state_machine) do
-      try do
-        SessionAffinity.bind_session(session_id, worker.worker_id)
-      rescue
-        _ ->
-          # SessionAffinity might not be running, that's ok for basic workers
-          :ok
-      end
-    end
-
+  defp bind_session_if_enhanced(_session_id, _worker) do
+    # In stateless architecture, we don't bind sessions to specific workers
+    # Any worker can handle any session by fetching data from centralized store
     :ok
   end
 
@@ -520,21 +513,12 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     # Initialize session tracking table
     _result = ensure_session_table()
 
-    # Start session affinity manager if enhanced workers are enabled
+    # In stateless architecture, we don't use session affinity
+    # All workers can handle any session by fetching data from SessionStore
     worker_module = Keyword.get(opts, :worker_module, PoolWorkerV2)
-
-    if worker_module == PoolWorkerV2Enhanced do
-      case SessionAffinity.start_link(name: :"#{__MODULE__}_session_affinity") do
-        {:ok, _} ->
-          Logger.info("Session affinity manager started for enhanced pool")
-
-        {:error, {:already_started, _}} ->
-          Logger.debug("Session affinity manager already running")
-
-        {:error, reason} ->
-          Logger.warning("Failed to start session affinity manager: #{inspect(reason)}")
-      end
-    end
+    
+    # Note: Session affinity is disabled in stateless architecture
+    # Workers fetch session data from centralized SessionStore as needed
 
     # Parse configuration
     pool_size = Keyword.get(opts, :pool_size, @default_pool_size)
@@ -590,17 +574,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   def handle_call(:get_status, _from, state) do
     sessions = get_session_info()
 
-    # Only get session affinity stats for enhanced workers
-    affinity_stats =
-      if state.worker_module == PoolWorkerV2Enhanced do
-        try do
-          SessionAffinity.get_stats()
-        rescue
-          _ -> %{}
-        end
-      else
-        %{}
-      end
+    # In stateless architecture, no session affinity is maintained
+    affinity_stats = %{}
 
     status = %{
       pool_size: state.pool_size,

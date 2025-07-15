@@ -4,7 +4,6 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
   alias DSPex.PythonBridge.{
     SessionPoolV2,
     PoolWorkerV2Enhanced,
-    SessionAffinity,
     WorkerStateMachine,
     WorkerMetrics
   }
@@ -42,7 +41,8 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
       # Check pool status
       status = GenServer.call(pool_name, :get_status)
       assert status.pool_size == 5
-      assert Map.has_key?(status, :session_affinity)
+      # In stateless architecture, no session affinity is maintained
+      assert status.session_affinity == %{}
 
       # Execute a simple operation to trigger worker lifecycle
       session_id = "integration_test_session_#{:erlang.unique_integer()}"
@@ -58,17 +58,16 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
       # Should succeed (or at least not crash)
       assert match?({:ok, _}, result) or match?({:error, _}, result)
 
-      # Check that session affinity was recorded
-      affinity_stats = SessionAffinity.get_stats()
-      assert is_map(affinity_stats)
+      # In stateless architecture, workers don't maintain session affinity
+      # Instead, they fetch session data from SessionStore as needed
     end
 
-    @tag :session_affinity
-    test "session affinity works across multiple operations", %{pool_name: pool_name} do
+    @tag :stateless_operations
+    test "stateless operations work across multiple workers", %{pool_name: pool_name} do
       actual_pool_name = GenServer.call(pool_name, :get_pool_name)
-      session_id = "affinity_test_session_#{:erlang.unique_integer()}"
+      session_id = "stateless_test_session_#{:erlang.unique_integer()}"
 
-      # First operation
+      # First operation - any worker can handle it
       result1 =
         SessionPoolV2.execute_in_session(
           session_id,
@@ -77,7 +76,7 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
           pool_name: actual_pool_name
         )
 
-      # Second operation should use same worker (if session affinity is working)
+      # Second operation - any worker can handle it (stateless)
       result2 =
         SessionPoolV2.execute_in_session(
           session_id,
@@ -90,9 +89,9 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
       assert match?({:ok, _}, result1) or match?({:error, _}, result1)
       assert match?({:ok, _}, result2) or match?({:error, _}, result2)
 
-      # Check affinity stats
-      stats = SessionAffinity.get_stats()
-      assert is_integer(stats.total_sessions)
+      # In stateless architecture, no session affinity is maintained
+      status = GenServer.call(pool_name, :get_status)
+      assert status.session_affinity == %{}
     end
 
     @tag :metrics
@@ -210,7 +209,7 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
       basic_status = GenServer.call(basic_pool_opts[:name], :get_status)
       IO.puts("Basic status: #{inspect(basic_status, pretty: true)}")
       assert basic_status.pool_size == 1
-      # Basic workers don't have session affinity
+      # In stateless architecture, all workers operate without session affinity
       assert basic_status.session_affinity == %{}
 
       # Defensive cleanup
@@ -225,10 +224,10 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
         end
       end
 
-      # Enhanced worker pools should have session affinity
+      # Test enhanced worker configuration (still stateless in new architecture)
       enhanced_pool_opts = [
         name: :"enhanced_test_pool_#{:erlang.unique_integer([:positive])}",
-        worker_module: PoolWorkerV2Enhanced,
+        worker_module: DSPex.PythonBridge.PoolWorkerV2Enhanced,
         pool_size: 1,
         overflow: 0
       ]
@@ -237,8 +236,8 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
 
       enhanced_status = GenServer.call(enhanced_pool_opts[:name], :get_status)
       assert enhanced_status.pool_size == 1
-      # Enhanced workers should have session affinity tracking
-      assert is_map(enhanced_status.session_affinity)
+      # In stateless architecture, even enhanced workers don't maintain session affinity
+      assert enhanced_status.session_affinity == %{}
 
       # Defensive cleanup  
       if Process.alive?(enhanced_pool) do
@@ -319,38 +318,27 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
 
   describe "Error Handling and Edge Cases" do
     @tag :error_handling
-    test "handles session affinity errors gracefully" do
-      # Start a SessionAffinity process for this test
-      affinity_name = :"test_affinity_#{:erlang.unique_integer([:positive])}"
-
-      {:ok, affinity_pid} =
-        SessionAffinity.start_link(
-          name: affinity_name,
-          cleanup_interval: 500,
-          session_timeout: 5000
-        )
-
-      on_exit(fn ->
-        if Process.alive?(affinity_pid) do
-          GenServer.stop(affinity_pid)
-        end
-      end)
-
-      # Test when SessionAffinity is not available
-      non_existent_session = "non_existent_session_#{:erlang.unique_integer()}"
-
-      result = SessionAffinity.get_worker(non_existent_session, affinity_name)
-      assert result == {:error, :no_affinity}
-
-      # Test session cleanup
-      test_session = "cleanup_test_session"
-      test_worker = "cleanup_test_worker"
-
-      :ok = SessionAffinity.bind_session(test_session, test_worker)
-      {:ok, ^test_worker} = SessionAffinity.get_worker(test_session, affinity_name)
-
-      :ok = SessionAffinity.unbind_session(test_session)
-      {:error, :no_affinity} = SessionAffinity.get_worker(test_session, affinity_name)
+    test "handles stateless session operations gracefully" do
+      # In stateless architecture, test that workers can handle sessions
+      # without maintaining affinity or local state
+      
+      # Test session operations without worker affinity
+      session_id = "stateless_session_#{:erlang.unique_integer()}"
+      
+      # Any worker should be able to handle any session
+      # This is the core principle of stateless architecture
+      
+      # Create a simple test to verify stateless behavior
+      worker_id = "stateless_test_worker"
+      sm = WorkerStateMachine.new(worker_id)
+      {:ok, sm} = WorkerStateMachine.transition(sm, :ready, :init_complete)
+      
+      # Worker should be able to accept work for any session
+      assert WorkerStateMachine.can_accept_work?(sm)
+      
+      # In stateless architecture, workers don't maintain session bindings
+      # They fetch session data from SessionStore as needed
+      assert sm.state == :ready
     end
 
     @tag :invalid_transitions

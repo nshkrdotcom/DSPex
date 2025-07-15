@@ -23,7 +23,7 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
     :python_path,
     :script_path,
     :worker_id,
-    :current_session,
+    :current_session,  # Kept for compatibility but not used for session binding
     :stats,
     :health_status,
     :started_at
@@ -106,6 +106,10 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
       {:session, session_id} ->
         handle_session_checkout(session_id, from, worker_state, pool_state)
 
+      :any_worker ->
+        # In stateless architecture, any worker can handle any request
+        handle_any_worker_checkout(from, worker_state, pool_state)
+
       :anonymous ->
         handle_anonymous_checkout(from, worker_state, pool_state)
 
@@ -175,11 +179,12 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
 
   ## Checkout Handlers
 
-  defp handle_session_checkout(session_id, {pid, _ref}, worker_state, pool_state) do
-    # Bind worker to session and update stats
+  defp handle_session_checkout(_session_id, {pid, _ref}, worker_state, pool_state) do
+    # In stateless architecture, we don't bind workers to sessions
+    # Workers can handle any session by fetching data from centralized store
     updated_state = %{
       worker_state
-      | current_session: session_id,
+      | current_session: nil,  # No session binding in stateless architecture
         stats: Map.update(worker_state.stats, :checkouts, 1, &(&1 + 1))
     }
 
@@ -213,6 +218,49 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
 
       {:error, reason} ->
         Logger.error("[#{worker_state.worker_id}] Port connection failed: #{inspect(reason)}")
+        {:remove, {:checkout_failed, reason}, pool_state}
+    end
+  end
+
+  defp handle_any_worker_checkout({pid, _ref}, worker_state, pool_state) do
+    # In stateless architecture, any worker can handle any request
+    # No session binding required - worker will fetch session data on demand
+    updated_state = %{
+      worker_state
+      | current_session: nil,  # No session binding in stateless architecture
+        stats: Map.update(worker_state.stats, :checkouts, 1, &(&1 + 1))
+    }
+
+    # Use safe port connection
+    case safe_port_connect(worker_state.port, pid, worker_state.worker_id) do
+      {:ok, _port} ->
+        # Return worker state as client state
+        {:ok, updated_state, updated_state, pool_state}
+
+      {:error, :not_a_pid} ->
+        Logger.error(
+          "[#{worker_state.worker_id}] Invalid PID type during any_worker checkout: #{inspect(pid)}"
+        )
+
+        {:remove, {:checkout_failed, :invalid_pid}, pool_state}
+
+      {:error, :process_not_alive} ->
+        Logger.error(
+          "[#{worker_state.worker_id}] Target process not alive during any_worker checkout: #{inspect(pid)}"
+        )
+
+        {:remove, {:checkout_failed, :process_not_alive}, pool_state}
+
+      {:error, :port_closed_during_connect} ->
+        Logger.error("[#{worker_state.worker_id}] Port closed during any_worker checkout")
+        {:remove, {:checkout_failed, :port_closed_during_connect}, pool_state}
+
+      {:error, {:connect_failed, reason}} ->
+        Logger.error("[#{worker_state.worker_id}] Port connection failed during any_worker checkout: #{inspect(reason)}")
+        {:remove, {:checkout_failed, {:connect_failed, reason}}, pool_state}
+
+      {:error, reason} ->
+        Logger.error("[#{worker_state.worker_id}] Port connection failed during any_worker checkout: #{inspect(reason)}")
         {:remove, {:checkout_failed, reason}, pool_state}
     end
   end

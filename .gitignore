@@ -154,4 +154,8 @@ examples/**/lcov.info
 docs/ashDocs/
 
 
+priv/python/__pycache__/
+
+
 repomix*.xml
+
