@@ -245,7 +245,7 @@ defmodule DSPex.PythonBridge.SessionPool do
         )
       catch
         :exit, {:timeout, _} ->
-          update_metrics(updated_state, :pool_timeout)
+          _result = update_metrics(updated_state, :pool_timeout)
           {:error, :pool_timeout}
 
         :exit, reason ->
@@ -281,7 +281,7 @@ defmodule DSPex.PythonBridge.SessionPool do
         )
       catch
         :exit, {:timeout, _} ->
-          update_metrics(state, :pool_timeout)
+          _result = update_metrics(state, :pool_timeout)
           {:error, :pool_timeout}
 
         :exit, reason ->
@@ -366,8 +366,8 @@ defmodule DSPex.PythonBridge.SessionPool do
     Logger.info("Shutting down session pool gracefully")
 
     # Cancel scheduled tasks
-    Process.cancel_timer(state.health_check_ref)
-    Process.cancel_timer(state.cleanup_ref)
+    _result1 = Process.cancel_timer(state.health_check_ref)
+    _result2 = Process.cancel_timer(state.cleanup_ref)
 
     # End all sessions
     for {session_id, _} <- state.sessions do
@@ -383,7 +383,7 @@ defmodule DSPex.PythonBridge.SessionPool do
   @impl true
   def handle_info(:health_check, state) do
     # Perform health check asynchronously
-    Task.start(fn -> perform_pool_health_check() end)
+    _task = Task.start(fn -> perform_pool_health_check() end)
 
     # Reschedule
     health_check_ref = schedule_health_check()

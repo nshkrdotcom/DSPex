@@ -258,7 +258,7 @@ defmodule DSPex.PythonBridge.ErrorReporter do
   @impl true
   def terminate(_reason, _state) do
     try do
-      :telemetry.detach("error-reporter")
+      _result = :telemetry.detach("error-reporter")
     rescue
       _ -> :ok
     end
@@ -269,7 +269,17 @@ defmodule DSPex.PythonBridge.ErrorReporter do
 
   ## Private Functions
 
-  @spec build_config(keyword()) :: map()
+  @spec build_config(keyword()) :: %{
+          alert_cooldown_ms: non_neg_integer(),
+          alert_destinations: list(),
+          alert_window_ms: non_neg_integer(),
+          circuit_open_threshold: non_neg_integer(),
+          cleanup_interval: non_neg_integer(),
+          error_rate_threshold: float(),
+          max_window_events: non_neg_integer(),
+          min_events_for_alert: non_neg_integer(),
+          monitoring_enabled: boolean()
+        }
   defp build_config(opts) do
     custom_config = Keyword.get(opts, :config, %{})
     app_config = Application.get_env(:dspex, __MODULE__, %{})
@@ -292,14 +302,15 @@ defmodule DSPex.PythonBridge.ErrorReporter do
     ]
 
     try do
-      :telemetry.attach_many(
-        "error-reporter",
-        events,
-        fn event_name, measurements, metadata, _config ->
-          send(__MODULE__, {:telemetry_event, event_name, measurements, metadata})
-        end,
-        nil
-      )
+      _result =
+        :telemetry.attach_many(
+          "error-reporter",
+          events,
+          fn event_name, measurements, metadata, _config ->
+            send(__MODULE__, {:telemetry_event, event_name, measurements, metadata})
+          end,
+          nil
+        )
     rescue
       error ->
         Logger.error("Failed to attach telemetry handlers: #{inspect(error)}")
@@ -461,30 +472,35 @@ defmodule DSPex.PythonBridge.ErrorReporter do
     error_events = Enum.count(recent_events, &(&1.type == :pool_error))
 
     # Check error rate threshold
-    if total_events >= state.config.min_events_for_alert do
-      error_rate = error_events / total_events
+    state =
+      if total_events >= state.config.min_events_for_alert do
+        error_rate = error_events / total_events
 
-      if error_rate >= state.config.error_rate_threshold do
-        alert = %{
-          type: :high_error_rate,
-          message:
-            "High error rate detected: #{Float.round(error_rate * 100, 1)}% (#{error_events}/#{total_events} in last #{div(state.config.alert_window_ms, 1000)}s)",
-          error_rate: error_rate,
-          error_count: error_events,
-          total_count: total_events,
-          timestamp: now,
-          metadata: %{window_ms: state.config.alert_window_ms}
-        }
+        if error_rate >= state.config.error_rate_threshold do
+          alert = %{
+            type: :high_error_rate,
+            message:
+              "High error rate detected: #{Float.round(error_rate * 100, 1)}% (#{error_events}/#{total_events} in last #{div(state.config.alert_window_ms, 1000)}s)",
+            error_rate: error_rate,
+            error_count: error_events,
+            total_count: total_events,
+            timestamp: now,
+            metadata: %{window_ms: state.config.alert_window_ms}
+          }
 
-        if should_send_alert(alert, state) do
-          send_alert(alert, state.config)
-          new_alert_history = add_to_queue(state.alert_history, alert, 50)
-          %{state | alert_history: new_alert_history}
+          if should_send_alert(alert, state) do
+            send_alert(alert, state.config)
+            new_alert_history = add_to_queue(state.alert_history, alert, 50)
+            %{state | alert_history: new_alert_history}
+          else
+            state
+          end
         else
           state
         end
+      else
+        state
       end
-    end
 
     # Check circuit breaker threshold
     open_circuits =
@@ -508,9 +524,9 @@ defmodule DSPex.PythonBridge.ErrorReporter do
       else
         state
       end
+    else
+      state
     end
-
-    state
   end
 
   @spec should_send_alert(map(), %__MODULE__{}) :: boolean()
@@ -545,7 +561,17 @@ defmodule DSPex.PythonBridge.ErrorReporter do
     end)
   end
 
-  @spec send_logger_alert(map()) :: :ok
+  @spec send_logger_alert(%{
+          message: binary(),
+          metadata: map(),
+          timestamp: integer(),
+          type: :circuit_opened | :high_error_rate | :multiple_circuits_open | :test_alert,
+          circuit: term(),
+          error_count: non_neg_integer(),
+          error_rate: float(),
+          open_count: non_neg_integer(),
+          total_count: non_neg_integer()
+        }) :: :ok
   defp send_logger_alert(alert) do
     case alert.type do
       :circuit_opened ->
@@ -562,7 +588,17 @@ defmodule DSPex.PythonBridge.ErrorReporter do
     end
   end
 
-  @spec send_telemetry_alert(map()) :: :ok
+  @spec send_telemetry_alert(%{
+          message: binary(),
+          metadata: map(),
+          timestamp: integer(),
+          type: :circuit_opened | :high_error_rate | :multiple_circuits_open | :test_alert,
+          circuit: term(),
+          error_count: non_neg_integer(),
+          error_rate: float(),
+          open_count: non_neg_integer(),
+          total_count: non_neg_integer()
+        }) :: :ok
   defp send_telemetry_alert(alert) do
     try do
       :telemetry.execute(
@@ -635,7 +671,21 @@ defmodule DSPex.PythonBridge.ErrorReporter do
     end
   end
 
-  @spec add_to_queue(:queue.queue(), term(), pos_integer()) :: :queue.queue()
+  @spec add_to_queue(
+          :queue.queue(term()),
+          %{
+            message: binary(),
+            metadata: map(),
+            timestamp: integer(),
+            type: :circuit_opened | :high_error_rate | :multiple_circuits_open,
+            circuit: term(),
+            error_count: non_neg_integer(),
+            error_rate: float(),
+            open_count: non_neg_integer(),
+            total_count: non_neg_integer()
+          },
+          pos_integer()
+        ) :: :queue.queue(term())
   defp add_to_queue(queue, item, max_size) do
     new_queue = :queue.in(item, queue)
 

@@ -44,7 +44,13 @@ defmodule DSPex.PythonBridge.WorkerMetrics do
       WorkerMetrics.record_transition("worker_123", :ready, :busy, 45_000)
       WorkerMetrics.record_transition("worker_123", :busy, :ready, 1_500, %{session_id: "sess_456"})
   """
-  @spec record_transition(String.t(), atom(), atom(), non_neg_integer(), map()) :: :ok
+  @spec record_transition(String.t(), atom(), atom(), non_neg_integer(), %{
+          optional(:session_id) => String.t(),
+          optional(:timestamp) => integer(),
+          optional(:operation) => atom(),
+          optional(:metadata) => map(),
+          optional(atom()) => term()
+        }) :: :ok
   def record_transition(worker_id, from_state, to_state, duration_ms, metadata \\ %{}) do
     measurements = %{duration: duration_ms}
 
@@ -82,7 +88,12 @@ defmodule DSPex.PythonBridge.WorkerMetrics do
       WorkerMetrics.record_health_check("worker_123", :success, 250)
       WorkerMetrics.record_health_check("worker_123", :failure, 5000, %{error: :timeout})
   """
-  @spec record_health_check(String.t(), atom(), non_neg_integer(), map()) :: :ok
+  @spec record_health_check(String.t(), atom(), non_neg_integer(), %{
+          optional(:error) => atom() | term(),
+          optional(:timestamp) => integer(),
+          optional(:metadata) => map(),
+          optional(atom()) => term()
+        }) :: :ok
   def record_health_check(worker_id, result, duration_ms, metadata \\ %{}) do
     measurements = %{duration: duration_ms}
 
@@ -121,7 +132,11 @@ defmodule DSPex.PythonBridge.WorkerMetrics do
       WorkerMetrics.record_session_affinity("sess_123", "worker_456", :hit)
       WorkerMetrics.record_session_affinity("sess_789", nil, :miss)
   """
-  @spec record_session_affinity(String.t(), String.t() | nil, :hit | :miss, map()) :: :ok
+  @spec record_session_affinity(String.t(), String.t() | nil, :hit | :miss, %{
+          optional(:timestamp) => integer(),
+          optional(:metadata) => map(),
+          optional(atom()) => term()
+        }) :: :ok
   def record_session_affinity(session_id, worker_id, hit_or_miss, metadata \\ %{}) do
     measurements = %{count: 1}
 
@@ -160,7 +175,13 @@ defmodule DSPex.PythonBridge.WorkerMetrics do
       WorkerMetrics.record_operation("worker_123", :execute, 1500, :success)
       WorkerMetrics.record_operation("worker_123", :checkout, 50, :error, %{reason: :port_closed})
   """
-  @spec record_operation(String.t(), atom(), non_neg_integer(), atom(), map()) :: :ok
+  @spec record_operation(String.t(), atom(), non_neg_integer(), atom(), %{
+          optional(:reason) => atom() | term(),
+          optional(:session_id) => String.t(),
+          optional(:timestamp) => integer(),
+          optional(:metadata) => map(),
+          optional(atom()) => term()
+        }) :: :ok
   def record_operation(worker_id, operation, duration_ms, result, metadata \\ %{}) do
     measurements = %{duration: duration_ms}
 
@@ -200,7 +221,12 @@ defmodule DSPex.PythonBridge.WorkerMetrics do
       WorkerMetrics.record_lifecycle("worker_123", :created)
       WorkerMetrics.record_lifecycle("worker_123", :removed, %{reason: :health_failure})
   """
-  @spec record_lifecycle(String.t(), atom(), map()) :: :ok
+  @spec record_lifecycle(String.t(), atom(), %{
+          optional(:reason) => atom() | term(),
+          optional(:timestamp) => integer(),
+          optional(:metadata) => map(),
+          optional(atom()) => term()
+        }) :: :ok
   def record_lifecycle(worker_id, event, metadata \\ %{}) do
     measurements = %{count: 1}
 
@@ -232,7 +258,11 @@ defmodule DSPex.PythonBridge.WorkerMetrics do
   - `value` - Metric value
   - `metadata` - Additional context (optional)
   """
-  @spec record_pool_metric(atom(), atom(), number(), map()) :: :ok
+  @spec record_pool_metric(atom(), atom(), number(), %{
+          optional(:timestamp) => integer(),
+          optional(:metadata) => map(),
+          optional(atom()) => term()
+        }) :: :ok
   def record_pool_metric(pool_name, metric_type, value, metadata \\ %{}) do
     measurements = %{value: value}
 
@@ -273,7 +303,11 @@ defmodule DSPex.PythonBridge.WorkerMetrics do
       result = perform_operation()
       timer.(if match?({:ok, _}, result), do: :success, else: :error)
   """
-  @spec start_timing(String.t(), atom(), map()) :: (atom() -> :ok)
+  @spec start_timing(String.t(), atom(), %{
+          optional(:session_id) => String.t(),
+          optional(:metadata) => map(),
+          optional(atom()) => term()
+        }) :: (atom() -> :ok)
   def start_timing(worker_id, operation, metadata \\ %{}) do
     start_time = System.monotonic_time(:millisecond)
 
@@ -299,24 +333,23 @@ defmodule DSPex.PythonBridge.WorkerMetrics do
 
       WorkerMetrics.attach_handler(:my_metrics, &handle_metrics/4)
   """
-  @spec attach_handler(atom(), function(), map()) :: :ok | {:error, term()}
+  @spec attach_handler(atom(), function(), %{
+          optional(:config) => map(),
+          optional(:metadata) => map(),
+          optional(atom()) => term()
+        }) :: :ok | {:error, term()}
   def attach_handler(handler_id, handler_function, config \\ %{})
       when is_function(handler_function, 4) do
-    if @telemetry_available do
-      events = [
-        [:dspex, :pool, :worker, :transition],
-        [:dspex, :pool, :worker, :health_check],
-        [:dspex, :pool, :session, :affinity],
-        [:dspex, :pool, :worker, :operation],
-        [:dspex, :pool, :worker, :lifecycle],
-        [:dspex, :pool, :metric]
-      ]
+    events = [
+      [:dspex, :pool, :worker, :transition],
+      [:dspex, :pool, :worker, :health_check],
+      [:dspex, :pool, :session, :affinity],
+      [:dspex, :pool, :worker, :operation],
+      [:dspex, :pool, :worker, :lifecycle],
+      [:dspex, :pool, :metric]
+    ]
 
-      :telemetry.attach_many(handler_id, events, handler_function, config)
-    else
-      Logger.warning("Telemetry not available, handler not attached")
-      {:error, :telemetry_not_available}
-    end
+    :telemetry.attach_many(handler_id, events, handler_function, config)
   end
 
   @doc """
@@ -328,11 +361,7 @@ defmodule DSPex.PythonBridge.WorkerMetrics do
   """
   @spec detach_handler(atom()) :: :ok | {:error, term()}
   def detach_handler(handler_id) do
-    if @telemetry_available do
-      :telemetry.detach(handler_id)
-    else
-      {:error, :telemetry_not_available}
-    end
+    :telemetry.detach(handler_id)
   end
 
   @doc """
@@ -345,7 +374,11 @@ defmodule DSPex.PythonBridge.WorkerMetrics do
 
   A map with metric summaries.
   """
-  @spec get_summary() :: map()
+  @spec get_summary() :: %{
+          events_recorded: String.t(),
+          telemetry_available: boolean(),
+          timestamp: integer()
+        }
   def get_summary do
     # This is a placeholder implementation
     # In a real system, you'd aggregate from your metrics backend
@@ -359,15 +392,6 @@ defmodule DSPex.PythonBridge.WorkerMetrics do
   ## Private Functions
 
   defp emit_event(event_name, measurements, metadata) do
-    if @telemetry_available do
-      :telemetry.execute(event_name, measurements, metadata)
-    else
-      # Fallback to logging when telemetry is not available
-      Logger.debug("Metric event",
-        event: event_name,
-        measurements: measurements,
-        metadata: metadata
-      )
-    end
+    :telemetry.execute(event_name, measurements, metadata)
   end
 end

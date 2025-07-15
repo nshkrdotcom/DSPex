@@ -104,7 +104,17 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestrator do
   - `{:ok, {:recovery_started, recovery_id}}` - Async recovery initiated
   - `{:error, reason}` - Recovery not possible
   """
-  @spec handle_error(term(), map()) :: {:ok, term()} | {:error, term()}
+  @spec handle_error(term(), %{
+          optional(:worker_id) => String.t(),
+          optional(:session_id) => String.t(),
+          optional(:operation) => atom(),
+          optional(:attempt) => non_neg_integer(),
+          optional(:adapter) => module(),
+          optional(:user_facing) => boolean(),
+          optional(:original_operation) => function(),
+          optional(:args) => list() | map(),
+          optional(atom()) => term()
+        }) :: {:ok, term()} | {:error, term()}
   def handle_error(error, context) do
     GenServer.call(__MODULE__, {:handle_error, error, context}, 30_000)
   end
@@ -121,7 +131,17 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestrator do
   - `{:ok, status}` - Recovery status information
   - `{:error, :not_found}` - Recovery ID not found
   """
-  @spec get_recovery_status(String.t()) :: {:ok, map()} | {:error, :not_found}
+  @spec get_recovery_status(String.t()) ::
+          {:ok,
+           %{
+             id: String.t(),
+             error_category: atom(),
+             strategy: atom(),
+             started_at: integer(),
+             duration: integer(),
+             status: :in_progress
+           }}
+          | {:error, :not_found}
   def get_recovery_status(recovery_id) do
     GenServer.call(__MODULE__, {:get_recovery_status, recovery_id})
   end
@@ -133,7 +153,16 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestrator do
 
   Map with recovery metrics including success rates, timing, and active recoveries.
   """
-  @spec get_metrics() :: map()
+  @spec get_metrics() :: %{
+          recoveries_initiated: non_neg_integer(),
+          recoveries_succeeded: non_neg_integer(),
+          recoveries_failed: non_neg_integer(),
+          recoveries_cancelled: non_neg_integer(),
+          avg_recovery_time: non_neg_integer(),
+          total_recovery_time: non_neg_integer(),
+          active_recoveries: non_neg_integer(),
+          success_rate: float()
+        }
   def get_metrics do
     GenServer.call(__MODULE__, :get_metrics)
   end
@@ -476,7 +505,7 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestrator do
   end
 
   @spec execute_retry_recovery(PoolErrorHandler.t(), recovery_strategy()) ::
-          {:ok, term()} | {:error, term()}
+          {:ok, term()} | {:error, :no_original_operation | term()}
   defp execute_retry_recovery(error, strategy) do
     context = error.context
 
@@ -496,7 +525,7 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestrator do
   end
 
   @spec execute_failover_recovery(PoolErrorHandler.t(), recovery_strategy()) ::
-          {:ok, term()} | {:error, term()}
+          {:ok, {:failover, term()}} | {:error, {:failover_failed, term()}}
   defp execute_failover_recovery(error, strategy) do
     adapter = strategy.fallback_adapter
     context = error.context
@@ -516,7 +545,8 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestrator do
     end
   end
 
-  @spec execute_custom_recovery(map(), recovery_strategy()) :: {:ok, term()} | {:error, term()}
+  @spec execute_custom_recovery(PoolErrorHandler.t(), recovery_strategy()) ::
+          {:ok, term()} | {:error, term()}
   defp execute_custom_recovery(error, strategy) do
     case strategy.custom_function do
       nil ->
@@ -577,7 +607,8 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestrator do
     "recovery_#{System.unique_integer([:positive])}_#{System.os_time(:nanosecond)}"
   end
 
-  @spec get_circuit_breaker_name(PoolErrorHandler.t()) :: atom() | nil
+  @spec get_circuit_breaker_name(PoolErrorHandler.t()) ::
+          :pool_connections | :pool_resources | :worker_initialization | nil
   defp get_circuit_breaker_name(error) do
     case error.error_category do
       :connection_error -> :pool_connections

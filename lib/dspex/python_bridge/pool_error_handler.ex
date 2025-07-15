@@ -112,7 +112,21 @@ defmodule DSPex.PythonBridge.PoolErrorHandler do
       wrapped = PoolErrorHandler.wrap_pool_error({:port_exited, 1}, context)
       # => %{error_category: :connection_error, severity: :major, ...}
   """
-  @spec wrap_pool_error(term(), map()) :: t()
+  @spec wrap_pool_error(term(), %{
+          optional(:worker_id) => String.t(),
+          optional(:session_id) => String.t(),
+          optional(:operation) => atom(),
+          optional(:attempt) => non_neg_integer(),
+          optional(:severity) => error_severity(),
+          optional(:affecting_all_workers) => boolean(),
+          optional(:user_facing) => boolean(),
+          optional(:metadata) => map(),
+          optional(:circuit) => atom(),
+          optional(:time_until_retry) => non_neg_integer(),
+          optional(:failure_count) => non_neg_integer(),
+          optional(:concurrent_requests) => non_neg_integer(),
+          optional(atom()) => term()
+        }) :: t()
   def wrap_pool_error(error, context) do
     category = categorize_error(error)
     severity = determine_severity(category, context)
@@ -156,7 +170,7 @@ defmodule DSPex.PythonBridge.PoolErrorHandler do
 
   Boolean indicating if retry should be attempted.
   """
-  @spec should_retry?(map(), non_neg_integer()) :: boolean()
+  @spec should_retry?(t(), non_neg_integer()) :: boolean()
   def should_retry?(wrapped_error, attempt \\ 1) do
     case wrapped_error.recovery_strategy do
       :immediate_retry -> attempt <= 3
@@ -181,7 +195,7 @@ defmodule DSPex.PythonBridge.PoolErrorHandler do
 
   Delay in milliseconds before next retry attempt.
   """
-  @spec get_retry_delay(map(), non_neg_integer()) :: non_neg_integer()
+  @spec get_retry_delay(t(), non_neg_integer()) :: non_neg_integer()
   def get_retry_delay(wrapped_error, attempt) do
     strategy = wrapped_error.recovery_strategy
     delays = Map.get(@retry_delays, strategy, [1_000])
@@ -201,7 +215,7 @@ defmodule DSPex.PythonBridge.PoolErrorHandler do
 
   Multi-line formatted string suitable for logging.
   """
-  @spec format_for_logging(map()) :: String.t()
+  @spec format_for_logging(t()) :: String.t()
   def format_for_logging(wrapped_error) do
     """
     Pool Error: #{wrapped_error.message}
@@ -270,7 +284,17 @@ defmodule DSPex.PythonBridge.PoolErrorHandler do
     end
   end
 
-  @spec determine_severity(error_category(), map()) :: error_severity()
+  @spec determine_severity(error_category(), %{
+          optional(:worker_id) => String.t(),
+          optional(:session_id) => String.t(),
+          optional(:operation) => atom(),
+          optional(:attempt) => non_neg_integer(),
+          optional(:severity) => error_severity(),
+          optional(:affecting_all_workers) => boolean(),
+          optional(:user_facing) => boolean(),
+          optional(:metadata) => map(),
+          optional(atom()) => term()
+        }) :: error_severity()
   defp determine_severity(category, context) do
     # Use provided severity if available, otherwise determine from category
     case Map.get(context, :severity) do
@@ -282,7 +306,17 @@ defmodule DSPex.PythonBridge.PoolErrorHandler do
     end
   end
 
-  @spec determine_base_severity(error_category(), map()) :: error_severity()
+  @spec determine_base_severity(error_category(), %{
+          optional(:worker_id) => String.t(),
+          optional(:session_id) => String.t(),
+          optional(:operation) => atom(),
+          optional(:attempt) => non_neg_integer(),
+          optional(:severity) => error_severity(),
+          optional(:affecting_all_workers) => boolean(),
+          optional(:user_facing) => boolean(),
+          optional(:metadata) => map(),
+          optional(atom()) => term()
+        }) :: error_severity()
   defp determine_base_severity(category, context) do
     base_severity =
       case category do
@@ -307,13 +341,23 @@ defmodule DSPex.PythonBridge.PoolErrorHandler do
     end
   end
 
-  @spec upgrade_severity(error_severity()) :: error_severity()
+  @spec upgrade_severity(error_severity()) :: :major | :critical
   defp upgrade_severity(:minor), do: :major
   defp upgrade_severity(:major), do: :critical
-  defp upgrade_severity(severity), do: severity
+  defp upgrade_severity(:warning), do: :major
+  defp upgrade_severity(:critical), do: :critical
 
-  @spec determine_recovery_strategy(error_category(), error_severity(), map()) ::
-          recovery_strategy()
+  @spec determine_recovery_strategy(error_category(), error_severity(), %{
+          optional(:worker_id) => String.t(),
+          optional(:session_id) => String.t(),
+          optional(:operation) => atom(),
+          optional(:attempt) => non_neg_integer(),
+          optional(:severity) => error_severity(),
+          optional(:affecting_all_workers) => boolean(),
+          optional(:user_facing) => boolean(),
+          optional(:metadata) => map(),
+          optional(atom()) => term()
+        }) :: recovery_strategy()
   defp determine_recovery_strategy(category, severity, context) do
     # Check for abandonment conditions first
     cond do
@@ -322,8 +366,17 @@ defmodule DSPex.PythonBridge.PoolErrorHandler do
     end
   end
 
-  @spec determine_strategy_by_category(error_category(), error_severity(), map()) ::
-          recovery_strategy()
+  @spec determine_strategy_by_category(error_category(), error_severity(), %{
+          optional(:worker_id) => String.t(),
+          optional(:session_id) => String.t(),
+          optional(:operation) => atom(),
+          optional(:attempt) => non_neg_integer(),
+          optional(:severity) => error_severity(),
+          optional(:affecting_all_workers) => boolean(),
+          optional(:user_facing) => boolean(),
+          optional(:metadata) => map(),
+          optional(atom()) => term()
+        }) :: recovery_strategy()
   defp determine_strategy_by_category(category, severity, _context) do
     case {category, severity} do
       # Resource errors - critical uses circuit breaker, major uses failover
