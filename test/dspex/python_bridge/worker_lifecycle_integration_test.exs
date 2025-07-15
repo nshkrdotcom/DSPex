@@ -201,11 +201,20 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
       {:ok, basic_pool} = SessionPoolV2.start_link(basic_pool_opts)
       
       basic_status = GenServer.call(basic_pool_opts[:name], :get_status)
+      IO.puts("Basic status: #{inspect(basic_status, pretty: true)}")
       assert basic_status.pool_size == 1
       # Basic workers don't have session affinity
       assert basic_status.session_affinity == %{}
       
-      GenServer.stop(basic_pool)
+      # Defensive cleanup
+      if Process.alive?(basic_pool) do
+        ref = Process.monitor(basic_pool)
+        GenServer.stop(basic_pool, :normal, 2000)
+        receive do
+          {:DOWN, ^ref, :process, ^basic_pool, _} -> :ok
+        after 100 -> :ok
+        end
+      end
       
       # Enhanced worker pools should have session affinity
       enhanced_pool_opts = [
@@ -222,7 +231,15 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
       # Enhanced workers should have session affinity tracking
       assert is_map(enhanced_status.session_affinity)
       
-      GenServer.stop(enhanced_pool)
+      # Defensive cleanup  
+      if Process.alive?(enhanced_pool) do
+        ref = Process.monitor(enhanced_pool)
+        GenServer.stop(enhanced_pool, :normal, 2000)
+        receive do
+          {:DOWN, ^ref, :process, ^enhanced_pool, _} -> :ok
+        after 100 -> :ok
+        end
+      end
     end
     
     @tag :concurrent_operations
