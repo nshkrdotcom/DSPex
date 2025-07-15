@@ -159,8 +159,11 @@ defmodule DSPex.PythonBridge.WorkerRecovery do
   """
   @spec execute_recovery(recovery_strategy(), map(), term()) ::
           {:retry, non_neg_integer()}
-          | {:ok, map()}
-          | {:remove, term(), term()}
+          | {:ok, %{state_machine: DSPex.PythonBridge.WorkerStateMachine.t()}, term()}
+          | {:remove,
+             {:recovery_removal, term()}
+             | {:replaced, term()}
+             | {:state_transition_failed, term()}, term()}
   def execute_recovery(strategy, worker_state, pool_state) do
     case strategy.action do
       :retry ->
@@ -217,7 +220,7 @@ defmodule DSPex.PythonBridge.WorkerRecovery do
       get_failure_delay({:timeout, "Operation timeout"})
       # => 3_000
   """
-  @spec get_failure_delay(term()) :: non_neg_integer()
+  @spec get_failure_delay(term()) :: 1000 | 3000 | 5000 | 10000
   def get_failure_delay(failure_reason) do
     case failure_reason do
       {:health_check_failed, _} -> 5_000

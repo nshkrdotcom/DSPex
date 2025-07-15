@@ -70,6 +70,45 @@ defmodule DSPex.PythonBridge.ErrorReporter do
           last_failure: integer() | nil
         }
 
+  @type circuit_opened_alert :: %{
+          type: :circuit_opened,
+          message: binary(),
+          timestamp: integer(),
+          metadata: map(),
+          circuit: term()
+        }
+
+  @type high_error_rate_alert :: %{
+          type: :high_error_rate,
+          message: binary(),
+          timestamp: integer(),
+          metadata: map(),
+          error_rate: float(),
+          error_count: non_neg_integer(),
+          total_count: non_neg_integer()
+        }
+
+  @type multiple_circuits_alert :: %{
+          type: :multiple_circuits_open,
+          message: binary(),
+          timestamp: integer(),
+          metadata: map(),
+          open_count: non_neg_integer()
+        }
+
+  @type test_alert :: %{
+          type: :test_alert,
+          message: binary(),
+          timestamp: integer(),
+          metadata: map()
+        }
+
+  @type alert ::
+          circuit_opened_alert()
+          | high_error_rate_alert()
+          | multiple_circuits_alert()
+          | test_alert()
+
   @default_config %{
     # 10% error rate triggers alert
     error_rate_threshold: 0.1,
@@ -136,7 +175,7 @@ defmodule DSPex.PythonBridge.ErrorReporter do
 
   List of recent alerts with timestamps and details.
   """
-  @spec get_alert_history() :: [map()]
+  @spec get_alert_history() :: [alert()]
   def get_alert_history do
     GenServer.call(__MODULE__, :get_alert_history)
   end
@@ -561,17 +600,7 @@ defmodule DSPex.PythonBridge.ErrorReporter do
     end)
   end
 
-  @spec send_logger_alert(%{
-          message: binary(),
-          metadata: map(),
-          timestamp: integer(),
-          type: :circuit_opened | :high_error_rate | :multiple_circuits_open | :test_alert,
-          circuit: term(),
-          error_count: non_neg_integer(),
-          error_rate: float(),
-          open_count: non_neg_integer(),
-          total_count: non_neg_integer()
-        }) :: :ok
+  @spec send_logger_alert(alert()) :: :ok
   defp send_logger_alert(alert) do
     case alert.type do
       :circuit_opened ->
@@ -588,17 +617,7 @@ defmodule DSPex.PythonBridge.ErrorReporter do
     end
   end
 
-  @spec send_telemetry_alert(%{
-          message: binary(),
-          metadata: map(),
-          timestamp: integer(),
-          type: :circuit_opened | :high_error_rate | :multiple_circuits_open | :test_alert,
-          circuit: term(),
-          error_count: non_neg_integer(),
-          error_rate: float(),
-          open_count: non_neg_integer(),
-          total_count: non_neg_integer()
-        }) :: :ok
+  @spec send_telemetry_alert(alert()) :: :ok
   defp send_telemetry_alert(alert) do
     try do
       :telemetry.execute(
@@ -671,21 +690,7 @@ defmodule DSPex.PythonBridge.ErrorReporter do
     end
   end
 
-  @spec add_to_queue(
-          :queue.queue(term()),
-          %{
-            message: binary(),
-            metadata: map(),
-            timestamp: integer(),
-            type: :circuit_opened | :high_error_rate | :multiple_circuits_open,
-            circuit: term(),
-            error_count: non_neg_integer(),
-            error_rate: float(),
-            open_count: non_neg_integer(),
-            total_count: non_neg_integer()
-          },
-          pos_integer()
-        ) :: :queue.queue(term())
+  @spec add_to_queue(:queue.queue(term()), alert(), pos_integer()) :: :queue.queue(term())
   defp add_to_queue(queue, item, max_size) do
     new_queue = :queue.in(item, queue)
 

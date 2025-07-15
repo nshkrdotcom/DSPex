@@ -247,15 +247,6 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
             {:error, reason} ->
               error = handle_decode_error(reason, enhanced_context)
               {{:error, error}, :close}
-
-            _ ->
-              error =
-                PoolErrorHandler.wrap_pool_error(
-                  {:malformed_response, "Unexpected response format"},
-                  enhanced_context
-                )
-
-              {{:error, error}, :close}
           end
 
         {^port, {:exit_status, status}} ->
@@ -286,7 +277,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     end
   end
 
-  @spec handle_pool_error(term(), map()) :: {:error, term()}
+  @spec handle_pool_error(term(), map()) :: {:error, DSPex.PythonBridge.PoolErrorHandler.t()}
   defp handle_pool_error(error, context) do
     wrapped = PoolErrorHandler.wrap_pool_error(error, context)
 

@@ -315,6 +315,7 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestrator do
         # Cancel the task
         if recovery.task_ref do
           _result = Task.shutdown(recovery.task_ref, :brutal_kill)
+          :ok
         end
 
         # Reply to original caller if waiting
@@ -618,16 +619,18 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestrator do
     end
   end
 
-  @spec get_fallback_adapter(PoolErrorHandler.t()) :: module() | nil
+  @spec get_fallback_adapter(PoolErrorHandler.t()) ::
+          DSPex.Adapters.Mock | DSPex.Adapters.PythonPort
   defp get_fallback_adapter(error) do
-    case Map.get(error.context || %{}, :adapter) do
+    case Map.get(error.context, :adapter) do
       DSPex.PythonBridge.SessionPoolV2 -> DSPex.Adapters.PythonPort
       DSPex.Adapters.PythonPort -> DSPex.Adapters.Mock
       _ -> DSPex.Adapters.Mock
     end
   end
 
-  @spec calculate_max_recovery_time(PoolErrorHandler.t()) :: pos_integer()
+  @spec calculate_max_recovery_time(PoolErrorHandler.t()) ::
+          2500 | 5000 | 10000 | 15000 | 30000 | 60000
   defp calculate_max_recovery_time(error) do
     base_time =
       case error.severity do
@@ -642,7 +645,11 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestrator do
     if Map.get(context, :user_facing), do: div(base_time, 2), else: base_time
   end
 
-  @spec update_success_metrics(map(), integer()) :: map()
+  @spec update_success_metrics(map(), integer()) :: %{
+          :avg_recovery_time => integer(),
+          :total_recovery_time => integer(),
+          optional(atom()) => term()
+        }
   defp update_success_metrics(metrics, duration) do
     current_total = Map.get(metrics, :total_recovery_time, 0)
     current_count = Map.get(metrics, :recoveries_succeeded, 0)
@@ -668,7 +675,12 @@ defmodule DSPex.PythonBridge.ErrorRecoveryOrchestrator do
     end
   end
 
-  @spec emit_telemetry(atom(), map(), map()) :: :ok
+  @spec emit_telemetry(:recovery_complete, %{duration: integer()}, %{
+          recovery_id: binary(),
+          error_category: atom(),
+          strategy: atom(),
+          result: atom()
+        }) :: :ok
   defp emit_telemetry(event, measurements, metadata) do
     try do
       :telemetry.execute(

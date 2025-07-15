@@ -329,7 +329,6 @@ defmodule DSPex.PythonBridge.PoolErrorHandler do
         :python_error -> :major
         :health_check_error -> :minor
         :session_error -> :minor
-        _ -> :warning
       end
 
     # Adjust severity based on context
@@ -341,10 +340,9 @@ defmodule DSPex.PythonBridge.PoolErrorHandler do
     end
   end
 
-  @spec upgrade_severity(error_severity()) :: :major | :critical
+  @spec upgrade_severity(:minor | :major | :critical) :: :major | :critical
   defp upgrade_severity(:minor), do: :major
   defp upgrade_severity(:major), do: :critical
-  defp upgrade_severity(:warning), do: :major
   defp upgrade_severity(:critical), do: :critical
 
   @spec determine_recovery_strategy(error_category(), error_severity(), %{

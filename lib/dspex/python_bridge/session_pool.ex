@@ -457,9 +457,6 @@ defmodule DSPex.PythonBridge.SessionPool do
       case metric do
         :pool_timeout ->
           Map.update(state.metrics, :pool_timeouts, 1, &(&1 + 1))
-
-        _ ->
-          state.metrics
       end
 
     %{state | metrics: metrics}
