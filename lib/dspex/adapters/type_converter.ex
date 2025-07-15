@@ -633,15 +633,16 @@ defmodule DSPex.Adapters.TypeConverter do
   # Enhanced Python format helpers for dynamic signature system
 
   defp convert_fields_to_python_format(fields) do
-    Enum.map(fields, fn 
+    Enum.map(fields, fn
       # New pattern to extract description from enhanced signature format
-      {name, {type, desc}, _constraints} -> 
+      {name, {type, desc}, _constraints} ->
         %{"name" => to_string(name), "type" => to_string(type), "description" => desc}
+
       # Existing pattern - backward compatibility
       {name, type, constraints} ->
         %{
-          "name" => to_string(name), 
-          "type" => to_string(type), 
+          "name" => to_string(name),
+          "type" => to_string(type),
           "description" => get_field_description(constraints)
         }
     end)
