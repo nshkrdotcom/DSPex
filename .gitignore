@@ -1,40 +1,55 @@
 # The directory Mix will write compiled artifacts to.
 /_build/
+examples/**/_build/
 
 # If you run "mix test --cover", coverage assets end up here.
 /cover/
+examples/**/cover/
 
 # The directory Mix downloads your dependencies sources to.
 /deps/
+examples/**/deps/
 
 # Where third-party dependencies like ExDoc output generated docs.
 /doc/
+examples/**/doc/
 
 # If the VM crashes, it generates a dump, let's ignore it too.
 erl_crash.dump
+examples/**/erl_crash.dump
 
 # Also ignore archive artifacts (built via "mix archive.build").
 *.ez
+examples/**/*.ez
 
 # Ignore package tarball (built via "mix hex.build").
 dspex-*.tar
 *.tar
+examples/**/*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+examples/**/tmp/
 
 # Ignore dialyzer output and cache
 /priv/plts/
 .dialyzer/
 .dialyzer_plt
 .dialyzer_plt.hash
+examples/**/priv/plts/
+examples/**/.dialyzer/
+examples/**/.dialyzer_plt
+examples/**/.dialyzer_plt.hash
 
 # Ignore LSP cache and temp files
 .elixir_ls/
 .lexical/
+examples/**/.elixir_ls/
+examples/**/.lexical/
 
 # Ignore Credo configuration cache
 .credo/
+examples/**/.credo/
 
 # Environment variables and secrets
 .env
@@ -42,6 +57,11 @@ dspex-*.tar
 .env.production
 .env.test
 *.env
+examples/**/.env
+examples/**/.env.local
+examples/**/.env.production
+examples/**/.env.test
+examples/**/*.env
 
 # OS generated files
 .DS_Store
@@ -51,6 +71,13 @@ dspex-*.tar
 .Trashes
 ehthumbs.db
 Thumbs.db
+examples/**/.DS_Store
+examples/**/.DS_Store?
+examples/**/._*
+examples/**/.Spotlight-V100
+examples/**/.Trashes
+examples/**/ehthumbs.db
+examples/**/Thumbs.db
 
 # Editor/IDE files
 .vscode/
@@ -58,10 +85,16 @@ Thumbs.db
 *.swp
 *.swo
 *~
+examples/**/.vscode/
+examples/**/.idea/
+examples/**/*.swp
+examples/**/*.swo
 
 # Log files
 *.log
 logs/
+examples/**/*.log
+examples/**/logs/
 
 # Phoenix specific
 /priv/static/
@@ -71,33 +104,52 @@ yarn-debug.log*
 yarn-error.log*
 package-lock.json
 yarn.lock
+examples/**/priv/static/
+examples/**/node_modules/
+examples/**/npm-debug.log*
+examples/**/yarn-debug.log*
+examples/**/yarn-error.log*
+examples/**/package-lock.json
+examples/**/yarn.lock
 
 # Phoenix Live Dashboard local storage
 /priv/static/dashboard/
+examples/**/priv/static/dashboard/
 
 # If using webpack or other asset builders
 /assets/node_modules/
+examples/**/assets/node_modules/
 
 # Release artifacts
 rel/
 *.tar.gz
+examples/**/rel/
+examples/**/*.tar.gz
 
 # Hex docs
 hex_metadata.config
+examples/**/hex_metadata.config
 
 # Ignore backup files
 *.bak
 *.backup
 *~
+examples/**/*.bak
+examples/**/*.backup
 
 # Ignore test artifacts and reports
 test-reports/
 *.junit.xml
 test_output/
+examples/**/test-reports/
+examples/**/*.junit.xml
+examples/**/test_output/
 
 # Ignore coverage reports
 coverage/
 lcov.info
+examples/**/coverage/
+examples/**/lcov.info
 
 docs/ashDocs/
 

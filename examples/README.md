@@ -20,7 +20,24 @@ export GEMINI_API_KEY="your-api-key-here"
 ./run_simple_example.sh
 ```
 
-### 2. [Concurrent Pool Example](concurrent_pool_example/)
+### 2. [Dynamic Signature Example](signature_example/) 🆕
+**Purpose**: Advanced dynamic signature capabilities beyond "question → answer"  
+**Difficulty**: Intermediate  
+**Features**:
+- Multi-input signatures (text + style, text + target_language)
+- Multi-output signatures (sentiment + summary + keywords + confidence)
+- Dynamic signature generation and caching
+- Real-world use cases (analysis, translation, enhancement, creative writing)
+- Fallback mechanisms for reliability
+
+**Quick Start**:
+```bash
+cd signature_example
+export GEMINI_API_KEY="your-api-key-here"
+./run_signature_example.sh
+```
+
+### 3. [Concurrent Pool Example](concurrent_pool_example/)
 **Purpose**: Advanced concurrent operations with SessionPoolV2  
 **Difficulty**: Advanced  
 **Features**:
@@ -63,6 +80,10 @@ Each example includes an executable shell script for easy CLI usage:
 cd simple_dspy_example
 ./run_simple_example.sh [command]
 
+# Dynamic signature example
+cd signature_example
+./run_signature_example.sh [command]
+
 # Concurrent example  
 cd concurrent_pool_example
 ./run_concurrent_example.sh [command]
@@ -75,6 +96,10 @@ Use Elixir Mix tasks directly:
 # Simple example
 cd simple_dspy_example
 mix run_example [command]
+
+# Dynamic signature example  
+cd signature_example
+mix run_all_examples [command]
 
 # Concurrent example
 cd concurrent_pool_example  
@@ -90,6 +115,7 @@ iex -S mix
 
 # Then run example functions
 iex> SimpleDspyExample.run()
+iex> SignatureExample.run_all_examples()
 iex> ConcurrentPoolExample.run_concurrent_operations()
 ```
 
@@ -100,6 +126,15 @@ iex> ConcurrentPoolExample.run_concurrent_operations()
 - `models` - List available language models
 - `errors` - Demonstrate error handling
 - `help` - Show help message
+
+### Dynamic Signature Example
+- Interactive menu (default) - Choose specific examples
+- `--all` - Run all signature examples
+- `--text-analysis` - Text analysis with multiple outputs
+- `--translation` - Multi-language translation
+- `--enhancement` - Content improvement
+- `--creative` - Creative writing generation
+- `--help` - Show help message
 
 ### Concurrent Pool Example
 - `concurrent` (default) - Run concurrent operations demo
@@ -128,18 +163,29 @@ For new users, we recommend following this learning path:
    ./run_simple_example.sh errors
    ```
 
-4. **Move to Concurrent Example**: Learn advanced pool features
+4. **Try Dynamic Signatures**: Learn advanced signature capabilities
+   ```bash
+   cd ../signature_example
+   ./run_signature_example.sh
+   ```
+
+5. **Explore Different Signature Types**: Test various use cases
+   ```bash
+   ./run_signature_example.sh # Choose from interactive menu
+   ```
+
+6. **Move to Concurrent Example**: Learn advanced pool features
    ```bash
    cd ../concurrent_pool_example
    ./run_concurrent_example.sh
    ```
 
-5. **Test Session Affinity**: See how stateful operations work
+7. **Test Session Affinity**: See how stateful operations work
    ```bash
    ./run_concurrent_example.sh affinity
    ```
 
-6. **Benchmark Performance**: Compare concurrent vs sequential execution
+8. **Benchmark Performance**: Compare concurrent vs sequential execution
    ```bash
    ./run_concurrent_example.sh benchmark
    ```
@@ -151,6 +197,14 @@ For new users, we recommend following this learning path:
 - **Error handling patterns**: Robust error checking and reporting
 - **Configuration management**: Environment variable usage
 - **Program signatures**: Input/output type definitions
+
+### Dynamic Signature Example Demonstrates
+- **Multi-input/output signatures**: Beyond "question → answer" patterns
+- **Dynamic signature generation**: Runtime signature class creation
+- **Signature caching**: Performance optimization through reuse
+- **Real-world use cases**: Text analysis, translation, enhancement, creative writing
+- **Fallback mechanisms**: Graceful degradation when dynamic signatures fail
+- **Type safety**: Automatic type conversion and validation
 
 ### Concurrent Example Demonstrates
 - **SessionPoolV2 capabilities**: Advanced pool management
@@ -174,6 +228,35 @@ program_config = %{
     outputs: [%{name: "answer", type: "string"}]
   }
 }
+```
+
+### Dynamic Signature Configuration (Signature Example)
+```elixir
+# Multi-input, multi-output signature
+signature = %{
+  name: "TextAnalysisSignature",
+  description: "Comprehensive text analysis",
+  inputs: [
+    %{name: "text", type: "string", description: "Input text to analyze"},
+    %{name: "style", type: "string", description: "Analysis style"}
+  ],
+  outputs: [
+    %{name: "sentiment", type: "string", description: "Detected sentiment"},
+    %{name: "summary", type: "string", description: "Text summary"},
+    %{name: "keywords", type: "string", description: "Key terms"},
+    %{name: "confidence_score", type: "string", description: "Confidence level"}
+  ]
+}
+
+# Create program with dynamic signature
+{:ok, prog_id} = adapter.create_program(%{
+  id: "analysis_program",
+  signature: signature
+})
+
+# Execute with multiple inputs
+inputs = %{text: "Sample text", style: "detailed"}
+{:ok, result} = adapter.execute_program(prog_id, inputs)
 ```
 
 ### Advanced Configuration (Concurrent Example)
@@ -226,11 +309,12 @@ SessionPoolV2.execute_in_session(session_id, :predict, args)
 
 After completing these examples:
 
-1. **Implement Your Own Signatures**: Create custom input/output definitions
-2. **Experiment with Different Models**: Try various Gemini model variants
-3. **Optimize Pool Configuration**: Tune pool sizes for your workload
-4. **Build Production Applications**: Apply patterns to real-world scenarios
-5. **Contribute Examples**: Share your own examples with the community
+1. **Implement Your Own Signatures**: Create custom input/output definitions beyond the provided examples
+2. **Experiment with Different Models**: Try various Gemini model variants and compare performance
+3. **Combine Dynamic Signatures with Pooling**: Use advanced signatures with SessionPoolV2 for production
+4. **Optimize Pool Configuration**: Tune pool sizes for your workload
+5. **Build Production Applications**: Apply patterns to real-world scenarios
+6. **Contribute Examples**: Share your own examples with the community
 
 ## Contributing
 

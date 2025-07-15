@@ -107,15 +107,29 @@ defmodule DSPex.Adapters.TypeConverter do
 
   @doc """
   Convert signature to target format with test layer awareness.
+  Enhanced for dynamic signature system with rich metadata.
   """
   @spec convert_signature_to_format(module(), atom(), conversion_opts()) :: map()
   def convert_signature_to_format(signature_module, target_format, opts \\ []) do
     signature = signature_module.__signature__()
 
-    %{
-      inputs: convert_fields_to_format(signature.inputs, target_format, opts),
-      outputs: convert_fields_to_format(signature.outputs, target_format, opts)
-    }
+    case target_format do
+      :python ->
+        # Enhanced payload for Python bridge dynamic signature factory
+        %{
+          "name" => to_string(signature.module),
+          "description" => get_module_doc(signature_module),
+          "inputs" => convert_fields_to_python_format(signature.inputs),
+          "outputs" => convert_fields_to_python_format(signature.outputs)
+        }
+
+      _other ->
+        # Backward compatibility for other formats
+        %{
+          inputs: convert_fields_to_format(signature.inputs, target_format, opts),
+          outputs: convert_fields_to_format(signature.outputs, target_format, opts)
+        }
+    end
   end
 
   @doc """
@@ -615,4 +629,31 @@ defmodule DSPex.Adapters.TypeConverter do
   defp type_of(data) when is_tuple(data), do: :tuple
   defp type_of(nil), do: nil
   defp type_of(_), do: :unknown
+
+  # Enhanced Python format helpers for dynamic signature system
+
+  defp convert_fields_to_python_format(fields) do
+    Enum.map(fields, fn 
+      # New pattern to extract description from enhanced signature format
+      {name, {type, desc}, _constraints} -> 
+        %{"name" => to_string(name), "type" => to_string(type), "description" => desc}
+      # Existing pattern - backward compatibility
+      {name, type, constraints} ->
+        %{
+          "name" => to_string(name), 
+          "type" => to_string(type), 
+          "description" => get_field_description(constraints)
+        }
+    end)
+  end
+
+  defp get_module_doc(module) do
+    case Code.fetch_docs(module) do
+      {:docs_v1, _, _, _, %{"en" => doc}, _, _} when is_binary(doc) -> doc
+      {:docs_v1, _, _, _, doc, _, _} when is_binary(doc) -> doc
+      _ -> ""
+    end
+  rescue
+    _ -> ""
+  end
 end
