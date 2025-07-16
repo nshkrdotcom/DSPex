@@ -92,10 +92,15 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
       case result do
         {:ok, response} when command == :create_program ->
           case store_program_data_after_creation(session_id, args, response) do
-            {:error, reason} -> 
-              Logger.warning("Program created successfully but failed to store metadata: #{inspect(reason)}")
-            _ -> :ok
+            {:error, reason} ->
+              Logger.warning(
+                "Program created successfully but failed to store metadata: #{inspect(reason)}"
+              )
+
+            _ ->
+              :ok
           end
+
           update_session_activity(session_id)
 
         {:ok, _} ->
