@@ -23,7 +23,8 @@ defmodule DSPex.PythonBridge.ConditionalSupervisor do
       case determine_bridge_mode(opts) do
         :pool ->
           Logger.info("Starting Python bridge pool supervisor")
-          [DSPex.PythonBridge.PoolSupervisor]
+          # Use enhanced supervisor that supports both V2 and V3
+          [DSPex.PythonBridge.EnhancedPoolSupervisor]
 
         :single ->
           Logger.info("Starting Python bridge supervisor (single mode)")

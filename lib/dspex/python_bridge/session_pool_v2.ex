@@ -233,11 +233,15 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
       # Wait for response with simple error handling
       receive do
         {^port, {:data, data}} ->
-          log_debug("Raw response from Python worker #{worker.worker_id}: #{inspect(data, limit: 500)}")
+          log_debug(
+            "Raw response from Python worker #{worker.worker_id}: #{inspect(data, limit: 500)}"
+          )
 
           case Protocol.decode_response(data) do
             {:ok, ^request_id, response} when is_map(response) ->
-              log_debug("Success response from worker #{worker.worker_id}: #{inspect(response, limit: 500)}")
+              log_debug(
+                "Success response from worker #{worker.worker_id}: #{inspect(response, limit: 500)}"
+              )
 
               {{:ok, response}, :ok}
 
@@ -262,7 +266,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
               else
                 Logger.error("Python error from worker #{worker.worker_id}: #{inspect(error)}")
               end
-              
+
               {{:error, error}, :ok}
 
             {:error, reason} ->
@@ -323,36 +327,36 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   end
 
   ## Enhanced Logging Functions
-  
+
   defp get_test_mode do
     :persistent_term.get({:dspex, :test_mode}, false)
   end
-  
+
   defp get_error_handling_config do
     Application.get_env(:dspex, :error_handling, [])
   end
-  
+
   defp should_log_verbose_worker_details? do
     config = get_error_handling_config()
     debug_mode = Keyword.get(config, :debug_mode, false)
     clean_output = Keyword.get(config, :clean_output, true)
-    
+
     # Show verbose details only in debug mode, suppress when clean_output is enabled
     debug_mode and not clean_output
   end
-  
+
   defp log_debug(message) do
     if should_log_verbose_worker_details?() do
       Logger.info(message)
     end
   end
-  
+
   defp log_worker_execution(worker_id, program_id, has_data, session_id) do
     if should_log_verbose_worker_details?() do
       Logger.info(
         "🔍 Execute program on worker #{worker_id}: program_id=#{program_id}, has_program_data=#{has_data}, session_id=#{session_id}"
       )
-      
+
       if has_data do
         Logger.info("✅ Program data included for cross-worker execution")
       else
@@ -360,26 +364,29 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
       end
     end
   end
-  
-  
+
   defp log_test_error(worker_id, reason) do
     config = get_error_handling_config()
     clean_output = Keyword.get(config, :clean_output, true)
-    
+
     if clean_output do
       # Clean test output - minimal logging
       cond do
         String.contains?(reason, "Program not found") ->
           Logger.info("🧪 Expected test error: Invalid program ID handled by worker #{worker_id}")
-          
+
         String.contains?(reason, "Unknown command") ->
           Logger.info("🧪 Expected test error: Unknown command handled by worker #{worker_id}")
-          
+
         String.contains?(reason, "Missing") ->
-          Logger.info("🧪 Expected test error: Missing required inputs handled by worker #{worker_id}")
-          
+          Logger.info(
+            "🧪 Expected test error: Missing required inputs handled by worker #{worker_id}"
+          )
+
         true ->
-          Logger.info("🧪 Test error handled by worker #{worker_id}: #{String.slice(reason, 0, 100)}")
+          Logger.info(
+            "🧪 Test error handled by worker #{worker_id}: #{String.slice(reason, 0, 100)}"
+          )
       end
     else
       # Verbose test output - show full details
@@ -387,15 +394,18 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
         String.contains?(reason, "Program not found") ->
           Logger.info("🧪 Expected test error: Invalid program ID handled by worker #{worker_id}")
           Logger.info("   Full error: #{reason}")
-          
+
         String.contains?(reason, "Unknown command") ->
           Logger.info("🧪 Expected test error: Unknown command handled by worker #{worker_id}")
           Logger.info("   Full error: #{reason}")
-          
+
         String.contains?(reason, "Missing") ->
-          Logger.info("🧪 Expected test error: Missing required inputs handled by worker #{worker_id}")
+          Logger.info(
+            "🧪 Expected test error: Missing required inputs handled by worker #{worker_id}"
+          )
+
           Logger.info("   Full error: #{reason}")
-          
+
         true ->
           Logger.error("Python error from worker #{worker_id}: #{inspect(reason)}")
       end
@@ -845,46 +855,51 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   defp pre_warm_workers(pool_name, pool_size) do
     Logger.info("Pre-warming #{pool_size} workers concurrently...")
     start_time = System.monotonic_time(:millisecond)
-    
+
     # Create parallel tasks to checkout and warm up each worker
-    warmup_tasks = for i <- 1..pool_size do
-      Task.async(fn ->
-        try do
-          case execute_anonymous(:ping, %{warmup: true, slot: i}, 
-                                pool_name: pool_name, 
-                                pool_timeout: 15_000, 
-                                timeout: 10_000) do
-            {:ok, response} -> 
-              worker_id = Map.get(response, "worker_id", "unknown")
-              Logger.info("Worker #{i} (#{worker_id}) warmed up successfully")
-              {:ok, i, worker_id}
-            {:error, reason} -> 
-              Logger.warning("Worker #{i} warmup failed: #{inspect(reason)}")
-              {:error, i, reason}
+    warmup_tasks =
+      for i <- 1..pool_size do
+        Task.async(fn ->
+          try do
+            case execute_anonymous(:ping, %{warmup: true, slot: i},
+                   pool_name: pool_name,
+                   pool_timeout: 15_000,
+                   timeout: 10_000
+                 ) do
+              {:ok, response} ->
+                worker_id = Map.get(response, "worker_id", "unknown")
+                Logger.info("Worker #{i} (#{worker_id}) warmed up successfully")
+                {:ok, i, worker_id}
+
+              {:error, reason} ->
+                Logger.warning("Worker #{i} warmup failed: #{inspect(reason)}")
+                {:error, i, reason}
+            end
+          rescue
+            error ->
+              Logger.warning("Worker #{i} warmup exception: #{inspect(error)}")
+              {:error, i, error}
           end
-        rescue
-          error ->
-            Logger.warning("Worker #{i} warmup exception: #{inspect(error)}")
-            {:error, i, error}
-        end
-      end)
-    end
-    
+        end)
+      end
+
     # Wait for all workers to complete warmup
     results = Task.await_many(warmup_tasks, 30_000)
-    
+
     # Report results
     successful = Enum.count(results, fn {status, _, _} -> status == :ok end)
     total_time = System.monotonic_time(:millisecond) - start_time
-    
-    Logger.info("Pre-warming complete: #{successful}/#{pool_size} workers ready in #{total_time}ms")
-    
+
+    Logger.info(
+      "Pre-warming complete: #{successful}/#{pool_size} workers ready in #{total_time}ms"
+    )
+
     if successful == pool_size do
       Logger.info("✅ All workers initialized concurrently - pool ready for requests")
     else
       Logger.warning("⚠️  #{pool_size - successful} workers failed to initialize")
     end
-    
+
     results
   end
 

@@ -48,10 +48,10 @@ config :dspex, :python_bridge,
 config :dspex, :error_handling,
   # Enable graceful test mode for error recovery tests
   test_mode: false,
-  
+
   # Suppress stack traces for expected test errors
   suppress_test_stack_traces: true,
-  
+
   # Show structured test error summary
   test_error_summary: true
 

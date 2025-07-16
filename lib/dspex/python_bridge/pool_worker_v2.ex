@@ -718,12 +718,12 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
         else
           validate_with_coordination()
         end
-      
+
       nil ->
         validate_with_coordination()
     end
   end
-  
+
   defp validate_with_coordination do
     # Use ETS-based coordination instead of global lock for better concurrency
     case :ets.insert_new(@env_cache_table, {:validation_in_progress, self()}) do
@@ -732,13 +732,16 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
         result = run_environment_validation()
         :ets.delete(@env_cache_table, :validation_in_progress)
         result
-        
+
       false ->
         # Another process is validating - wait briefly then check cache
         :timer.sleep(50)
+
         case :persistent_term.get({:dspex, :env_info}, nil) do
-          {env_info, _timestamp} -> {:ok, env_info}
-          nil -> 
+          {env_info, _timestamp} ->
+            {:ok, env_info}
+
+          nil ->
             # Fallback to old method if coordination fails
             run_environment_validation()
         end

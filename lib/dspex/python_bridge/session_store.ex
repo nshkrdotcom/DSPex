@@ -500,6 +500,73 @@ defmodule DSPex.PythonBridge.SessionStore do
     {:noreply, state}
   end
 
+  @doc """
+  Stores a program in a session.
+  """
+  @spec store_program(String.t(), String.t(), map()) :: :ok | {:error, term()}
+  def store_program(session_id, program_id, program_data) do
+    update_session(session_id, fn session ->
+      programs = Map.get(session, :programs, %{})
+      updated_programs = Map.put(programs, program_id, program_data)
+      Map.put(session, :programs, updated_programs)
+    end)
+    |> case do
+      {:ok, _} -> :ok
+      error -> error
+    end
+  end
+
+  @doc """
+  Updates a program in a session.
+  """
+  @spec update_program(String.t(), String.t(), map()) :: :ok | {:error, term()}
+  def update_program(session_id, program_id, program_data) do
+    store_program(session_id, program_id, program_data)
+  end
+
+  @doc """
+  Gets a program from a session.
+  """
+  @spec get_program(String.t(), String.t()) :: {:ok, map()} | {:error, :not_found}
+  def get_program(session_id, program_id) do
+    case get_session(session_id) do
+      {:ok, session} ->
+        programs = Map.get(session, :programs, %{})
+
+        case Map.get(programs, program_id) do
+          nil -> {:error, :not_found}
+          program_data -> {:ok, program_data}
+        end
+
+      {:error, :not_found} ->
+        {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Stores worker-session affinity mapping.
+  """
+  @spec store_worker_session(String.t(), String.t()) :: :ok
+  def store_worker_session(session_id, worker_id) do
+    update_session(session_id, fn session ->
+      Map.put(session, :last_worker_id, worker_id)
+    end)
+    |> case do
+      {:ok, _} ->
+        :ok
+
+      {:error, _} ->
+        # Create session if it doesn't exist
+        create_session(session_id)
+
+        update_session(session_id, fn session ->
+          Map.put(session, :last_worker_id, worker_id)
+        end)
+
+        :ok
+    end
+  end
+
   ## Private Functions
 
   defp do_cleanup_expired_sessions(table, stats) do
