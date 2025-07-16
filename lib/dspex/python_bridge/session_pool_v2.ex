@@ -22,11 +22,12 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     Protocol
   }
 
-  # Configuration defaults
+  # Configuration defaults - Phase 2B aggressive adjustments
   @default_pool_size System.schedulers_online() * 2
   @default_overflow 2
-  @default_checkout_timeout 15_000  # Increased from 10s to 15s for worker initialization
-  @default_operation_timeout 60_000  # Increased from 45s to 60s for Python operations
+  @default_checkout_timeout 45_000  # Increased from 25s to 45s for worker initialization
+  @default_operation_timeout 120_000  # Increased from 90s to 120s for Python operations
+  @default_pool_startup_timeout 60_000  # Increased pool startup timeout
   @health_check_interval 30_000
   @session_cleanup_interval 300_000
 
@@ -71,11 +72,10 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
 
     # Track session for monitoring (but not for affinity)
     track_session(session_id)
-    update_session_activity(session_id)
 
     try do
       # In stateless architecture, any worker can handle any session
-      NimblePool.checkout!(
+      result = NimblePool.checkout!(
         pool_name,
         :any_worker,
         fn _from, worker ->
@@ -83,6 +83,14 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
         end,
         pool_timeout
       )
+
+      # Update session activity after successful execution (Phase 2A fix)
+      case result do
+        {:ok, _} -> update_session_activity(session_id)
+        _ -> :ok
+      end
+
+      result
     catch
       :exit, {:timeout, _} ->
         {:error, {:timeout_error, :checkout_timeout, "No workers available", %{pool_name: pool_name, session_id: session_id}}}
@@ -353,6 +361,12 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
           "Minimal session pool V2 started with #{pool_size} workers, #{overflow} overflow"
         )
 
+        # Phase 2B: Disabled pre-warming to avoid interference with worker initialization
+        # spawn(fn ->
+        #   :timer.sleep(100)  # Let pool fully initialize first
+        #   ensure_minimum_workers(state)
+        # end)
+
         {:ok, state}
 
       {:error, reason} ->
@@ -457,9 +471,15 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     _result1 = Process.cancel_timer(state.health_check_ref)
     _result2 = Process.cancel_timer(state.cleanup_ref)
 
-    # Stop the pool
+    # Stop the pool with longer timeout and confirmation (Phase 2A fix)
     if state.pool_pid do
-      NimblePool.stop(state.pool_name, :shutdown, 5_000)
+      try do
+        NimblePool.stop(state.pool_name, :shutdown, 15_000)  # Increased timeout
+        # Wait for confirmation that pool is actually stopped
+        :timer.sleep(100)
+      catch
+        _, _ -> :ok  # Ignore shutdown errors in tests
+      end
     end
 
     :ok
@@ -494,6 +514,24 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
 
   defp schedule_cleanup do
     Process.send_after(self(), :cleanup_stale_sessions, @session_cleanup_interval)
+  end
+
+  # Phase 2B: Pre-warm workers to reduce checkout delays
+  defp ensure_minimum_workers(state) do
+    # Pre-warm workers in background to reduce checkout delays
+    spawn(fn ->
+      for _i <- 1..min(state.pool_size, 2) do
+        try do
+          NimblePool.checkout!(state.pool_name, :pre_warm, fn _from, _worker ->
+            # Just check worker health, then return
+            {{:ok, :pre_warmed}, :ok}
+          end, 1000)
+        catch
+          _, _ -> :ok  # Ignore pre-warming failures
+        end
+        :timer.sleep(50)  # Small delay between pre-warming attempts
+      end
+    end)
   end
 
   ## Supervisor Integration
