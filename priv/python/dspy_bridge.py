@@ -1593,6 +1593,65 @@ def write_message(message: Dict[str, Any]) -> None:
             f.flush()
 
 
+def get_logging_mode():
+    """
+    Get current logging mode from environment variables.
+    
+    Returns:
+        dict: Logging configuration
+    """
+    return {
+        'test_mode': os.getenv('DSPEX_TEST_MODE', 'false').lower() == 'true',
+        'debug_mode': os.getenv('DSPEX_DEBUG_MODE', 'false').lower() == 'true', 
+        'clean_output': os.getenv('DSPEX_CLEAN_OUTPUT', 'true').lower() == 'true',
+        'suppress_stack_traces': os.getenv('DSPEX_SUPPRESS_STACK_TRACES', 'true').lower() == 'true'
+    }
+
+def is_expected_test_error(error_message):
+    """
+    Check if an error message is from an expected test scenario.
+    
+    Args:
+        error_message: The error message string
+        
+    Returns:
+        bool: True if this is an expected test error
+    """
+    expected_test_errors = [
+        "Program not found",
+        "Unknown command", 
+        "Missing required_field",
+        "not all input fields were provided"
+    ]
+    
+    error_lower = error_message.lower()
+    return any(expected in error_lower for expected in expected_test_errors)
+
+def should_show_stack_trace(error_message, logging_config):
+    """
+    Determine if stack trace should be shown for this error.
+    
+    Args:
+        error_message: The error message string
+        logging_config: Current logging configuration
+        
+    Returns:
+        bool: True if stack trace should be shown
+    """
+    # Always show in debug mode
+    if logging_config['debug_mode']:
+        return True
+        
+    # Never show for expected test errors if suppression is enabled
+    if logging_config['suppress_stack_traces'] and is_expected_test_error(error_message):
+        return False
+        
+    # Show for unexpected errors unless in clean test mode
+    if logging_config['test_mode'] and logging_config['clean_output']:
+        return False
+        
+    return True
+
 def main():
     """
     Main event loop for the DSPy bridge.
@@ -1734,10 +1793,18 @@ def main():
                     f.flush()
                 continue
             except Exception as e:
+                # Get logging configuration
+                logging_config = get_logging_mode()
+                is_test_error = is_expected_test_error(str(e))
+                show_stack_trace = should_show_stack_trace(str(e), logging_config)
+                
                 # Debug log
                 with open('/tmp/dspy_bridge_debug.log', 'a') as f:
                     f.write(f"[{time.time()}] Command error: {e}\n")
-                    f.write(f"[{time.time()}] Traceback: {traceback.format_exc()}\n")
+                    f.write(f"[{time.time()}] Is test error: {is_test_error}\n")
+                    f.write(f"[{time.time()}] Show stack trace: {show_stack_trace}\n")
+                    if logging_config['debug_mode'] or not is_test_error:
+                        f.write(f"[{time.time()}] Traceback: {traceback.format_exc()}\n")
                     f.flush()
                 
                 try:
@@ -1756,9 +1823,17 @@ def main():
                         f.flush()
                     continue
                 
-                # Log error details
-                print(f"Command error: {e}", file=sys.stderr)
-                print(traceback.format_exc(), file=sys.stderr)
+                # Conditional error output based on logging configuration
+                if logging_config['clean_output'] and is_test_error:
+                    # In clean mode, only show minimal error for expected test errors
+                    pass  # Let Elixir handle the clean formatting
+                elif show_stack_trace:
+                    # Show full error details
+                    print(f"Command error: {e}", file=sys.stderr)
+                    print(traceback.format_exc(), file=sys.stderr)
+                else:
+                    # Show just the error message
+                    print(f"Command error: {e}", file=sys.stderr)
     
     except KeyboardInterrupt:
         print("Bridge interrupted by user", file=sys.stderr)

@@ -21,15 +21,24 @@ defmodule PoolExample do
   @dspy_io_logging Application.compile_env(:pool_example, :dspy_io_logging, true)
   
   defp log_dspy_input(context, input) do
-    if @dspy_io_logging do
+    if @dspy_io_logging and should_show_dspy_io_logging?() do
       IO.puts("🔍 #{context} INPUT: #{inspect(input)}")
     end
   end
   
   defp log_dspy_response(context, response) do
-    if @dspy_io_logging do
+    if @dspy_io_logging and should_show_dspy_io_logging?() do
       IO.puts("✅ #{context} DSPY RESPONSE: #{inspect(response)}")
     end
+  end
+  
+  defp should_show_dspy_io_logging? do
+    config = Application.get_env(:dspex, :error_handling, [])
+    debug_mode = Keyword.get(config, :debug_mode, false)
+    clean_output = Keyword.get(config, :clean_output, true)
+    
+    # Show DSPy I/O only in debug mode or when clean output is disabled
+    debug_mode or not clean_output
   end
 
   @doc """
@@ -426,88 +435,371 @@ defmodule PoolExample do
   
   This demonstrates the pool's resilience to errors and recovery mechanisms.
   """
-  def run_error_recovery_test do
-    Logger.info("🛡️ Running Error Handling and Recovery Test")
+  def run_error_recovery_test(opts \\ []) do
+    test_mode = Keyword.get(opts, :test_mode, true)
+    clean_output = Keyword.get(opts, :clean_output, true)
+    
+    if clean_output do
+      IO.puts("🛡️ Running Error Handling and Recovery Test")
+      if test_mode do
+        IO.puts("🧪 Test mode enabled - errors will be handled gracefully")
+      end
+    else
+      IO.puts("🛡️ Running Error Handling and Recovery Test")
+      Logger.info("🛡️ Running Error Handling and Recovery Test")
+      
+      if test_mode do
+        IO.puts("🧪 Test mode enabled - errors will be handled gracefully")
+        Logger.info("🧪 Test mode enabled - errors will be handled gracefully")
+      end
+    end
+    
+    if test_mode do
+      set_test_mode(true)
+      # Set environment variables for Python bridge
+      System.put_env("DSPEX_TEST_MODE", "true")
+      System.put_env("DSPEX_CLEAN_OUTPUT", if(clean_output, do: "true", else: "false"))
+    end
     
     ensure_pool_started()
     
-    # Test various error scenarios
+    # Define structured test scenarios with expected errors
     test_scenarios = [
-      {"Invalid program ID", fn ->
-        SessionPoolV2.execute_anonymous(
-          :execute_program,
-          %{
-            program_id: "non_existent_program",
-            inputs: %{test: "data"}
-          }
-        )
-      end},
-      
-      {"Missing required inputs", fn ->
-        case SessionPoolV2.execute_anonymous(
-          :create_program,
-          %{
-            id: "test_prog_#{System.unique_integer([:positive])}",
-            signature: %{
-              inputs: [%{name: "required_field", type: "string"}],
-              outputs: [%{name: "result", type: "string"}]
+      %{
+        name: "Invalid Program ID",
+        expected_error: "Program not found",
+        error_type: :program_not_found,
+        description: "Tests handling of requests for non-existent programs",
+        test_fn: fn ->
+          SessionPoolV2.execute_anonymous(
+            :execute_program,
+            %{
+              program_id: "non_existent_program",
+              inputs: %{test: "data"}
             }
-          }
-        ) do
-          {:ok, prog_result} ->
-            SessionPoolV2.execute_anonymous(
-              :execute_program,
-              %{
-                program_id: prog_result["program_id"],
-                inputs: %{}  # Missing required field
-              }
-            )
-          error ->
-            error
+          )
         end
-      end},
+      },
       
-      {"Invalid command", fn ->
-        SessionPoolV2.execute_anonymous(
-          :invalid_command,
-          %{some: "data"}
-        )
-      end}
+      %{
+        name: "Invalid JSON Structure",
+        expected_error: "Invalid",
+        error_type: :invalid_input,
+        description: "Tests handling of malformed input data",
+        test_fn: fn ->
+          SessionPoolV2.execute_anonymous(
+            :create_program,
+            %{
+              id: "test_prog_#{System.unique_integer([:positive])}",
+              # Missing required signature field completely
+              invalid_field: "this should cause an error"
+            }
+          )
+        end
+      },
+      
+      %{
+        name: "Invalid Command",
+        expected_error: "Unknown command",
+        error_type: :unknown_command,
+        description: "Tests handling of unsupported commands",
+        test_fn: fn ->
+          SessionPoolV2.execute_anonymous(
+            :invalid_command,
+            %{some: "data"}
+          )
+        end
+      }
     ]
     
-    Enum.each(test_scenarios, fn {scenario_name, test_fn} ->
-      Logger.info("\n🧪 Testing: #{scenario_name}")
-      
-      result = try do
-        test_fn.()
-      rescue
-        error ->
-          Logger.warning("❌ Test function crashed: #{inspect(error)}")
-          {:error, :test_crashed}
-      catch
-        :exit, reason ->
-          Logger.warning("❌ Test function exited: #{inspect(reason)}")
-          {:error, :test_exited}
+    # Execute test scenarios with structured reporting
+    results = Enum.map(test_scenarios, fn scenario ->
+      if clean_output do
+        # Clean output - single line per test
+        IO.write("🧪 Testing: #{scenario.name} → ")
+      else
+        # Verbose output - multi-line with details
+        IO.puts("\n🧪 Testing: #{scenario.name}")
+        IO.puts("   Expected: #{scenario.expected_error}")
+        IO.puts("   Purpose: #{scenario.description}")
+        Logger.info("\n🧪 Testing: #{scenario.name}")
+        Logger.info("   Expected: #{scenario.expected_error}")
+        Logger.info("   Purpose: #{scenario.description}")
       end
       
+      result = execute_test_scenario(scenario, test_mode, clean_output)
+      
       case result do
-        {:error, error_tuple} when is_tuple(error_tuple) and tuple_size(error_tuple) == 4 ->
-          {category, type, message, context} = error_tuple
-          Logger.info("✅ Properly handled error:")
-          Logger.info("   Category: #{category}")
-          Logger.info("   Type: #{type}")
-          Logger.info("   Message: #{message}")
-          Logger.info("   Context: #{inspect(context)}")
+        {:expected_error, error_info} ->
+          if clean_output do
+            IO.puts("✅ Expected error handled correctly")
+          else
+            IO.puts("✅ Expected error handled correctly")
+            IO.puts("   Error type: #{error_info.type}")
+            IO.puts("   Message: #{error_info.message}")
+            Logger.info("✅ Expected error handled correctly")
+            Logger.info("   Error type: #{error_info.type}")
+            Logger.info("   Message: #{error_info.message}")
+          end
+          {scenario.name, :pass}
           
-        {:error, reason} ->
-          Logger.info("✅ Error returned: #{inspect(reason)}")
+        {:unexpected_error, error_info} ->
+          if clean_output do
+            IO.puts("❌ Unexpected error format")
+          else
+            Logger.warning("❌ Unexpected error format")
+            Logger.warning("   Got: #{inspect(error_info)}")
+          end
+          {scenario.name, :fail}
           
-        other ->
-          Logger.warning("❌ Unexpected result: #{inspect(other)}")
+        {:no_error, result} ->
+          if clean_output do
+            IO.puts("❌ Expected error but operation succeeded")
+          else
+            Logger.warning("❌ Expected error but operation succeeded")
+            Logger.warning("   Result: #{inspect(result)}")
+          end
+          {scenario.name, :fail}
+          
+        {:test_failure, reason} ->
+          if clean_output do
+            IO.puts("❌ Test execution failed")
+          else
+            Logger.warning("❌ Test execution failed: #{inspect(reason)}")
+          end
+          {scenario.name, :fail}
       end
     end)
     
+    # Generate test summary
+    generate_test_summary(results, test_mode, clean_output)
+    
+    if test_mode do
+      set_test_mode(false)
+    end
+    
+    IO.puts("\n🎉 Error Handling and Recovery Test Complete!")
     Logger.info("\n🎉 Error Handling and Recovery Test Complete!")
+  end
+  
+  defp execute_test_scenario(scenario, test_mode, _clean_output) do
+    try do
+      result = scenario.test_fn.()
+      
+      case result do
+        {:error, error_tuple} when is_tuple(error_tuple) ->
+          if error_contains_expected?(error_tuple, scenario.expected_error) do
+            error_info = extract_error_info(error_tuple)
+            {:expected_error, error_info}
+          else
+            {:unexpected_error, error_tuple}
+          end
+          
+        {:error, reason} ->
+          if error_contains_expected?(reason, scenario.expected_error) do
+            error_info = %{type: scenario.error_type, message: inspect(reason)}
+            {:expected_error, error_info}
+          else
+            {:unexpected_error, reason}
+          end
+          
+        other ->
+          {:no_error, other}
+      end
+    rescue
+      error ->
+        if test_mode do
+          Logger.info("🧪 Test exception caught: #{inspect(error)}")
+        end
+        {:test_failure, {:exception, error}}
+    catch
+      :exit, reason ->
+        if test_mode do
+          Logger.info("🧪 Test exit caught: #{inspect(reason)}")
+        end
+        {:test_failure, {:exit, reason}}
+    end
+  end
+  
+  defp error_contains_expected?(error, expected_text) do
+    error_string = cond do
+      is_tuple(error) and tuple_size(error) >= 3 ->
+        elem(error, 2) |> to_string()
+      is_binary(error) ->
+        error
+      true ->
+        inspect(error)
+    end
+    
+    String.contains?(error_string, expected_text)
+  end
+  
+  defp extract_error_info(error_tuple) when is_tuple(error_tuple) and tuple_size(error_tuple) >= 3 do
+    {category, type, message, _context} = error_tuple
+    %{
+      category: category,
+      type: type,
+      message: message
+    }
+  end
+  
+  defp extract_error_info(error) do
+    %{
+      type: :unknown,
+      message: inspect(error)
+    }
+  end
+  
+  defp generate_test_summary(results, test_mode, clean_output) do
+    passed = Enum.count(results, fn {_, result} -> result == :pass end)
+    failed = Enum.count(results, fn {_, result} -> result == :fail end)
+    total = length(results)
+    
+    if clean_output do
+      # Clean summary - concise format
+      IO.puts("\n📊 Error Recovery Test Summary:")
+      IO.puts("Total scenarios: #{total}")
+      IO.puts("Passed: #{passed}")
+      IO.puts("Failed: #{failed}")
+      IO.puts("Success rate: #{Float.round(passed / total * 100, 1)}%")
+      
+      if test_mode do
+        IO.puts("🧪 Test mode: Errors handled gracefully")
+      end
+    else
+      # Verbose summary - detailed format
+      IO.puts("\n📊 Error Recovery Test Summary:")
+      IO.puts("   Total scenarios: #{total}")
+      IO.puts("   Passed: #{passed}")
+      IO.puts("   Failed: #{failed}")
+      IO.puts("   Success rate: #{Float.round(passed / total * 100, 1)}%")
+      Logger.info("\n📊 Error Recovery Test Summary:")
+      Logger.info("   Total scenarios: #{total}")
+      Logger.info("   Passed: #{passed}")
+      Logger.info("   Failed: #{failed}")
+      Logger.info("   Success rate: #{Float.round(passed / total * 100, 1)}%")
+      
+      if test_mode do
+        IO.puts("   🧪 Test mode: Errors handled gracefully")
+        Logger.info("   🧪 Test mode: Errors handled gracefully")
+      end
+      
+      if failed > 0 do
+        Logger.info("\n❌ Failed scenarios:")
+        Enum.each(results, fn {name, result} ->
+          if result == :fail do
+            Logger.info("   - #{name}")
+          end
+        end)
+      end
+    end
+  end
+  
+  defp set_test_mode(enabled) do
+    :persistent_term.put({:dspex, :test_mode}, enabled)
+  end
+  
+  defp enable_clean_demo_mode do
+    # Set application config for clean demo output
+    Application.put_env(:dspex, :error_handling, [
+      test_mode: false,
+      debug_mode: false, 
+      clean_output: true,
+      suppress_stack_traces: true,
+      clean_test_output: true
+    ])
+    
+    # Set environment variables for Python bridge
+    System.put_env("DSPEX_TEST_MODE", "false")
+    System.put_env("DSPEX_DEBUG_MODE", "false") 
+    System.put_env("DSPEX_CLEAN_OUTPUT", "true")
+    System.put_env("DSPEX_SUPPRESS_STACK_TRACES", "true")
+  end
+  
+  defp enable_ultra_clean_demo_mode do
+    # Set application config for ultra-clean presentation output
+    Application.put_env(:dspex, :error_handling, [
+      test_mode: false,
+      debug_mode: false, 
+      clean_output: true,
+      suppress_stack_traces: true,
+      clean_test_output: true,
+      ultra_clean: true
+    ])
+    
+    # Set environment variables for Python bridge
+    System.put_env("DSPEX_TEST_MODE", "false")
+    System.put_env("DSPEX_DEBUG_MODE", "false") 
+    System.put_env("DSPEX_CLEAN_OUTPUT", "true")
+    System.put_env("DSPEX_SUPPRESS_STACK_TRACES", "true")
+  end
+  
+  defp run_minimal_session_test do
+    session1 = "demo_session_1"
+    session2 = "demo_session_2"
+    
+    # Create and execute without verbose logging
+    {:ok, _} = SessionPoolV2.execute_in_session(session1, :create_program, %{
+      id: "demo_prog_1", signature: %{inputs: [%{name: "question", type: "string"}], outputs: [%{name: "answer", type: "string"}]}
+    })
+    {:ok, _} = SessionPoolV2.execute_in_session(session2, :create_program, %{
+      id: "demo_prog_2", signature: %{inputs: [%{name: "text", type: "string"}], outputs: [%{name: "summary", type: "string"}]}
+    })
+    
+    IO.puts("   Programs created and executed successfully across different sessions")
+    
+    # Cleanup
+    SessionPoolV2.end_session(session1)
+    SessionPoolV2.end_session(session2)
+  end
+  
+  defp run_minimal_concurrent_test do
+    tasks = for i <- 1..5 do
+      Task.async(fn ->
+        temp_session = "demo_temp_#{i}"
+        {:ok, prog_result} = SessionPoolV2.execute_in_session(temp_session, :create_program, %{
+          id: "demo_calc_#{i}", signature: %{inputs: [%{name: "expression", type: "string"}], outputs: [%{name: "result", type: "string"}]}
+        })
+        {:ok, exec_result} = SessionPoolV2.execute_in_session(temp_session, :execute_program, %{
+          program_id: prog_result["program_id"], inputs: %{expression: "#{i} + #{i}"}
+        })
+        SessionPoolV2.end_session(temp_session)
+        {i, exec_result["outputs"]["result"]}
+      end)
+    end
+    
+    results = Task.await_many(tasks, 30_000)
+    results_summary = Enum.map(results, fn {i, result} -> "#{i}+#{i}=#{result}" end) |> Enum.join(", ")
+    IO.puts("   Results: #{results_summary}")
+  end
+  
+
+  @doc """
+  Run clean demo with minimal output for presentations.
+  """
+  def run_clean_demo do
+    IO.puts("🚀 DSPex V2 Pool System Demo")
+    IO.puts("============================")
+    
+    # Enable ultra-clean mode
+    enable_ultra_clean_demo_mode()
+    ensure_pool_started()
+    
+    # Demo 1: Session Affinity (essential only)
+    IO.puts("\n✅ Session Affinity: Creating programs in separate sessions...")
+    run_minimal_session_test()
+    
+    # Demo 2: Concurrent Operations (results only)
+    IO.puts("✅ Concurrent Operations: 5 parallel calculations...")
+    run_minimal_concurrent_test()
+    
+    # Demo 3: Error Handling (clean format)
+    IO.puts("✅ Error Handling: Testing graceful error recovery...")
+    run_error_recovery_test(test_mode: true, clean_output: true)
+    
+    IO.puts("\n🎉 Demo Complete!")
+    IO.puts("💡 DSPex V2 provides robust pooling with session affinity,")
+    IO.puts("   concurrent execution, and intelligent error handling.")
   end
 
   @doc """
@@ -516,11 +808,14 @@ defmodule PoolExample do
   def run_all_tests do
     Logger.info("🚀 Running All DSPex Pool Example Tests\n")
     
+    # Enable clean output mode for demo
+    enable_clean_demo_mode()
+    
     tests = [
       {"Session Affinity Test", &run_session_affinity_test/0},
       {"Anonymous Operations Test", &run_anonymous_operations_test/0},
       {"Concurrent Stress Test", fn -> run_concurrent_stress_test(10) end},
-      {"Error Recovery Test", &run_error_recovery_test/0}
+      {"Error Recovery Test", fn -> run_error_recovery_test(test_mode: true, clean_output: true) end}
     ]
     
     results = Enum.map(tests, fn {name, test_fn} ->

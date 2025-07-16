@@ -50,7 +50,7 @@ defmodule PoolExample.CLI do
 
   defp process({["error_recovery"], _opts}) do
     setup_environment()
-    PoolExample.run_error_recovery_test()
+    PoolExample.run_error_recovery_test(test_mode: true)
     shutdown_gracefully()
   end
 
@@ -67,6 +67,24 @@ defmodule PoolExample.CLI do
       :exit, reason ->
         IO.puts("❌ Test execution exited: #{inspect(reason)}")
         Logger.error("Test execution exited: #{inspect(reason)}")
+    end
+    
+    shutdown_gracefully()
+  end
+
+  defp process({["demo"], _opts}) do
+    setup_environment()
+    
+    try do
+      PoolExample.run_clean_demo()
+    rescue
+      error ->
+        IO.puts("❌ Demo execution failed: #{inspect(error)}")
+        Logger.error("Demo execution failed: #{inspect(error)}")
+    catch
+      :exit, reason ->
+        IO.puts("❌ Demo execution exited: #{inspect(reason)}")
+        Logger.error("Demo execution exited: #{inspect(reason)}")
     end
     
     shutdown_gracefully()
@@ -110,6 +128,7 @@ defmodule PoolExample.CLI do
       stress             Run concurrent stress test
       error_recovery     Test error handling and recovery
       all                Run all tests
+      demo               Run clean demo (minimal output for presentations)
 
     Options:
       -h, --help         Show this help message

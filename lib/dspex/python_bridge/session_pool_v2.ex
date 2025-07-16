@@ -169,16 +169,16 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
       case result do
         {:ok, response} when command == :create_program ->
           program_id = Map.get(response, "program_id")
-          Logger.info("🔄 Storing anonymous program globally: #{program_id}")
+          log_debug("🔄 Storing anonymous program globally: #{program_id}")
 
           case store_anonymous_program_globally(args, response) do
             {:error, reason} ->
-              Logger.warning(
+              log_debug(
                 "Anonymous program created successfully but failed to store globally: #{inspect(reason)}"
               )
 
             :ok ->
-              Logger.info("✅ Anonymous program stored globally: #{program_id}")
+              log_debug("✅ Anonymous program stored globally: #{program_id}")
           end
 
         _ ->
@@ -216,22 +216,11 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     # Enhance args with session data for stateless workers
     enhanced_args = enhance_args_with_session_data(args, session_id, command)
 
-    # Debug logging for cross-worker execution
+    # Conditional logging for cross-worker execution
     if command == :execute_program do
       program_id = Map.get(args, :program_id)
       has_program_data = Map.has_key?(enhanced_args, :program_data)
-
-      Logger.info(
-        "🔍 Execute program on worker #{worker.worker_id}: program_id=#{program_id}, has_program_data=#{has_program_data}, session_id=#{session_id}"
-      )
-
-      if has_program_data do
-        Logger.info("✅ Program data included for cross-worker execution")
-      else
-        Logger.warning(
-          "❌ NO program data found for program #{program_id} on worker #{worker.worker_id}"
-        )
-      end
+      log_worker_execution(worker.worker_id, program_id, has_program_data, session_id)
     end
 
     try do
@@ -244,15 +233,11 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
       # Wait for response with simple error handling
       receive do
         {^port, {:data, data}} ->
-          Logger.info(
-            "Raw response from Python worker #{worker.worker_id}: #{inspect(data, limit: 500)}"
-          )
+          log_debug("Raw response from Python worker #{worker.worker_id}: #{inspect(data, limit: 500)}")
 
           case Protocol.decode_response(data) do
             {:ok, ^request_id, response} when is_map(response) ->
-              Logger.info(
-                "Success response from worker #{worker.worker_id}: #{inspect(response, limit: 500)}"
-              )
+              log_debug("Success response from worker #{worker.worker_id}: #{inspect(response, limit: 500)}")
 
               {{:ok, response}, :ok}
 
@@ -271,7 +256,13 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
                 {:communication_error, :python_error, reason,
                  %{worker_id: worker.worker_id, session_id: session_id}}
 
-              Logger.error("Python error from worker #{worker.worker_id}: #{inspect(error)}")
+              # Log differently based on test mode
+              if get_test_mode() do
+                log_test_error(worker.worker_id, reason)
+              else
+                Logger.error("Python error from worker #{worker.worker_id}: #{inspect(error)}")
+              end
+              
               {{:error, error}, :ok}
 
             {:error, reason} ->
@@ -328,6 +319,86 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
 
         # System errors are likely fatal - remove worker
         {{:error, error_tuple}, :close}
+    end
+  end
+
+  ## Enhanced Logging Functions
+  
+  defp get_test_mode do
+    :persistent_term.get({:dspex, :test_mode}, false)
+  end
+  
+  defp get_error_handling_config do
+    Application.get_env(:dspex, :error_handling, [])
+  end
+  
+  defp should_log_verbose_worker_details? do
+    config = get_error_handling_config()
+    debug_mode = Keyword.get(config, :debug_mode, false)
+    clean_output = Keyword.get(config, :clean_output, true)
+    
+    # Show verbose details only in debug mode, suppress when clean_output is enabled
+    debug_mode and not clean_output
+  end
+  
+  defp log_debug(message) do
+    if should_log_verbose_worker_details?() do
+      Logger.info(message)
+    end
+  end
+  
+  defp log_worker_execution(worker_id, program_id, has_data, session_id) do
+    if should_log_verbose_worker_details?() do
+      Logger.info(
+        "🔍 Execute program on worker #{worker_id}: program_id=#{program_id}, has_program_data=#{has_data}, session_id=#{session_id}"
+      )
+      
+      if has_data do
+        Logger.info("✅ Program data included for cross-worker execution")
+      else
+        Logger.warning("❌ NO program data found for program #{program_id} on worker #{worker_id}")
+      end
+    end
+  end
+  
+  
+  defp log_test_error(worker_id, reason) do
+    config = get_error_handling_config()
+    clean_output = Keyword.get(config, :clean_output, true)
+    
+    if clean_output do
+      # Clean test output - minimal logging
+      cond do
+        String.contains?(reason, "Program not found") ->
+          Logger.info("🧪 Expected test error: Invalid program ID handled by worker #{worker_id}")
+          
+        String.contains?(reason, "Unknown command") ->
+          Logger.info("🧪 Expected test error: Unknown command handled by worker #{worker_id}")
+          
+        String.contains?(reason, "Missing") ->
+          Logger.info("🧪 Expected test error: Missing required inputs handled by worker #{worker_id}")
+          
+        true ->
+          Logger.info("🧪 Test error handled by worker #{worker_id}: #{String.slice(reason, 0, 100)}")
+      end
+    else
+      # Verbose test output - show full details
+      cond do
+        String.contains?(reason, "Program not found") ->
+          Logger.info("🧪 Expected test error: Invalid program ID handled by worker #{worker_id}")
+          Logger.info("   Full error: #{reason}")
+          
+        String.contains?(reason, "Unknown command") ->
+          Logger.info("🧪 Expected test error: Unknown command handled by worker #{worker_id}")
+          Logger.info("   Full error: #{reason}")
+          
+        String.contains?(reason, "Missing") ->
+          Logger.info("🧪 Expected test error: Missing required inputs handled by worker #{worker_id}")
+          Logger.info("   Full error: #{reason}")
+          
+        true ->
+          Logger.error("Python error from worker #{worker_id}: #{inspect(reason)}")
+      end
     end
   end
 
@@ -673,11 +744,11 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
           session_id == "anonymous" ->
             case SessionStore.get_global_program(program_id) do
               {:ok, program_data} ->
-                Logger.info("✅ Found global program #{program_id} for anonymous execution")
+                log_debug("✅ Found global program #{program_id} for anonymous execution")
                 Map.put(base_args, :program_data, program_data)
 
               {:error, :not_found} ->
-                Logger.warning("❌ Global program #{program_id} not found for anonymous execution")
+                log_debug("❌ Global program #{program_id} not found for anonymous execution")
                 base_args
             end
 

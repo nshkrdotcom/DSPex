@@ -51,7 +51,7 @@ export TEST_MODE=full_integration
 COMMAND=${1:-all}
 
 case $COMMAND in
-    session_affinity|anonymous|stress|error_recovery|all)
+    session_affinity|anonymous|stress|error_recovery|all|demo)
         echo -e "${GREEN}Running: $COMMAND${NC}"
         mix run -e "PoolExample.CLI.main([\"$COMMAND\"])"
         ;;
@@ -64,6 +64,7 @@ case $COMMAND in
         echo "  stress           - Run concurrent stress test"
         echo "  error_recovery   - Test error handling and recovery"
         echo "  all              - Run all tests (default)"
+        echo "  demo             - Run clean demo (minimal output for presentations)"
         echo "  help             - Show this help message"
         ;;
     *)

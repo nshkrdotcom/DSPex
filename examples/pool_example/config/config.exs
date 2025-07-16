@@ -12,9 +12,17 @@ config :dspex,
   default_adapter: :python_pool_v2,
   python_path: System.get_env("PYTHON_PATH") || "python3"
 
+# Enhanced error handling configuration
+config :dspex, :error_handling,
+  test_mode: false,
+  debug_mode: false,
+  clean_output: true,
+  suppress_stack_traces: true,
+  clean_test_output: true
+
 # Configure logger
 config :logger,
-  level: :error,
+  level: :info,
   format: "$time $metadata[$level] $message\n"
 
 # Import environment specific config
