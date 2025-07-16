@@ -23,8 +23,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     SessionStore
   }
 
-  # Configuration defaults
-  @default_pool_size System.schedulers_online() * 2
+  # Configuration defaults - reduced for resource efficiency
+  @default_pool_size 4
   @default_overflow 2
   # 75s to allow for worker initialization (5-6s) + operation buffer
   @default_checkout_timeout 75_000
@@ -524,14 +524,13 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     genserver_name = Keyword.get(opts, :name, __MODULE__)
     pool_name = :"#{genserver_name}_pool"
 
-    # Start NimblePool with simple worker configuration
+    # Start NimblePool with lazy initialization to control worker creation
     pool_config = [
       worker: {worker_module, []},
       pool_size: pool_size,
       max_overflow: overflow,
-      # Use eager initialization to pre-create workers for better performance
-      # Workers will be created at startup to avoid creation delays
-      lazy: false,
+      # Use lazy initialization so we can control concurrent worker creation
+      lazy: true,
       name: pool_name
     ]
 
@@ -555,6 +554,9 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
         Logger.info(
           "Minimal session pool V2 started with #{pool_size} workers, #{overflow} overflow"
         )
+
+        # Force concurrent worker initialization
+        spawn(fn -> pre_warm_workers(pool_name, pool_size) end)
 
         {:ok, state}
 
@@ -834,6 +836,56 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     else
       {:error, :no_program_id}
     end
+  end
+
+  ## Worker Pre-warming for Concurrent Initialization
+
+  # Force concurrent worker initialization by exercising all workers in parallel.
+  # This overcomes NimblePool's sequential worker creation by forcing checkout/checkin.
+  defp pre_warm_workers(pool_name, pool_size) do
+    Logger.info("Pre-warming #{pool_size} workers concurrently...")
+    start_time = System.monotonic_time(:millisecond)
+    
+    # Create parallel tasks to checkout and warm up each worker
+    warmup_tasks = for i <- 1..pool_size do
+      Task.async(fn ->
+        try do
+          case execute_anonymous(:ping, %{warmup: true, slot: i}, 
+                                pool_name: pool_name, 
+                                pool_timeout: 15_000, 
+                                timeout: 10_000) do
+            {:ok, response} -> 
+              worker_id = Map.get(response, "worker_id", "unknown")
+              Logger.info("Worker #{i} (#{worker_id}) warmed up successfully")
+              {:ok, i, worker_id}
+            {:error, reason} -> 
+              Logger.warning("Worker #{i} warmup failed: #{inspect(reason)}")
+              {:error, i, reason}
+          end
+        rescue
+          error ->
+            Logger.warning("Worker #{i} warmup exception: #{inspect(error)}")
+            {:error, i, error}
+        end
+      end)
+    end
+    
+    # Wait for all workers to complete warmup
+    results = Task.await_many(warmup_tasks, 30_000)
+    
+    # Report results
+    successful = Enum.count(results, fn {status, _, _} -> status == :ok end)
+    total_time = System.monotonic_time(:millisecond) - start_time
+    
+    Logger.info("Pre-warming complete: #{successful}/#{pool_size} workers ready in #{total_time}ms")
+    
+    if successful == pool_size do
+      Logger.info("✅ All workers initialized concurrently - pool ready for requests")
+    else
+      Logger.warning("⚠️  #{pool_size - successful} workers failed to initialize")
+    end
+    
+    results
   end
 
   ## Supervisor Integration

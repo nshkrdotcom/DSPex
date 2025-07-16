@@ -47,6 +47,12 @@ fi
 # Set test mode for full integration
 export TEST_MODE=full_integration
 
+# Optimize environment for better resource usage
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+
 # Parse command line arguments
 COMMAND=${1:-all}
 

@@ -710,21 +710,39 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
   end
 
   defp validate_and_cache_environment do
-    # Use a global lock to prevent multiple workers from validating simultaneously
-    :global.trans({:env_validation_lock, node()}, fn ->
-      # Check cache again inside the lock
-      case :ets.lookup(@env_cache_table, :env_info) do
-        [{:env_info, env_info, timestamp}] ->
-          if System.os_time(:second) - timestamp < 3600 do
-            {:ok, env_info}
-          else
+    # Fast path: Check persistent_term cache first (no locks)
+    case :persistent_term.get({:dspex, :env_info}, nil) do
+      {env_info, timestamp} when timestamp != nil ->
+        if System.os_time(:second) - timestamp < 3600 do
+          {:ok, env_info}
+        else
+          validate_with_coordination()
+        end
+      
+      nil ->
+        validate_with_coordination()
+    end
+  end
+  
+  defp validate_with_coordination do
+    # Use ETS-based coordination instead of global lock for better concurrency
+    case :ets.insert_new(@env_cache_table, {:validation_in_progress, self()}) do
+      true ->
+        # We're the coordinator - run validation
+        result = run_environment_validation()
+        :ets.delete(@env_cache_table, :validation_in_progress)
+        result
+        
+      false ->
+        # Another process is validating - wait briefly then check cache
+        :timer.sleep(50)
+        case :persistent_term.get({:dspex, :env_info}, nil) do
+          {env_info, _timestamp} -> {:ok, env_info}
+          nil -> 
+            # Fallback to old method if coordination fails
             run_environment_validation()
-          end
-
-        [] ->
-          run_environment_validation()
-      end
-    end)
+        end
+    end
   end
 
   defp run_environment_validation do
@@ -732,8 +750,10 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
 
     case DSPex.PythonBridge.EnvironmentCheck.validate_environment() do
       {:ok, env_info} ->
-        # Cache the result
-        :ets.insert(@env_cache_table, {:env_info, env_info, System.os_time(:second)})
+        timestamp = System.os_time(:second)
+        # Cache in both persistent_term (fast) and ETS (backup)
+        :persistent_term.put({:dspex, :env_info}, {env_info, timestamp})
+        :ets.insert(@env_cache_table, {:env_info, env_info, timestamp})
         {:ok, env_info}
 
       {:error, _reason} = error ->
