@@ -622,7 +622,7 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
   @env_cache_table :dspex_env_cache
 
   defp get_cached_environment_info do
-    ensure_cache_table()
+    _table = ensure_cache_table()
 
     case :ets.lookup(@env_cache_table, :env_info) do
       [{:env_info, env_info, timestamp}] ->
