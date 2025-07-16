@@ -143,12 +143,14 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
           Logger.info(
             "Worker #{worker_state.worker_id} port closed after successful operation, removing worker"
           )
+
           {:remove, :port_closed_after_success, pool_state}
-          
+
         {:error, reason} ->
           Logger.error(
             "Worker #{worker_state.worker_id} port reconnection failed: #{inspect(reason)}"
           )
+
           {:remove, {:port_reconnect_failed, reason}, pool_state}
       end
     end
@@ -552,21 +554,23 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
   # Reconnects the port back to the worker process to keep Python bridge alive
   defp reconnect_port_to_worker(worker_state) do
     worker_pid = self()
-    
+
     # First check if port is still alive
     case Port.info(worker_state.port) do
       nil ->
         Logger.warning("[#{worker_state.worker_id}] Port already closed, cannot reconnect")
         {:error, :port_already_closed}
-        
+
       port_info ->
-        Logger.debug("[#{worker_state.worker_id}] Port info before reconnect: #{inspect(port_info)}")
-        
+        Logger.debug(
+          "[#{worker_state.worker_id}] Port info before reconnect: #{inspect(port_info)}"
+        )
+
         # Attempt reconnection with retry for transient failures
         reconnect_port_to_worker_with_retry(worker_state, worker_pid, 3)
     end
   end
-  
+
   defp reconnect_port_to_worker_with_retry(worker_state, worker_pid, attempts) do
     case safe_port_connect(worker_state.port, worker_pid, worker_state.worker_id) do
       {:ok, _port} ->
@@ -577,9 +581,12 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
         # Brief delay before retry for transient port issues
         :timer.sleep(10)
         reconnect_port_to_worker_with_retry(worker_state, worker_pid, attempts - 1)
-        
+
       {:error, reason} ->
-        Logger.debug("[#{worker_state.worker_id}] Port reconnection failed after #{4 - attempts} attempts: #{inspect(reason)}")
+        Logger.debug(
+          "[#{worker_state.worker_id}] Port reconnection failed after #{4 - attempts} attempts: #{inspect(reason)}"
+        )
+
         {:error, reason}
     end
   end
