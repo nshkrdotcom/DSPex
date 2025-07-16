@@ -155,21 +155,22 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     operation_timeout = Keyword.get(opts, :timeout, @default_operation_timeout)
 
     try do
-      result = NimblePool.checkout!(
-        pool_name,
-        :anonymous,
-        fn _from, worker ->
-          execute_with_worker(worker, command, args, operation_timeout, "anonymous")
-        end,
-        pool_timeout
-      )
+      result =
+        NimblePool.checkout!(
+          pool_name,
+          :anonymous,
+          fn _from, worker ->
+            execute_with_worker(worker, command, args, operation_timeout, "anonymous")
+          end,
+          pool_timeout
+        )
 
       # Handle global program storage for anonymous operations
       case result do
         {:ok, response} when command == :create_program ->
           program_id = Map.get(response, "program_id")
           Logger.info("🔄 Storing anonymous program globally: #{program_id}")
-          
+
           case store_anonymous_program_globally(args, response) do
             {:error, reason} ->
               Logger.warning(
@@ -219,12 +220,17 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     if command == :execute_program do
       program_id = Map.get(args, :program_id)
       has_program_data = Map.has_key?(enhanced_args, :program_data)
-      Logger.info("🔍 Execute program on worker #{worker.worker_id}: program_id=#{program_id}, has_program_data=#{has_program_data}, session_id=#{session_id}")
-      
+
+      Logger.info(
+        "🔍 Execute program on worker #{worker.worker_id}: program_id=#{program_id}, has_program_data=#{has_program_data}, session_id=#{session_id}"
+      )
+
       if has_program_data do
         Logger.info("✅ Program data included for cross-worker execution")
       else
-        Logger.warning("❌ NO program data found for program #{program_id} on worker #{worker.worker_id}")
+        Logger.warning(
+          "❌ NO program data found for program #{program_id} on worker #{worker.worker_id}"
+        )
       end
     end
 
@@ -627,7 +633,10 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   # For stateless workers, this function fetches necessary session data
   # from the SessionStore and includes it in the command arguments.
   defp enhance_args_with_session_data(args, session_id, command) do
-    base_args = if session_id, do: Map.put(args, :session_id, session_id), else: Map.put(args, :session_id, "anonymous")
+    base_args =
+      if session_id,
+        do: Map.put(args, :session_id, session_id),
+        else: Map.put(args, :session_id, "anonymous")
 
     # For execute_program commands, fetch program data
     if command == :execute_program do
@@ -685,7 +694,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
         # Extract complete serializable program data from Python response
         program_data = %{
           program_id: program_id,
-          signature_def: Map.get(create_response, "signature_def", Map.get(create_response, "signature", %{})),
+          signature_def:
+            Map.get(create_response, "signature_def", Map.get(create_response, "signature", %{})),
           signature_class: Map.get(create_response, "signature_class"),
           field_mapping: Map.get(create_response, "field_mapping", %{}),
           fallback_used: Map.get(create_response, "fallback_used", false),
@@ -730,7 +740,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
       # Extract complete serializable program data from Python response
       program_data = %{
         program_id: program_id,
-        signature_def: Map.get(create_response, "signature_def", Map.get(create_response, "signature", %{})),
+        signature_def:
+          Map.get(create_response, "signature_def", Map.get(create_response, "signature", %{})),
         signature_class: Map.get(create_response, "signature_class"),
         field_mapping: Map.get(create_response, "field_mapping", %{}),
         fallback_used: Map.get(create_response, "fallback_used", false),

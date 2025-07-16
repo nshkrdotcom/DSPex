@@ -302,6 +302,7 @@ defmodule DSPex.PythonBridge.SessionStore do
 
     # Create global programs table
     global_programs_table_name = :"#{table_name}_global_programs"
+
     global_programs_table =
       :ets.new(global_programs_table_name, [
         :set,
@@ -335,7 +336,10 @@ defmodule DSPex.PythonBridge.SessionStore do
       }
     }
 
-    Logger.info("SessionStore started with table #{table} and global programs table #{global_programs_table}")
+    Logger.info(
+      "SessionStore started with table #{table} and global programs table #{global_programs_table}"
+    )
+
     {:ok, state}
   end
 
@@ -454,9 +458,9 @@ defmodule DSPex.PythonBridge.SessionStore do
     # Store with timestamp for potential TTL cleanup
     timestamp = System.monotonic_time(:second)
     program_entry = {program_id, program_data, timestamp}
-    
+
     :ets.insert(state.global_programs_table, program_entry)
-    
+
     new_stats = Map.update!(state.stats, :global_programs_stored, &(&1 + 1))
     {:reply, :ok, %{state | stats: new_stats}}
   end
@@ -466,7 +470,7 @@ defmodule DSPex.PythonBridge.SessionStore do
     case :ets.lookup(state.global_programs_table, program_id) do
       [{^program_id, program_data, _timestamp}] ->
         {:reply, {:ok, program_data}, state}
-      
+
       [] ->
         {:reply, {:error, :not_found}, state}
     end
@@ -475,7 +479,7 @@ defmodule DSPex.PythonBridge.SessionStore do
   @impl true
   def handle_call({:delete_global_program, program_id}, _from, state) do
     :ets.delete(state.global_programs_table, program_id)
-    
+
     new_stats = Map.update!(state.stats, :global_programs_deleted, &(&1 + 1))
     {:reply, :ok, %{state | stats: new_stats}}
   end

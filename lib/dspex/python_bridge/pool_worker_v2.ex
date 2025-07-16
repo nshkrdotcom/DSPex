@@ -181,10 +181,12 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
       # Give Python process time to cleanup
       # Wait for port to exit or force close
       ref = Process.monitor(worker_state.port)
+
       receive do
         {port, {:exit_status, _}} when port == worker_state.port ->
           Process.demonitor(ref, [:flush])
           :ok
+
         {:DOWN, ^ref, :port, _, _} ->
           :ok
       after
@@ -621,7 +623,7 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
 
   defp get_cached_environment_info do
     ensure_cache_table()
-    
+
     case :ets.lookup(@env_cache_table, :env_info) do
       [{:env_info, env_info, timestamp}] ->
         # Cache is valid for 1 hour
@@ -631,7 +633,7 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
         else
           validate_and_cache_environment()
         end
-      
+
       [] ->
         validate_and_cache_environment()
     end
@@ -639,13 +641,13 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
 
   defp validate_and_cache_environment do
     Logger.info("Running environment validation (will be cached for subsequent workers)")
-    
+
     case DSPex.PythonBridge.EnvironmentCheck.validate_environment() do
       {:ok, env_info} ->
         # Cache the result
         :ets.insert(@env_cache_table, {:env_info, env_info, System.os_time(:second)})
         {:ok, env_info}
-      
+
       {:error, _reason} = error ->
         error
     end
@@ -655,7 +657,7 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
     case :ets.whereis(@env_cache_table) do
       :undefined ->
         :ets.new(@env_cache_table, [:set, :public, :named_table])
-      
+
       _tid ->
         :ok
     end
