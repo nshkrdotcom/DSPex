@@ -45,6 +45,8 @@ import threading
 import os
 import argparse
 import re
+import signal
+import atexit
 from typing import Dict, Any, Optional, List, Union
 
 # Handle DSPy import with fallback
@@ -77,8 +79,11 @@ class DSPyBridge:
         self.mode = mode
         self.worker_id = worker_id
         
-        # NOTE: No local programs storage - all session data is in centralized SessionStore
-        # Programs are fetched from SessionStore on demand for stateless workers
+        # Initialize programs storage based on mode
+        if self.mode == "standalone":
+            # Standalone mode needs local storage
+            self.programs = {}
+        # Pool-worker mode uses centralized SessionStore, no local storage needed
             
         self.start_time = time.time()
         self.command_count = 0
@@ -690,6 +695,16 @@ class DSPyBridge:
             program_info['execution_count'] += 1
             program_info['last_executed'] = time.time()
             
+            # Monitor memory after AI operation
+            memory_info = self._get_memory_usage()
+            if memory_info.get("percent", 0) > 80:
+                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                    f.write(f"[{time.time()}] High memory usage after AI operation: {memory_info}\n")
+                    f.write(f"[{time.time()}] Worker ID: {self.worker_id}, Session: {session_id}\n")
+                    f.flush()
+                # Force garbage collection to free memory
+                gc.collect()
+            
             # Debug: Write what we got from DSPy to debug log
             with open('/tmp/dspy_bridge_debug.log', 'a') as f:
                 f.write(f"[{time.time()}] DEBUG: DSPy result type: {type(result)}\n")
@@ -808,14 +823,16 @@ class DSPyBridge:
                     f.write(f"[{time.time()}] list_programs called without session_id in pool-worker mode\n")
                     f.flush()
         else:
-            for program_id, program_info in self.programs.items():
-                program_list.append({
-                    "id": program_id,
-                    "created_at": program_info['created_at'],
-                    "execution_count": program_info['execution_count'],
-                    "last_executed": program_info['last_executed'],
-                    "signature": program_info['signature']
-                })
+            # Check if programs exists (it might not in pool-worker mode)
+            if hasattr(self, 'programs'):
+                for program_id, program_info in self.programs.items():
+                    program_list.append({
+                        "id": program_id,
+                        "created_at": program_info['created_at'],
+                        "execution_count": program_info['execution_count'],
+                        "last_executed": program_info['last_executed'],
+                        "signature": program_info['signature']
+                    })
         
         return {
             "programs": program_list,
@@ -845,6 +862,8 @@ class DSPyBridge:
             
             # Handle "anonymous" session for minimal pooling - use local storage
             if session_id == "anonymous":
+                if not hasattr(self, 'programs'):
+                    self.programs = {}
                 if program_id not in self.programs:
                     raise ValueError(f"Program not found: {program_id}")
                 del self.programs[program_id]
@@ -861,6 +880,8 @@ class DSPyBridge:
                 # Delete program from centralized session store
                 self.update_session_in_store(session_id, "delete_program", program_id, None)
         else:
+            if not hasattr(self, 'programs'):
+                self.programs = {}
             if program_id not in self.programs:
                 raise ValueError(f"Program not found: {program_id}")
             
@@ -890,6 +911,10 @@ class DSPyBridge:
         if not program_id:
             raise ValueError("Program ID is required")
         
+        if not hasattr(self, 'programs'):
+            self.programs = {}
+        if not hasattr(self, 'programs'):
+            self.programs = {}
         if program_id not in self.programs:
             raise ValueError(f"Program not found: {program_id}")
         
@@ -914,7 +939,7 @@ class DSPyBridge:
             Dictionary with statistics
         """
         return {
-            "programs_count": len(self.programs),
+            "programs_count": len(getattr(self, 'programs', {})),
             "command_count": self.command_count,
             "error_count": self.error_count,
             "uptime": time.time() - self.start_time,
@@ -933,8 +958,9 @@ class DSPyBridge:
         Returns:
             Dictionary with cleanup status
         """
-        program_count = len(self.programs)
-        self.programs.clear()
+        program_count = len(getattr(self, 'programs', {}))
+        if hasattr(self, 'programs'):
+            self.programs.clear()
         
         # Force garbage collection
         gc.collect()
@@ -956,12 +982,13 @@ class DSPyBridge:
         Returns:
             Dictionary with reset status
         """
-        program_count = len(self.programs)
+        program_count = len(getattr(self, 'programs', {}))
         command_count = self.command_count
         error_count = self.error_count
         
         # Clear all state
-        self.programs.clear()
+        if hasattr(self, 'programs'):
+            self.programs.clear()
         self.command_count = 0
         self.error_count = 0
         
@@ -1023,7 +1050,8 @@ class DSPyBridge:
             # We just need to clean up any local references
             sessions_cleaned = 0  # No local sessions to clean
         else:
-            self.programs.clear()
+            if hasattr(self, 'programs'):
+                self.programs.clear()
             
         # Force garbage collection
         gc.collect()
@@ -1083,6 +1111,8 @@ class DSPyBridge:
         if not program_id:
             raise ValueError("Program ID is required")
         
+        if not hasattr(self, 'programs'):
+            self.programs = {}
         if program_id in self.programs:
             raise ValueError(f"Program with ID '{program_id}' already exists")
         
@@ -1130,6 +1160,8 @@ class DSPyBridge:
         if not program_id:
             raise ValueError("Program ID is required")
         
+        if not hasattr(self, 'programs'):
+            self.programs = {}
         if program_id not in self.programs:
             raise ValueError(f"Program not found: {program_id}")
         
@@ -1556,19 +1588,40 @@ def main():
     parser.add_argument('--mode', choices=['standalone', 'pool-worker'], default='standalone',
                         help='Bridge operation mode')
     parser.add_argument('--worker-id', type=str, help='Worker ID for pool-worker mode')
-    args = parser.parse_args()
+    cmd_args = parser.parse_args()
     
     # Debug log parsed args
     with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-        f.write(f"Parsed args: mode={args.mode}, worker_id={args.worker_id}\n")
+        f.write(f"Parsed args: mode={cmd_args.mode}, worker_id={cmd_args.worker_id}\n")
         f.flush()
     
     # Create bridge with specified mode
-    bridge = DSPyBridge(mode=args.mode, worker_id=args.worker_id)
+    bridge = DSPyBridge(mode=cmd_args.mode, worker_id=cmd_args.worker_id)
     
-    print(f"DSPy Bridge started in {args.mode} mode", file=sys.stderr)
-    if args.worker_id:
-        print(f"Worker ID: {args.worker_id}", file=sys.stderr)
+    # Set up signal handlers for graceful shutdown
+    def handle_signal(signum, frame):
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] Received signal {signum} (worker_id: {cmd_args.worker_id})\n")
+            f.flush()
+        # For pool workers, just exit cleanly
+        if cmd_args.mode == 'pool-worker':
+            sys.exit(0)
+    
+    signal.signal(signal.SIGTERM, handle_signal)
+    signal.signal(signal.SIGINT, handle_signal)
+    
+    # Register exit handler for diagnostics
+    def exit_handler():
+        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+            f.write(f"[{time.time()}] Python bridge exiting (worker_id: {cmd_args.worker_id}, mode: {cmd_args.mode})\n")
+            f.write(f"[{time.time()}] Memory usage: {bridge._get_memory_usage()}\n")
+            f.flush()
+    
+    atexit.register(exit_handler)
+    
+    print(f"DSPy Bridge started in {cmd_args.mode} mode", file=sys.stderr)
+    if cmd_args.worker_id:
+        print(f"Worker ID: {cmd_args.worker_id}", file=sys.stderr)
     print(f"DSPy available: {DSPY_AVAILABLE}", file=sys.stderr)
     
     # Debug log stdin info
