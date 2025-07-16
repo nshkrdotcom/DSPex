@@ -37,8 +37,8 @@ defmodule DSPex.PythonBridge.PoolSupervisor do
   defp default_config do
     %{
       enabled: true,
-      pool_size: Application.get_env(:dspex, :pool_size, 3),
-      overflow: Application.get_env(:dspex, :pool_overflow, 1),
+      pool_size: Application.get_env(:dspex, :pool_size, 8),
+      overflow: Application.get_env(:dspex, :pool_overflow, 4),
       checkout_timeout: 5_000,
       operation_timeout: 30_000,
       health_check_interval: 30_000,

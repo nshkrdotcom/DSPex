@@ -650,9 +650,14 @@ defmodule DSPex.Adapters.TypeConverter do
 
   defp get_module_doc(module) do
     case Code.fetch_docs(module) do
-      {:docs_v1, _, _, _, %{"en" => doc}, _, _} when is_binary(doc) -> doc
-      {:docs_v1, _, _, _, doc, _, _} when is_binary(doc) -> doc
-      _ -> ""
+      {:docs_v1, _, _, _, %{"en" => doc}, _, _} when is_binary(doc) ->
+        doc
+
+      {:docs_v1, _, _, _, doc, _, _} when is_map(doc) and is_map_key(doc, "en") ->
+        doc["en"]
+
+      _ ->
+        ""
     end
   rescue
     _ -> ""

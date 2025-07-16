@@ -7,7 +7,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   without complex enterprise features.
 
   Key features:
-  - Stateless architecture with no session affinity
+  - Session affinity to maintain Python process state
   - Direct port communication between clients and Python processes
   - Simple error handling with structured error responses
   - ETS-based session tracking for observability only
@@ -19,19 +19,21 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
 
   alias DSPex.PythonBridge.{
     PoolWorkerV2,
-    Protocol
+    Protocol,
+    SessionStore
   }
 
-  # Configuration defaults - Phase 2B aggressive adjustments
+  # Configuration defaults
   @default_pool_size System.schedulers_online() * 2
   @default_overflow 2
-  @default_checkout_timeout 45_000  # Increased from 25s to 45s for worker initialization
-  @default_operation_timeout 120_000  # Increased from 90s to 120s for Python operations
-  @default_pool_startup_timeout 60_000  # Increased pool startup timeout
+  # 75s to allow for worker initialization (5-6s) + operation buffer
+  @default_checkout_timeout 75_000
+  # 60s timeout for real AI operations
+  @default_operation_timeout 60_000
   @health_check_interval 30_000
   @session_cleanup_interval 300_000
 
-  # ETS table for session tracking
+  # ETS table for session tracking (monitoring only)
   @session_table :dspex_pool_sessions
 
   # State structure
@@ -70,39 +72,55 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     pool_timeout = Keyword.get(opts, :pool_timeout, @default_checkout_timeout)
     operation_timeout = Keyword.get(opts, :timeout, @default_operation_timeout)
 
-    # Track session for monitoring (but not for affinity)
+    # Track session for monitoring and affinity
     track_session(session_id)
 
     try do
-      # In stateless architecture, any worker can handle any session
-      result = NimblePool.checkout!(
-        pool_name,
-        :any_worker,
-        fn _from, worker ->
-          execute_with_worker(worker, command, args, operation_timeout, session_id)
-        end,
-        pool_timeout
-      )
+      # Use any available worker - session data is centralized in SessionStore
+      result =
+        NimblePool.checkout!(
+          pool_name,
+          :any_worker,
+          fn _from, worker ->
+            # All session data is in SessionStore, any worker can handle any session
+            execute_with_worker(worker, command, args, operation_timeout, session_id)
+          end,
+          pool_timeout
+        )
 
-      # Update session activity after successful execution (Phase 2A fix)
+      # Handle program creation storage (Task 2.1)
       case result do
-        {:ok, _} -> update_session_activity(session_id)
-        _ -> :ok
+        {:ok, response} when command == :create_program ->
+          store_program_data_after_creation(session_id, args, response)
+          update_session_activity(session_id)
+
+        {:ok, _} ->
+          update_session_activity(session_id)
+
+        _ ->
+          :ok
       end
 
       result
     catch
       :exit, {:timeout, _} ->
-        {:error, {:timeout_error, :checkout_timeout, "No workers available", %{pool_name: pool_name, session_id: session_id}}}
+        {:error,
+         {:timeout_error, :checkout_timeout, "No workers available",
+          %{pool_name: pool_name, session_id: session_id}}}
 
       :exit, {:noproc, _} ->
-        {:error, {:resource_error, :pool_not_available, "Pool not started", %{pool_name: pool_name}}}
+        {:error,
+         {:resource_error, :pool_not_available, "Pool not started", %{pool_name: pool_name}}}
 
       :exit, reason ->
-        {:error, {:system_error, :pool_exit, "Pool process exited", %{reason: reason, session_id: session_id}}}
+        {:error,
+         {:system_error, :pool_exit, "Pool process exited",
+          %{reason: reason, session_id: session_id}}}
 
       kind, error ->
-        {:error, {:system_error, :unexpected_error, "Unexpected error during checkout", %{kind: kind, error: error, session_id: session_id}}}
+        {:error,
+         {:system_error, :unexpected_error, "Unexpected error during checkout",
+          %{kind: kind, error: error, session_id: session_id}}}
     end
   end
 
@@ -138,16 +156,20 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
       )
     catch
       :exit, {:timeout, _} ->
-        {:error, {:timeout_error, :checkout_timeout, "No workers available", %{pool_name: pool_name}}}
+        {:error,
+         {:timeout_error, :checkout_timeout, "No workers available", %{pool_name: pool_name}}}
 
       :exit, {:noproc, _} ->
-        {:error, {:resource_error, :pool_not_available, "Pool not started", %{pool_name: pool_name}}}
+        {:error,
+         {:resource_error, :pool_not_available, "Pool not started", %{pool_name: pool_name}}}
 
       :exit, reason ->
         {:error, {:system_error, :pool_exit, "Pool process exited", %{reason: reason}}}
 
       kind, error ->
-        {:error, {:system_error, :unexpected_error, "Unexpected error during checkout", %{kind: kind, error: error}}}
+        {:error,
+         {:system_error, :unexpected_error, "Unexpected error during checkout",
+          %{kind: kind, error: error}}}
     end
   end
 
@@ -159,8 +181,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     # Generate request ID and encode
     request_id = System.unique_integer([:positive, :monotonic])
 
-    # Add session_id to args if provided (for observability)
-    enhanced_args = if session_id, do: Map.put(args, :session_id, session_id), else: args
+    # Enhance args with session data for stateless workers
+    enhanced_args = enhance_args_with_session_data(args, session_id, command)
 
     try do
       request_payload = Protocol.encode_request(request_id, command, enhanced_args)
@@ -172,43 +194,83 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
       # Wait for response with simple error handling
       receive do
         {^port, {:data, data}} ->
+          Logger.info(
+            "Raw response from Python worker #{worker.worker_id}: #{inspect(data, limit: 500)}"
+          )
+
           case Protocol.decode_response(data) do
             {:ok, ^request_id, response} when is_map(response) ->
+              Logger.info(
+                "Success response from worker #{worker.worker_id}: #{inspect(response, limit: 500)}"
+              )
+
               {{:ok, response}, :ok}
 
             {:ok, other_id, _} ->
-              error = {:communication_error, :response_mismatch, "Expected ID #{request_id}, got #{other_id}", %{expected_id: request_id, actual_id: other_id, worker_id: worker.worker_id}}
+              error =
+                {:communication_error, :response_mismatch,
+                 "Expected ID #{request_id}, got #{other_id}",
+                 %{expected_id: request_id, actual_id: other_id, worker_id: worker.worker_id}}
+
+              Logger.error("Response mismatch from worker #{worker.worker_id}: #{inspect(error)}")
               {{:error, error}, :close}
 
             {:error, _id, reason} ->
-              error = {:communication_error, :python_error, reason, %{worker_id: worker.worker_id, session_id: session_id}}
+              error =
+                {:communication_error, :python_error, reason,
+                 %{worker_id: worker.worker_id, session_id: session_id}}
+
+              Logger.error("Python error from worker #{worker.worker_id}: #{inspect(error)}")
               {{:error, error}, :ok}
 
             {:error, reason} ->
-              error = {:communication_error, :decode_error, "Failed to decode response: #{inspect(reason)}", %{decode_reason: reason, worker_id: worker.worker_id}}
+              error =
+                {:communication_error, :decode_error,
+                 "Failed to decode response: #{inspect(reason)}",
+                 %{decode_reason: reason, worker_id: worker.worker_id}}
+
+              Logger.error("Decode error from worker #{worker.worker_id}: #{inspect(error)}")
               {{:error, error}, :close}
           end
 
         {^port, {:exit_status, status}} ->
-          error = {:communication_error, :port_exited, "Python process exited with status #{status}", %{exit_status: status, worker_id: worker.worker_id}}
+          error =
+            {:communication_error, :port_exited, "Python process exited with status #{status}",
+             %{exit_status: status, worker_id: worker.worker_id}}
+
           {{:error, error}, :close}
       after
         timeout ->
-          Logger.error("Command timeout for worker #{worker.worker_id}: #{command} (#{timeout}ms)")
-          error = {:timeout_error, :command_timeout, "Command timed out after #{timeout}ms", %{timeout_ms: timeout, worker_id: worker.worker_id, command: command}}
+          Logger.error(
+            "TIMEOUT: No response from Python worker #{worker.worker_id} for command #{command} after #{timeout}ms"
+          )
+
+          error =
+            {:timeout_error, :command_timeout, "Command timed out after #{timeout}ms",
+             %{timeout_ms: timeout, worker_id: worker.worker_id, command: command}}
+
           {{:error, error}, :close}
       end
     catch
       :exit, {:timeout, _} ->
-        error = {:timeout_error, :command_timeout, "Command timed out after #{timeout}ms", %{timeout_ms: timeout, worker_id: worker.worker_id, command: command}}
+        error =
+          {:timeout_error, :command_timeout, "Command timed out after #{timeout}ms",
+           %{timeout_ms: timeout, worker_id: worker.worker_id, command: command}}
+
         {{:error, error}, :close}
 
       :error, {:badarg, _} ->
-        error = {:communication_error, :port_send_failed, "Port.command/2 failed - port may be closed", %{worker_id: worker.worker_id}}
+        error =
+          {:communication_error, :port_send_failed, "Port.command/2 failed - port may be closed",
+           %{worker_id: worker.worker_id}}
+
         {{:error, error}, :close}
 
       kind, error ->
-        error_tuple = {:system_error, :command_error, "Unexpected error during command execution", %{error_kind: kind, error: error, worker_id: worker.worker_id}}
+        error_tuple =
+          {:system_error, :command_error, "Unexpected error during command execution",
+           %{error_kind: kind, error: error, worker_id: worker.worker_id}}
+
         {{:error, error_tuple}, :close}
     end
   end
@@ -257,6 +319,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
           last_activity: System.monotonic_time(:millisecond),
           operations: 1
         }
+
         _result = :ets.insert(@session_table, {session_id, session_info})
         :ok
     end
@@ -266,8 +329,12 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   Ends a session and cleans up resources.
   """
   def end_session(session_id) do
+    # Clean up monitoring data
     _result = ensure_session_table()
     _result = :ets.delete(@session_table, session_id)
+
+    # Clean up centralized session data
+    SessionStore.delete_session(session_id)
     :ok
   end
 
@@ -316,7 +383,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
 
   @impl true
   def init(opts) do
-    # Initialize session tracking table
+    # Initialize session tracking table (monitoring only)
     _result = ensure_session_table()
 
     # In minimal pooling, we only use PoolWorkerV2 (not Enhanced)
@@ -336,7 +403,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
       worker: {worker_module, []},
       pool_size: pool_size,
       max_overflow: overflow,
-      lazy: true,  # Don't pre-start all workers to avoid initialization blocking
+      # Pre-start workers to ensure immediate availability for concurrent requests
+      lazy: false,
       name: pool_name
     ]
 
@@ -378,8 +446,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   def handle_call(:get_status, _from, state) do
     sessions = get_session_info()
 
-    # In stateless architecture, no session affinity is maintained
-    affinity_stats = %{}
+    # Session affinity is maintained through NimblePool
+    affinity_stats = %{active_sessions: length(sessions)}
 
     status = %{
       pool_size: state.pool_size,
@@ -474,11 +542,13 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     # Stop the pool with longer timeout and confirmation (Phase 2A fix)
     if state.pool_pid do
       try do
-        NimblePool.stop(state.pool_name, :shutdown, 15_000)  # Increased timeout
+        # Increased timeout
+        NimblePool.stop(state.pool_name, :shutdown, 15_000)
         # Wait for confirmation that pool is actually stopped
         :timer.sleep(100)
       catch
-        _, _ -> :ok  # Ignore shutdown errors in tests
+        # Ignore shutdown errors in tests
+        _, _ -> :ok
       end
     end
 
@@ -516,23 +586,86 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     Process.send_after(self(), :cleanup_stale_sessions, @session_cleanup_interval)
   end
 
-  # Phase 2B: Pre-warm workers to reduce checkout delays
-  defp ensure_minimum_workers(state) do
-    # Pre-warm workers in background to reduce checkout delays
-    spawn(fn ->
-      for _i <- 1..min(state.pool_size, 2) do
-        try do
-          NimblePool.checkout!(state.pool_name, :pre_warm, fn _from, _worker ->
-            # Just check worker health, then return
-            {{:ok, :pre_warmed}, :ok}
-          end, 1000)
-        catch
-          _, _ -> :ok  # Ignore pre-warming failures
+  ## Session Management Functions (using centralized SessionStore)
+
+  # Enhances command arguments with session data for stateless workers.
+  # For stateless workers, this function fetches necessary session data
+  # from the SessionStore and includes it in the command arguments.
+  defp enhance_args_with_session_data(args, session_id, command) do
+    base_args = if session_id, do: Map.put(args, :session_id, session_id), else: args
+
+    # For execute_program commands with named sessions, fetch program data from SessionStore
+    if command == :execute_program and session_id != nil and session_id != "anonymous" do
+      program_id = Map.get(args, :program_id)
+
+      if program_id do
+        case SessionStore.get_session(session_id) do
+          {:ok, session} ->
+            program_data = Map.get(session.programs, program_id)
+
+            if program_data do
+              Map.put(base_args, :program_data, program_data)
+            else
+              Logger.debug("Program #{program_id} not found in session #{session_id}")
+              base_args
+            end
+
+          {:error, reason} ->
+            Logger.debug("Session #{session_id} not found: #{inspect(reason)}")
+            base_args
         end
-        :timer.sleep(50)  # Small delay between pre-warming attempts
+      else
+        base_args
       end
-    end)
+    else
+      base_args
+    end
   end
+
+  # Stores program data in the SessionStore after successful creation.
+  defp store_program_data_after_creation(session_id, create_args, create_response) do
+    if session_id != nil and session_id != "anonymous" do
+      program_id = Map.get(create_response, "program_id")
+
+      if program_id do
+        # Extract serializable program data from creation args
+        program_data = %{
+          program_id: program_id,
+          signature_def: Map.get(create_args, :signature, %{}),
+          created_at: System.system_time(:second),
+          execution_count: 0,
+          last_executed: nil,
+          program_type: Map.get(create_response, "program_type", "predict"),
+          signature: Map.get(create_response, "signature", %{})
+        }
+
+        store_program_in_session(session_id, program_id, program_data)
+      end
+    end
+  end
+
+  # Stores program data in the SessionStore.
+  defp store_program_in_session(session_id, program_id, program_data) do
+    if session_id != nil and session_id != "anonymous" do
+      case SessionStore.get_session(session_id) do
+        {:ok, _session} ->
+          # Update existing session
+          SessionStore.update_session(session_id, fn session ->
+            %{session | programs: Map.put(session.programs, program_id, program_data)}
+          end)
+
+        {:error, :not_found} ->
+          # Create new session
+          {:ok, _session} = SessionStore.create_session(session_id)
+
+          SessionStore.update_session(session_id, fn session ->
+            %{session | programs: Map.put(session.programs, program_id, program_data)}
+          end)
+      end
+    end
+  end
+
+  # Phase 2B: Pre-warm workers to reduce checkout delays
 
   ## Supervisor Integration
 

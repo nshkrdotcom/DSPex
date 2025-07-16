@@ -29,7 +29,7 @@ defmodule PoolFixedTest do
 
     # Check components
     pool_supervisor = Process.whereis(DSPex.PythonBridge.PoolSupervisor)
-    session_pool = Process.whereis(DSPex.PythonBridge.SessionPool)
+    session_pool = Process.whereis(DSPex.PythonBridge.SessionPoolV2)
 
     assert pool_supervisor != nil
     assert session_pool != nil
@@ -38,7 +38,7 @@ defmodule PoolFixedTest do
     IO.puts("Session pool: #{inspect(session_pool)}")
 
     # Get pool status
-    status = DSPex.PythonBridge.SessionPool.get_pool_status()
+    status = DSPex.PythonBridge.SessionPoolV2.get_pool_status()
     IO.puts("Pool status: #{inspect(status, pretty: true)}")
 
     # Try to use the pool through the adapter

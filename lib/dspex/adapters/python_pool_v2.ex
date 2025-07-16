@@ -56,7 +56,7 @@ defmodule DSPex.Adapters.PythonPoolV2 do
     args = %{
       program_id: program_id,
       inputs: inputs,
-      options: Map.delete(options, :session_id)
+      options: remove_session_id(options)
     }
 
     # Extract pool options
@@ -334,9 +334,15 @@ defmodule DSPex.Adapters.PythonPoolV2 do
 
   ## Private Functions
 
-  defp get_session_id(config_or_options) do
+  defp get_session_id(config_or_options) when is_map(config_or_options) do
     Map.get(config_or_options, :session_id, @default_session)
   end
+
+  defp get_session_id(config_or_options) when is_list(config_or_options) do
+    Keyword.get(config_or_options, :session_id, @default_session)
+  end
+
+  defp get_session_id(_), do: @default_session
 
   defp convert_config(config) do
     config
@@ -432,10 +438,29 @@ defmodule DSPex.Adapters.PythonPoolV2 do
     {:error, reason}
   end
 
-  defp get_pool_opts(options) do
+  defp get_pool_opts(options) when is_map(options) do
     case Map.get(options, :pool_name) do
       nil -> []
       pool_name -> [pool_name: pool_name]
     end
   end
+
+  defp get_pool_opts(options) when is_list(options) do
+    case Keyword.get(options, :pool_name) do
+      nil -> []
+      pool_name -> [pool_name: pool_name]
+    end
+  end
+
+  defp get_pool_opts(_), do: []
+
+  defp remove_session_id(options) when is_map(options) do
+    Map.delete(options, :session_id)
+  end
+
+  defp remove_session_id(options) when is_list(options) do
+    Keyword.delete(options, :session_id)
+  end
+
+  defp remove_session_id(_), do: %{}
 end

@@ -23,7 +23,8 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
     :python_path,
     :script_path,
     :worker_id,
-    :current_session,  # Kept for compatibility but not used for session binding
+    # Kept for compatibility but not used for session binding
+    :current_session,
     :stats,
     :health_status,
     :started_at
@@ -126,14 +127,25 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
     # Update stats
     updated_state = update_checkin_stats(worker_state, checkin_type)
 
-    # Determine if worker should be removed
-    case should_remove_worker?(updated_state, checkin_type) do
-      true ->
-        Logger.debug("Worker #{worker_state.worker_id} will be removed")
-        {:remove, :closed, pool_state}
+    # Reconnect port to worker process to keep Python bridge alive
+    case reconnect_port_to_worker(updated_state) do
+      :ok ->
+        # Determine if worker should be removed
+        case should_remove_worker?(updated_state, checkin_type) do
+          true ->
+            Logger.debug("Worker #{worker_state.worker_id} will be removed")
+            {:remove, :closed, pool_state}
 
-      false ->
-        {:ok, updated_state, pool_state}
+          false ->
+            {:ok, updated_state, pool_state}
+        end
+
+      {:error, reason} ->
+        Logger.error(
+          "Worker #{worker_state.worker_id} port reconnection failed: #{inspect(reason)}"
+        )
+
+        {:remove, {:port_reconnect_failed, reason}, pool_state}
     end
   end
 
@@ -179,12 +191,12 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
 
   ## Checkout Handlers
 
-  defp handle_session_checkout(_session_id, {pid, _ref}, worker_state, pool_state) do
-    # In stateless architecture, we don't bind workers to sessions
-    # Workers can handle any session by fetching data from centralized store
+  defp handle_session_checkout(session_id, {pid, _ref}, worker_state, pool_state) do
+    # Stateless workers - any worker can handle any session using centralized SessionStore
     updated_state = %{
       worker_state
-      | current_session: nil,  # No session binding in stateless architecture
+      | # Track current session for logging
+        current_session: session_id,
         stats: Map.update(worker_state.stats, :checkouts, 1, &(&1 + 1))
     }
 
@@ -227,7 +239,8 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
     # No session binding required - worker will fetch session data on demand
     updated_state = %{
       worker_state
-      | current_session: nil,  # No session binding in stateless architecture
+      | # No session binding in stateless architecture
+        current_session: nil,
         stats: Map.update(worker_state.stats, :checkouts, 1, &(&1 + 1))
     }
 
@@ -256,11 +269,17 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
         {:remove, {:checkout_failed, :port_closed_during_connect}, pool_state}
 
       {:error, {:connect_failed, reason}} ->
-        Logger.error("[#{worker_state.worker_id}] Port connection failed during any_worker checkout: #{inspect(reason)}")
+        Logger.error(
+          "[#{worker_state.worker_id}] Port connection failed during any_worker checkout: #{inspect(reason)}"
+        )
+
         {:remove, {:checkout_failed, {:connect_failed, reason}}, pool_state}
 
       {:error, reason} ->
-        Logger.error("[#{worker_state.worker_id}] Port connection failed during any_worker checkout: #{inspect(reason)}")
+        Logger.error(
+          "[#{worker_state.worker_id}] Port connection failed during any_worker checkout: #{inspect(reason)}"
+        )
+
         {:remove, {:checkout_failed, reason}, pool_state}
     end
   end
@@ -522,6 +541,21 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
 
       :error, reason ->
         {:error, {:connect_failed, reason}}
+    end
+  end
+
+  # Reconnects the port back to the worker process to keep Python bridge alive
+  defp reconnect_port_to_worker(worker_state) do
+    worker_pid = self()
+
+    case safe_port_connect(worker_state.port, worker_pid, worker_state.worker_id) do
+      {:ok, _port} ->
+        Logger.debug("[#{worker_state.worker_id}] Port reconnected to worker process")
+        :ok
+
+      {:error, reason} ->
+        Logger.debug("[#{worker_state.worker_id}] Port reconnection failed: #{inspect(reason)}")
+        {:error, reason}
     end
   end
 

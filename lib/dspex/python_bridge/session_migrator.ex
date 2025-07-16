@@ -191,7 +191,8 @@ defmodule DSPex.PythonBridge.SessionMigrator do
         :ets.insert(state.table, {migration_id, migration_state})
 
         # Start migration process asynchronously
-        Task.start(fn -> perform_migration(migration_id, state.table, state.session_store) end)
+        _task =
+          Task.start(fn -> perform_migration(migration_id, state.table, state.session_store) end)
 
         new_stats = Map.update(state.stats, :migrations_started, 1, &(&1 + 1))
         {:reply, {:ok, migration_id}, %{state | stats: new_stats}}
@@ -426,10 +427,6 @@ defmodule DSPex.PythonBridge.SessionMigrator do
         {:error, :not_found} ->
           Logger.error("Session #{session_id} not found during migration")
           {:error, :session_not_found}
-
-        {:error, reason} ->
-          Logger.error("Failed to get session #{session_id} during migration: #{inspect(reason)}")
-          {:error, {:session_get_failed, reason}}
       end
     rescue
       error ->

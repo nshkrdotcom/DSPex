@@ -321,21 +321,21 @@ defmodule DSPex.PythonBridge.WorkerLifecycleIntegrationTest do
     test "handles stateless session operations gracefully" do
       # In stateless architecture, test that workers can handle sessions
       # without maintaining affinity or local state
-      
+
       # Test session operations without worker affinity
       session_id = "stateless_session_#{:erlang.unique_integer()}"
-      
+
       # Any worker should be able to handle any session
       # This is the core principle of stateless architecture
-      
+
       # Create a simple test to verify stateless behavior
       worker_id = "stateless_test_worker"
       sm = WorkerStateMachine.new(worker_id)
       {:ok, sm} = WorkerStateMachine.transition(sm, :ready, :init_complete)
-      
+
       # Worker should be able to accept work for any session
       assert WorkerStateMachine.can_accept_work?(sm)
-      
+
       # In stateless architecture, workers don't maintain session bindings
       # They fetch session data from SessionStore as needed
       assert sm.state == :ready

@@ -5,16 +5,22 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
   alias DSPex.PythonBridge.{SessionPoolV2, PoolWorkerV2, Protocol}
 
   @moduletag :core_pool
-  @moduletag timeout: 300_000  # 5 minutes for pool tests (Phase 2B increase)
+  # 5 minutes for pool tests (Phase 2B increase)
+  @moduletag timeout: 300_000
 
   # Phase 2A: Retry helper for flaky tests
   defp retry_operation(operation, max_retries \\ 3) do
     Enum.reduce_while(1..max_retries, nil, fn attempt, _acc ->
       case operation.() do
-        {:ok, result} -> {:halt, {:ok, result}}
-        error when attempt == max_retries -> {:halt, error}
+        {:ok, result} ->
+          {:halt, {:ok, result}}
+
+        error when attempt == max_retries ->
+          {:halt, error}
+
         _error ->
-          :timer.sleep(100 * attempt)  # Exponential backoff
+          # Exponential backoff
+          :timer.sleep(100 * attempt)
           {:cont, nil}
       end
     end)
@@ -26,18 +32,21 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
       opts = [name: pool_name]
 
       # Phase 2A: Use retry logic for pool startup
-      {:ok, {pid, status}} = retry_operation(fn ->
-        case SessionPoolV2.start_link(opts) do
-          {:ok, pid} when is_pid(pid) ->
-            if Process.alive?(pid) do
-              status = SessionPoolV2.get_pool_status(pool_name)
-              {:ok, {pid, status}}
-            else
-              {:error, :process_not_alive}
-            end
-          error -> error
-        end
-      end)
+      {:ok, {pid, status}} =
+        retry_operation(fn ->
+          case SessionPoolV2.start_link(opts) do
+            {:ok, pid} when is_pid(pid) ->
+              if Process.alive?(pid) do
+                status = SessionPoolV2.get_pool_status(pool_name)
+                {:ok, {pid, status}}
+              else
+                {:error, :process_not_alive}
+              end
+
+            error ->
+              error
+          end
+        end)
 
       assert Process.alive?(pid)
       assert status.pool_size > 0
@@ -57,6 +66,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
 
     test "start_link/1 accepts custom pool configuration" do
       pool_name = :"test_pool_custom_#{System.unique_integer([:positive])}"
+
       opts = [
         name: pool_name,
         pool_size: 2,
@@ -65,18 +75,21 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
       ]
 
       # Phase 2A: Use retry logic for pool startup
-      {:ok, {pid, status}} = retry_operation(fn ->
-        case SessionPoolV2.start_link(opts) do
-          {:ok, pid} when is_pid(pid) ->
-            if Process.alive?(pid) do
-              status = SessionPoolV2.get_pool_status(pool_name)
-              {:ok, {pid, status}}
-            else
-              {:error, :process_not_alive}
-            end
-          error -> error
-        end
-      end)
+      {:ok, {pid, status}} =
+        retry_operation(fn ->
+          case SessionPoolV2.start_link(opts) do
+            {:ok, pid} when is_pid(pid) ->
+              if Process.alive?(pid) do
+                status = SessionPoolV2.get_pool_status(pool_name)
+                {:ok, {pid, status}}
+              else
+                {:error, :process_not_alive}
+              end
+
+            error ->
+              error
+          end
+        end)
 
       assert status.pool_size == 2
       assert status.max_overflow == 1
@@ -95,18 +108,21 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
       opts = [name: pool_name]
 
       # Phase 2A: Use retry logic for pool startup
-      {:ok, {pid, actual_pool_name}} = retry_operation(fn ->
-        case SessionPoolV2.start_link(opts) do
-          {:ok, pid} when is_pid(pid) ->
-            if Process.alive?(pid) do
-              actual_pool_name = SessionPoolV2.get_pool_name_for(pool_name)
-              {:ok, {pid, actual_pool_name}}
-            else
-              {:error, :process_not_alive}
-            end
-          error -> error
-        end
-      end)
+      {:ok, {pid, actual_pool_name}} =
+        retry_operation(fn ->
+          case SessionPoolV2.start_link(opts) do
+            {:ok, pid} when is_pid(pid) ->
+              if Process.alive?(pid) do
+                actual_pool_name = SessionPoolV2.get_pool_name_for(pool_name)
+                {:ok, {pid, actual_pool_name}}
+              else
+                {:error, :process_not_alive}
+              end
+
+            error ->
+              error
+          end
+        end)
 
       assert actual_pool_name == :"#{pool_name}_pool"
 
@@ -130,6 +146,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
         if Process.alive?(pid) do
           GenServer.stop(pid, :normal, 10_000)
         end
+
         # Safe ETS cleanup - only if table exists
         case :ets.whereis(:dspex_pool_sessions) do
           :undefined -> :ok
@@ -143,12 +160,13 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
     test "successfully executes ping command with session tracking", %{pool_name: pool_name} do
       session_id = "test_session_#{System.unique_integer()}"
 
-      result = SessionPoolV2.execute_in_session(
-        session_id,
-        :ping,
-        %{test: true},
-        pool_name: :"#{pool_name}_pool"
-      )
+      result =
+        SessionPoolV2.execute_in_session(
+          session_id,
+          :ping,
+          %{test: true},
+          pool_name: :"#{pool_name}_pool"
+        )
 
       assert {:ok, response} = result
       assert is_map(response)
@@ -164,19 +182,22 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
     test "handles timeout errors gracefully", %{pool_name: pool_name} do
       session_id = "timeout_session_#{System.unique_integer()}"
 
-      result = SessionPoolV2.execute_in_session(
-        session_id,
-        :ping,
-        %{},
-        pool_name: :"#{pool_name}_pool",
-        pool_timeout: 1  # Very short timeout
-      )
+      result =
+        SessionPoolV2.execute_in_session(
+          session_id,
+          :ping,
+          %{},
+          pool_name: :"#{pool_name}_pool",
+          # Very short timeout
+          pool_timeout: 1
+        )
 
       # Should either succeed quickly or timeout
       case result do
         {:ok, _response} ->
           # Command executed quickly
           :ok
+
         {:error, {:timeout_error, :checkout_timeout, _message, context}} ->
           assert context.pool_name == :"#{pool_name}_pool"
           assert context.session_id == session_id
@@ -186,12 +207,13 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
     test "returns structured error for non-existent pool" do
       session_id = "error_session_#{System.unique_integer()}"
 
-      result = SessionPoolV2.execute_in_session(
-        session_id,
-        :ping,
-        %{},
-        pool_name: :non_existent_pool
-      )
+      result =
+        SessionPoolV2.execute_in_session(
+          session_id,
+          :ping,
+          %{},
+          pool_name: :non_existent_pool
+        )
 
       assert {:error, {:resource_error, :pool_not_available, _message, context}} = result
       assert context.pool_name == :non_existent_pool
@@ -201,12 +223,13 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
       session_id = "observability_session_#{System.unique_integer()}"
 
       # Use a command that echoes back the arguments
-      result = SessionPoolV2.execute_in_session(
-        session_id,
-        :ping,
-        %{echo_args: true},
-        pool_name: :"#{pool_name}_pool"
-      )
+      result =
+        SessionPoolV2.execute_in_session(
+          session_id,
+          :ping,
+          %{echo_args: true},
+          pool_name: :"#{pool_name}_pool"
+        )
 
       assert {:ok, response} = result
       # The session_id should be included in the response for observability
@@ -225,6 +248,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
         if Process.alive?(pid) do
           GenServer.stop(pid, :normal, 10_000)
         end
+
         # Safe ETS cleanup - only if table exists
         case :ets.whereis(:dspex_pool_sessions) do
           :undefined -> :ok
@@ -236,11 +260,12 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
     end
 
     test "successfully executes ping command without session tracking", %{pool_name: pool_name} do
-      result = SessionPoolV2.execute_anonymous(
-        :ping,
-        %{test: true},
-        pool_name: :"#{pool_name}_pool"
-      )
+      result =
+        SessionPoolV2.execute_anonymous(
+          :ping,
+          %{test: true},
+          pool_name: :"#{pool_name}_pool"
+        )
 
       assert {:ok, response} = result
       assert is_map(response)
@@ -248,18 +273,21 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
     end
 
     test "handles timeout errors gracefully", %{pool_name: pool_name} do
-      result = SessionPoolV2.execute_anonymous(
-        :ping,
-        %{},
-        pool_name: :"#{pool_name}_pool",
-        pool_timeout: 1  # Very short timeout
-      )
+      result =
+        SessionPoolV2.execute_anonymous(
+          :ping,
+          %{},
+          pool_name: :"#{pool_name}_pool",
+          # Very short timeout
+          pool_timeout: 1
+        )
 
       # Should either succeed quickly or timeout
       case result do
         {:ok, _response} ->
           # Command executed quickly
           :ok
+
         {:error, {:timeout_error, :checkout_timeout, _message, context}} ->
           assert context.pool_name == :"#{pool_name}_pool"
           refute Map.has_key?(context, :session_id)
@@ -267,22 +295,24 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
     end
 
     test "returns structured error for non-existent pool" do
-      result = SessionPoolV2.execute_anonymous(
-        :ping,
-        %{},
-        pool_name: :non_existent_pool
-      )
+      result =
+        SessionPoolV2.execute_anonymous(
+          :ping,
+          %{},
+          pool_name: :non_existent_pool
+        )
 
       assert {:error, {:resource_error, :pool_not_available, _message, context}} = result
       assert context.pool_name == :non_existent_pool
     end
 
     test "does not include session_id in command arguments", %{pool_name: pool_name} do
-      result = SessionPoolV2.execute_anonymous(
-        :ping,
-        %{echo_args: true},
-        pool_name: :"#{pool_name}_pool"
-      )
+      result =
+        SessionPoolV2.execute_anonymous(
+          :ping,
+          %{echo_args: true},
+          pool_name: :"#{pool_name}_pool"
+        )
 
       assert {:ok, response} = result
       assert is_map(response)
@@ -344,6 +374,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
       tracked_sessions = Enum.filter(sessions, &(&1.session_id in session_ids))
 
       assert length(tracked_sessions) == 3
+
       Enum.each(tracked_sessions, fn session ->
         assert session.session_id in session_ids
         assert is_integer(session.started_at)
@@ -363,6 +394,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
         if Process.alive?(pid) do
           GenServer.stop(pid, :normal, 10_000)
         end
+
         # Safe ETS cleanup - only if table exists
         case :ets.whereis(:dspex_pool_sessions) do
           :undefined -> :ok
@@ -382,11 +414,13 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
 
       assert status.pool_size == 3
       assert status.max_overflow == 2
-      assert status.active_sessions >= 2  # At least our test sessions
+      # At least our test sessions
+      assert status.active_sessions >= 2
       assert is_list(status.sessions)
       assert is_integer(status.uptime_ms)
       assert status.uptime_ms >= 0
-      assert is_map(status.session_affinity)  # Should be empty in stateless architecture
+      # Should be empty in stateless architecture
+      assert is_map(status.session_affinity)
     end
 
     test "health_check/1 returns healthy status", %{pool_name: pool_name} do
@@ -405,6 +439,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
         if Process.alive?(pid) do
           GenServer.stop(pid, :normal, 10_000)
         end
+
         # Safe ETS cleanup - only if table exists
         case :ets.whereis(:dspex_pool_sessions) do
           :undefined -> :ok
@@ -419,14 +454,15 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
       # Execute commands with different session IDs
       session_ids = for i <- 1..5, do: "stateless_session_#{i}_#{System.unique_integer()}"
 
-      results = Enum.map(session_ids, fn session_id ->
-        SessionPoolV2.execute_in_session(
-          session_id,
-          :ping,
-          %{session_test: true},
-          pool_name: :"#{pool_name}_pool"
-        )
-      end)
+      results =
+        Enum.map(session_ids, fn session_id ->
+          SessionPoolV2.execute_in_session(
+            session_id,
+            :ping,
+            %{session_test: true},
+            pool_name: :"#{pool_name}_pool"
+          )
+        end)
 
       # All should succeed regardless of which worker handles them
       Enum.each(results, fn result ->
@@ -447,25 +483,29 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
 
       # Phase 2A: Execute multiple commands with explicit synchronization
       for i <- 1..3 do
-        {:ok, _response} = SessionPoolV2.execute_in_session(
-          session_id,
-          :ping,
-          %{operation_number: i},
-          pool_name: :"#{pool_name}_pool"
-        )
+        {:ok, _response} =
+          SessionPoolV2.execute_in_session(
+            session_id,
+            :ping,
+            %{operation_number: i},
+            pool_name: :"#{pool_name}_pool"
+          )
+
         # Small delay to ensure session tracking updates are processed
         :timer.sleep(10)
       end
 
       # Phase 2A: Add retry logic for eventual consistency
-      {:ok, session_info} = retry_operation(fn ->
-        sessions = SessionPoolV2.get_session_info()
-        case Enum.find(sessions, &(&1.session_id == session_id)) do
-          nil -> {:error, :session_not_found}
-          info when info.operations >= 3 -> {:ok, info}
-          _info -> {:error, :operations_not_updated}
-        end
-      end)
+      {:ok, session_info} =
+        retry_operation(fn ->
+          sessions = SessionPoolV2.get_session_info()
+
+          case Enum.find(sessions, &(&1.session_id == session_id)) do
+            nil -> {:error, :session_not_found}
+            info when info.operations >= 3 -> {:ok, info}
+            _info -> {:error, :operations_not_updated}
+          end
+        end)
 
       assert session_info != nil
       assert session_info.operations >= 3
@@ -486,6 +526,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
         if Process.alive?(pid) do
           GenServer.stop(pid, :normal, 10_000)
         end
+
         # Safe ETS cleanup - only if table exists
         case :ets.whereis(:dspex_pool_sessions) do
           :undefined -> :ok
@@ -498,20 +539,28 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
 
     test "returns structured error tuples with proper categorization", %{pool_name: pool_name} do
       # Test timeout error
-      result = SessionPoolV2.execute_in_session(
-        "error_session",
-        :ping,
-        %{},
-        pool_name: :"#{pool_name}_pool",
-        pool_timeout: 1
-      )
+      result =
+        SessionPoolV2.execute_in_session(
+          "error_session",
+          :ping,
+          %{},
+          pool_name: :"#{pool_name}_pool",
+          pool_timeout: 1
+        )
 
       case result do
         {:ok, _} ->
           # Command succeeded quickly
           :ok
+
         {:error, {category, type, message, context}} ->
-          assert category in [:timeout_error, :resource_error, :communication_error, :system_error]
+          assert category in [
+                   :timeout_error,
+                   :resource_error,
+                   :communication_error,
+                   :system_error
+                 ]
+
           assert is_atom(type)
           assert is_binary(message)
           assert is_map(context)
@@ -519,11 +568,12 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
     end
 
     test "error context includes relevant debugging information" do
-      result = SessionPoolV2.execute_anonymous(
-        :ping,
-        %{},
-        pool_name: :non_existent_pool_error_test
-      )
+      result =
+        SessionPoolV2.execute_anonymous(
+          :ping,
+          %{},
+          pool_name: :non_existent_pool_error_test
+        )
 
       assert {:error, {_category, _type, _message, context}} = result
       assert context.pool_name == :non_existent_pool_error_test
@@ -541,6 +591,7 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
         if Process.alive?(pid) do
           GenServer.stop(pid, :normal, 10_000)
         end
+
         # Safe ETS cleanup - only if table exists
         case :ets.whereis(:dspex_pool_sessions) do
           :undefined -> :ok
@@ -559,25 +610,29 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
       end
 
       # Reduced from 5 to 3 concurrent operations for better reliability
-      tasks = for i <- 1..3 do
-        # Phase 2B: Longer stagger to reduce resource contention
-        :timer.sleep(i * 100)  # 100ms stagger
-        Task.async(fn ->
-          session_id = "concurrent_session_#{i}_#{System.unique_integer()}"
-          # Add retry logic for individual operations
-          retry_operation(fn ->
-            SessionPoolV2.execute_in_session(
-              session_id,
-              :ping,
-              %{concurrent_test: i},
-              pool_name: :"#{pool_name}_pool"
-            )
+      tasks =
+        for i <- 1..3 do
+          # Phase 2B: Longer stagger to reduce resource contention
+          # 100ms stagger
+          :timer.sleep(i * 100)
+
+          Task.async(fn ->
+            session_id = "concurrent_session_#{i}_#{System.unique_integer()}"
+            # Add retry logic for individual operations
+            retry_operation(fn ->
+              SessionPoolV2.execute_in_session(
+                session_id,
+                :ping,
+                %{concurrent_test: i},
+                pool_name: :"#{pool_name}_pool"
+              )
+            end)
           end)
-        end)
-      end
+        end
 
       # Phase 2B: Much more generous timeout to match new pool configuration
-      results = Task.await_many(tasks, 240_000)  # 4 minutes
+      # 4 minutes
+      results = Task.await_many(tasks, 240_000)
 
       # All should succeed
       Enum.each(results, fn result ->
@@ -594,32 +649,36 @@ defmodule DSPex.PythonBridge.SessionPoolV2Test do
       end
 
       # Reduced from 5 to 3 concurrent operations for better reliability
-      tasks = for i <- 1..3 do
-        # Phase 2B: Longer stagger to reduce resource contention
-        :timer.sleep(i * 100)  # 100ms stagger
-        Task.async(fn ->
-          # Add retry logic for individual operations
-          retry_operation(fn ->
-            if rem(i, 2) == 0 do
-              SessionPoolV2.execute_in_session(
-                "mixed_session_#{i}",
-                :ping,
-                %{mixed_test: i},
-                pool_name: :"#{pool_name}_pool"
-              )
-            else
-              SessionPoolV2.execute_anonymous(
-                :ping,
-                %{mixed_test: i},
-                pool_name: :"#{pool_name}_pool"
-              )
-            end
+      tasks =
+        for i <- 1..3 do
+          # Phase 2B: Longer stagger to reduce resource contention
+          # 100ms stagger
+          :timer.sleep(i * 100)
+
+          Task.async(fn ->
+            # Add retry logic for individual operations
+            retry_operation(fn ->
+              if rem(i, 2) == 0 do
+                SessionPoolV2.execute_in_session(
+                  "mixed_session_#{i}",
+                  :ping,
+                  %{mixed_test: i},
+                  pool_name: :"#{pool_name}_pool"
+                )
+              else
+                SessionPoolV2.execute_anonymous(
+                  :ping,
+                  %{mixed_test: i},
+                  pool_name: :"#{pool_name}_pool"
+                )
+              end
+            end)
           end)
-        end)
-      end
+        end
 
       # Phase 2B: Much more generous timeout to match new pool configuration
-      results = Task.await_many(tasks, 240_000)  # 4 minutes
+      # 4 minutes
+      results = Task.await_many(tasks, 240_000)
 
       # All should succeed
       Enum.each(results, fn result ->

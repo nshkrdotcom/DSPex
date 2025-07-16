@@ -82,6 +82,8 @@ defmodule DSPex.PythonBridge.Types do
           | :pool_unavailable
           | :worker_init_failed
           | :port_closed
+          | :unknown_error
+          | :unexpected_error
           | :protocol_error
           | :supervisor_crash
           | :worker_crash

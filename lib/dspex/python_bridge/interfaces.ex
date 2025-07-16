@@ -122,9 +122,6 @@ defmodule DSPex.PythonBridge.Interfaces do
 
       %{timeout: invalid_timeout} ->
         {:error, "Invalid timeout value: #{inspect(invalid_timeout)}"}
-
-      _ ->
-        {:error, "Invalid options structure"}
     end
   end
 

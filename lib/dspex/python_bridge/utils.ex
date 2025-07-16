@@ -108,7 +108,7 @@ defmodule DSPex.PythonBridge.Utils do
   @doc """
   Safely executes a function with a timeout.
   """
-  @spec with_timeout(function(), integer()) :: {:ok, term()} | {:error, :timeout}
+  @spec with_timeout((-> any()), non_neg_integer()) :: {:ok, term()} | {:error, :timeout}
   def with_timeout(fun, timeout_ms) when is_function(fun, 0) and is_integer(timeout_ms) do
     task = Task.async(fun)
 
@@ -117,7 +117,7 @@ defmodule DSPex.PythonBridge.Utils do
         {:ok, result}
 
       nil ->
-        Task.shutdown(task, :brutal_kill)
+        _shutdown_result = Task.shutdown(task, :brutal_kill)
         {:error, :timeout}
     end
   end

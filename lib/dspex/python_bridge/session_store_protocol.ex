@@ -49,10 +49,6 @@ defmodule DSPex.PythonBridge.SessionStoreProtocol do
       {:error, :not_found} ->
         Logger.debug("Session #{session_id} not found")
         {:error, :session_not_found}
-
-      {:error, reason} ->
-        Logger.error("Error getting session #{session_id}: #{inspect(reason)}")
-        {:error, reason}
     end
   end
 
@@ -123,7 +119,10 @@ defmodule DSPex.PythonBridge.SessionStoreProtocol do
   end
 
   def handle_session_request(command, _args, worker_state) do
-    Logger.error("Unknown session store command: #{command} from worker #{get_worker_id(worker_state)}")
+    Logger.error(
+      "Unknown session store command: #{command} from worker #{get_worker_id(worker_state)}"
+    )
+
     {:error, :unknown_command}
   end
 
@@ -281,19 +280,31 @@ defmodule DSPex.PythonBridge.SessionStoreProtocol do
         {:error, :session_store_timeout}
 
       {:port_exited, status} ->
-        Logger.error("Python worker exited during session operation (status: #{status}): #{inspect(context)}")
+        Logger.error(
+          "Python worker exited during session operation (status: #{status}): #{inspect(context)}"
+        )
+
         {:error, :worker_unavailable}
 
       {:python_error, reason} ->
-        Logger.error("Python worker error during session operation: #{reason}, context: #{inspect(context)}")
+        Logger.error(
+          "Python worker error during session operation: #{reason}, context: #{inspect(context)}"
+        )
+
         {:error, {:python_error, reason}}
 
       {:decode_error, reason} ->
-        Logger.error("Protocol decode error during session operation: #{reason}, context: #{inspect(context)}")
+        Logger.error(
+          "Protocol decode error during session operation: #{reason}, context: #{inspect(context)}"
+        )
+
         {:error, {:protocol_error, reason}}
 
       other ->
-        Logger.error("Unexpected session store error: #{inspect(other)}, context: #{inspect(context)}")
+        Logger.error(
+          "Unexpected session store error: #{inspect(other)}, context: #{inspect(context)}"
+        )
+
         {:error, {:unexpected_error, other}}
     end
   end

@@ -18,7 +18,7 @@ defmodule DSPex.PythonBridge.WorkerFailureRecoveryTest do
     test_id = System.unique_integer([:positive])
     store_name = :"failure_test_session_store_#{test_id}"
     pool_name = :"failure_test_session_pool_#{test_id}"
-    
+
     # Start SessionStore for tests
     {:ok, store_pid} = SessionStore.start_link(name: store_name)
 
@@ -78,7 +78,9 @@ defmodule DSPex.PythonBridge.WorkerFailureRecoveryTest do
       end
     end
 
-    test "new worker can access session data after previous worker failure", %{store_name: store_name} do
+    test "new worker can access session data after previous worker failure", %{
+      store_name: store_name
+    } do
       session_id = "handover_test_session_#{System.unique_integer()}"
 
       # Create session and add data (simulating first worker)
@@ -128,7 +130,10 @@ defmodule DSPex.PythonBridge.WorkerFailureRecoveryTest do
   end
 
   describe "recovery from session store errors" do
-    test "system handles session store temporary unavailability", %{store_pid: store_pid, store_name: store_name} do
+    test "system handles session store temporary unavailability", %{
+      store_pid: store_pid,
+      store_name: store_name
+    } do
       session_id = "recovery_test_session_#{System.unique_integer()}"
 
       # Create session normally
@@ -346,7 +351,8 @@ defmodule DSPex.PythonBridge.WorkerFailureRecoveryTest do
 
       # Verify all data is present (initial + recovery operations)
       {:ok, final_session} = SessionStore.get_session(store_name, session_id)
-      assert map_size(final_session.programs) == 9  # 1 initial + 8 recovery
+      # 1 initial + 8 recovery
+      assert map_size(final_session.programs) == 9
 
       # Verify initial program survived
       {:ok, initial_program} = Session.get_program(final_session, "initial_program")
@@ -416,7 +422,9 @@ defmodule DSPex.PythonBridge.WorkerFailureRecoveryTest do
       {:ok, final_counter} = Session.get_program(final_session, "shared_counter")
       assert final_counter.count == successful_ops
 
-      Logger.info("Consistency test: #{successful_ops}/20 operations succeeded, final count: #{final_counter.count}")
+      Logger.info(
+        "Consistency test: #{successful_ops}/20 operations succeeded, final count: #{final_counter.count}"
+      )
     end
   end
 end

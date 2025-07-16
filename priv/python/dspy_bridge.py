@@ -77,13 +77,8 @@ class DSPyBridge:
         self.mode = mode
         self.worker_id = worker_id
         
-        # Remove local session storage - all session data is now centralized
-        # In pool-worker mode, we fetch session data on demand from Elixir
-        if mode == "pool-worker":
-            # No local session storage
-            pass
-        else:
-            self.programs: Dict[str, Any] = {}
+        # NOTE: No local programs storage - all session data is in centralized SessionStore
+        # Programs are fetched from SessionStore on demand for stateless workers
             
         self.start_time = time.time()
         self.command_count = 0
@@ -342,17 +337,17 @@ class DSPyBridge:
         if not program_id:
             raise ValueError("Program ID is required")
         
-        # In pool-worker mode, check for program existence via centralized session store
+        # In pool-worker mode, programs are managed through centralized SessionStore
+        # The Elixir side should have already checked for existence, so we don't need to check here
+        # We'll let the storage operation determine if there's a conflict
         if self.mode == "pool-worker":
             session_id = args.get('session_id')
             if not session_id:
                 raise ValueError("Session ID required in pool-worker mode")
-            
-            # Check if program already exists in centralized session store
-            session_data = self.get_session_from_store(session_id)
-            if session_data and program_id in session_data.get('programs', {}):
-                raise ValueError(f"Program with ID '{program_id}' already exists in session {session_id}")
         else:
+            # In standalone mode, check local storage
+            if not hasattr(self, 'programs'):
+                self.programs = {}
             if program_id in self.programs:
                 raise ValueError(f"Program with ID '{program_id}' already exists")
         
@@ -402,10 +397,19 @@ class DSPyBridge:
             }
             
             if self.mode == "pool-worker":
+                # In pool mode, we don't store programs locally - they're managed centrally
+                # The Elixir SessionStore will handle storage, we just acknowledge creation
                 session_id = args.get('session_id')
-                # Store program in centralized session store instead of local storage
-                self.update_session_in_store(session_id, "programs", program_id, program_info)
+                if session_id == "anonymous":
+                    # Anonymous sessions still use local storage (temporary)
+                    if not hasattr(self, 'programs'):
+                        self.programs = {}
+                    self.programs[program_id] = program_info
+                # For named sessions, don't store locally - Elixir handles it
             else:
+                # Standalone mode uses local storage
+                if not hasattr(self, 'programs'):
+                    self.programs = {}
                 self.programs[program_id] = program_info
             
             return {
@@ -530,6 +534,60 @@ class DSPyBridge:
         # Return both the class and the field mapping
         return signature_class, field_mapping
     
+    def _recreate_program_from_data(self, program_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Recreates a program object from stored data for stateless workers.
+        
+        Args:
+            program_data: The program data retrieved from SessionStore
+            
+        Returns:
+            Dictionary containing recreated program info
+        """
+        if not DSPY_AVAILABLE:
+            raise RuntimeError("DSPy not available - cannot recreate programs")
+        
+        try:
+            signature_def = program_data.get('signature_def', {})
+            signature_class = program_data.get('signature_class')
+            field_mapping = program_data.get('field_mapping', {})
+            fallback_used = program_data.get('fallback_used', False)
+            
+            # Recreate the program object
+            if signature_class and not fallback_used and signature_def:
+                # Try to recreate the dynamic signature
+                try:
+                    recreated_signature_class, recreated_field_mapping = self._get_or_create_signature_class(signature_def)
+                    program = dspy.Predict(recreated_signature_class)
+                    field_mapping = recreated_field_mapping
+                except Exception:
+                    # Fall back to Q&A
+                    program = dspy.Predict("question -> answer")
+                    field_mapping = {}
+                    fallback_used = True
+            else:
+                # Use Q&A format
+                program = dspy.Predict("question -> answer")
+                field_mapping = {}
+                fallback_used = True
+            
+            # Recreate the program info structure
+            recreated_info = {
+                'program': program,
+                'signature_class': signature_class,
+                'signature_def': signature_def,
+                'field_mapping': field_mapping,
+                'fallback_used': fallback_used,
+                'created_at': program_data.get('created_at', time.time()),
+                'execution_count': program_data.get('execution_count', 0),
+                'last_executed': program_data.get('last_executed')
+            }
+            
+            return recreated_info
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to recreate program from data: {str(e)}")
+    
     
     def execute_program(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -552,23 +610,24 @@ class DSPyBridge:
         # Get program based on mode
         if self.mode == "pool-worker":
             session_id = args.get('session_id')
-            if not session_id:
-                raise ValueError("Session ID required in pool-worker mode")
-            
-            # Fetch session data from centralized store
-            session_data = self.get_session_from_store(session_id)
-            if not session_data:
-                raise ValueError(f"Session not found: {session_id}")
+            if session_id and session_id != "anonymous":
+                # For named sessions, the program data should be passed in the request
+                # by the Elixir side which fetched it from SessionStore
+                program_data = args.get('program_data')
+                if not program_data:
+                    raise ValueError(f"Program not found: {program_id} (no program data provided)")
                 
-            programs = session_data.get('programs', {})
-            if program_id not in programs:
-                raise ValueError(f"Program not found in session {session_id}: {program_id}")
-                
-            program_info = programs[program_id]
+                # Recreate the program object from the stored data
+                program_info = self._recreate_program_from_data(program_data)
+            else:
+                # Anonymous sessions use local storage (temporary)
+                if not hasattr(self, 'programs') or program_id not in self.programs:
+                    raise ValueError(f"Program not found: {program_id}")
+                program_info = self.programs[program_id]
         else:
-            if program_id not in self.programs:
+            # Standalone mode uses local storage
+            if not hasattr(self, 'programs') or program_id not in self.programs:
                 raise ValueError(f"Program not found: {program_id}")
-                
             program_info = self.programs[program_id]
             
         program = program_info['program']
@@ -784,17 +843,23 @@ class DSPyBridge:
             if not session_id:
                 raise ValueError("Session ID required in pool-worker mode")
             
-            # Check if session and program exist in centralized store
-            session_data = self.get_session_from_store(session_id)
-            if not session_data:
-                raise ValueError(f"Session not found: {session_id}")
-                
-            programs = session_data.get('programs', {})
-            if program_id not in programs:
-                raise ValueError(f"Program not found in session {session_id}: {program_id}")
-                
-            # Delete program from centralized session store
-            self.update_session_in_store(session_id, "delete_program", program_id, None)
+            # Handle "anonymous" session for minimal pooling - use local storage
+            if session_id == "anonymous":
+                if program_id not in self.programs:
+                    raise ValueError(f"Program not found: {program_id}")
+                del self.programs[program_id]
+            else:
+                # Check if session and program exist in centralized store for named sessions
+                session_data = self.get_session_from_store(session_id)
+                if not session_data:
+                    raise ValueError(f"Session not found: {session_id}")
+                    
+                programs = session_data.get('programs', {})
+                if program_id not in programs:
+                    raise ValueError(f"Program not found in session {session_id}: {program_id}")
+                    
+                # Delete program from centralized session store
+                self.update_session_in_store(session_id, "delete_program", program_id, None)
         else:
             if program_id not in self.programs:
                 raise ValueError(f"Program not found: {program_id}")
@@ -1191,28 +1256,24 @@ class DSPyBridge:
                 f.write(f"[{time.time()}] get_session_from_store called for session: {session_id}\n")
                 f.flush()
             
-            # In pool-worker mode, we communicate with Elixir via the established protocol
-            if self.mode == "pool-worker":
-                # Create a request to get session data from Elixir SessionStore
-                request = {
-                    "command": "get_session_data",
-                    "args": {"session_id": session_id}
-                }
-                
-                # Send request via stdout and wait for response
-                # This uses the existing JSON protocol for communication
-                request_id = int(time.time() * 1000000)  # Use timestamp-based ID
-                
-                # For now, we'll simulate the communication since we need to implement
-                # the full bidirectional protocol. In a real implementation, this would
-                # send a request to Elixir and wait for a response.
-                
-                # Simulate session not found for now
-                # This will be properly implemented when we add bidirectional communication
-                return None
-            else:
-                # In standalone mode, there's no centralized session store
-                return None
+            # In pool-worker mode, we need to get session data from the Elixir SessionStore
+            # For now, we'll use a simple approach where we assume session data 
+            # is passed through the session_id parameter or we use a local fallback
+            
+            # TODO: Implement proper SessionStore communication protocol
+            # This would require extending the existing protocol to support
+            # bidirectional communication between Python and Elixir
+            
+            # For Task 2.1, we'll implement a workaround where we return None
+            # and let the calling code handle the missing session data
+            # The real solution would be to implement a session data cache
+            # or extend the protocol to fetch data on demand
+            
+            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                f.write(f"[{time.time()}] SessionStore communication not yet implemented - returning None\n")
+                f.flush()
+            
+            return None
             
         except Exception as e:
             with open('/tmp/dspy_bridge_debug.log', 'a') as f:

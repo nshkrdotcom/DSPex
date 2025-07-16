@@ -130,7 +130,7 @@ defmodule DSPex.PythonBridge.PoolConfig do
   @doc """
   Determines if the pool should be started based on configuration.
   """
-  @spec should_start_pool?() :: boolean()
+  @spec should_start_pool?() :: true
   def should_start_pool? do
     config = get_pool_config()
     config.pool_size > 0
@@ -139,7 +139,7 @@ defmodule DSPex.PythonBridge.PoolConfig do
   @doc """
   Gets the Python script path, resolving relative paths.
   """
-  @spec get_script_path() :: String.t()
+  @spec get_script_path() :: String.t() | Path.t()
   def get_script_path do
     script_path = get_pool_config(:script_path)
 

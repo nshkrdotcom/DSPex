@@ -549,6 +549,8 @@ defmodule DSPex.Adapters.PythonPort do
     end
   end
 
+  defp convert_signature(signature), do: signature
+
   defp convert_signature_legacy_map(signature) do
     # Ensure signature format is compatible with Python bridge
     signature
@@ -560,8 +562,6 @@ defmodule DSPex.Adapters.PythonPort do
       {key, value} -> {to_string(key), value}
     end)
   end
-
-  defp convert_signature(signature), do: signature
 
   # Enhanced metadata conversion for Stage 2 implementation
   defp convert_enhanced_metadata_to_bridge_format(enhanced_metadata) do

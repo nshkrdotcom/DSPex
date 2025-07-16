@@ -17,7 +17,7 @@ defmodule DSPex.PythonBridge.StatelessWorkerIntegrationTest do
     test_id = System.unique_integer([:positive])
     store_name = :"test_session_store_#{test_id}"
     pool_name = :"test_session_pool_#{test_id}"
-    
+
     # Start SessionStore for tests
     {:ok, store_pid} = SessionStore.start_link(name: store_name)
 
@@ -331,7 +331,8 @@ defmodule DSPex.PythonBridge.StatelessWorkerIntegrationTest do
       tasks =
         for i <- 1..6 do
           Task.async(fn ->
-            worker_id = "worker_#{rem(i, 3) + 1}"  # Distribute across 3 workers
+            # Distribute across 3 workers
+            worker_id = "worker_#{rem(i, 3) + 1}"
 
             program_data = %{
               signature: %{inputs: [], outputs: []},

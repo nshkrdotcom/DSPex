@@ -184,10 +184,6 @@ defmodule DSPex.Signature.Compiler do
 
   # Metadata Generation
 
-  defp build_signature_metadata(inputs, outputs, module) do
-    build_signature_metadata(inputs, outputs, module, nil, [])
-  end
-
   defp build_signature_metadata(inputs, outputs, module, description, opts) do
     %{
       inputs: inputs,
@@ -200,11 +196,7 @@ defmodule DSPex.Signature.Compiler do
 
   # Code Generation
 
-  defp generate_signature_code(signature_metadata) do
-    generate_signature_code(signature_metadata, [])
-  end
-
-  defp generate_signature_code(signature_metadata, opts) do
+  defp generate_signature_code(signature_metadata, _opts) do
     quote do
       @signature_compiled unquote(Macro.escape(signature_metadata))
 
