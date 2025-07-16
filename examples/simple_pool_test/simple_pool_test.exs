@@ -91,7 +91,12 @@ defmodule SimplePoolTest do
     
     results = Task.await_many(tasks, 75_000)
     
-    IO.puts "Results:"
+    # Flush any pending IO operations to ensure clean output
+    IO.write ""
+    
+    IO.puts "\n============================================================"
+    IO.puts "📊 FINAL RESULTS:"
+    IO.puts "============================================================"
     Enum.with_index(results, 1) |> Enum.each(fn {result, idx} ->
       case result do
         {:ok, answer} -> 
@@ -100,10 +105,14 @@ defmodule SimplePoolTest do
           IO.puts "  #{idx}. ❌ #{inspect(error)}"
       end
     end)
+    
+    IO.puts "============================================================\n"
   end
 end
 
 # Run it
 if System.argv() |> List.first() != "--no-run" do
   SimplePoolTest.main()
+  # Exit cleanly
+  System.halt(0)
 end
