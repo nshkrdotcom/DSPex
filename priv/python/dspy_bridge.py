@@ -1467,7 +1467,11 @@ class DSPyBridge:
 
 def read_message() -> Optional[Dict[str, Any]]:
     """
-    Read a length-prefixed message from stdin.
+    Read a message from stdin in packet mode.
+    
+    With Erlang ports in packet mode, each complete message is delivered
+    to stdin as a complete unit. We need to read the exact amount of data
+    that was sent.
     
     Returns:
         Parsed JSON message or None if EOF/error
@@ -1478,46 +1482,34 @@ def read_message() -> Optional[Dict[str, Any]]:
         f.flush()
     
     try:
-        # For Erlang ports, we need to use readexactly-style approach
-        # Read 4-byte length header
-        length_bytes = sys.stdin.buffer.read(4)
+        # Read the 4-byte length header with proper blocking
+        length_bytes = b''
+        while len(length_bytes) < 4:
+            chunk = sys.stdin.buffer.read(4 - len(length_bytes))
+            if not chunk:  # EOF - process shutdown
+                return None
+            length_bytes += chunk
         
-        # Debug log
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Read length bytes: {len(length_bytes)} bytes\n")
-            if len(length_bytes) > 0:
-                f.write(f"[{time.time()}] Raw length bytes: {length_bytes.hex()}\n")
-            f.flush()
-        
-        if len(length_bytes) == 0:  # EOF - process shutdown
-            return None
-        elif len(length_bytes) < 4:  # Partial read - should not happen with ports
-            print(f"Partial length header read: {len(length_bytes)} bytes", file=sys.stderr)
-            return None
-        
+        # Unpack the length (big-endian)
         length = struct.unpack('>I', length_bytes)[0]
         
+        # Read the JSON payload with proper blocking
+        data = b''
+        while len(data) < length:
+            chunk = sys.stdin.buffer.read(length - len(data))
+            if not chunk:  # EOF - process shutdown
+                return None
+            data += chunk
+        
         # Debug log
         with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Unpacked length: {length}\n")
+            f.write(f"[{time.time()}] Read length: {length}, data: {len(data)} bytes\n")
+            if len(data) > 0:
+                f.write(f"[{time.time()}] JSON data: {data[:100]}...\n")
             f.flush()
         
-        # Read message payload
-        message_bytes = sys.stdin.buffer.read(length)
-        
-        # Debug log
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Read message bytes: {len(message_bytes)}/{length}\n")
-            f.flush()
-        
-        if len(message_bytes) == 0:  # EOF - process shutdown
-            return None
-        elif len(message_bytes) < length:  # Partial read - should not happen with ports
-            print(f"Partial message read: {len(message_bytes)}/{length} bytes", file=sys.stderr)
-            return None
-        
-        # Parse JSON
-        message_str = message_bytes.decode('utf-8')
+        # Parse JSON directly
+        message_str = data.decode('utf-8')
         
         # Debug log
         with open('/tmp/dspy_bridge_debug.log', 'a') as f:
@@ -1551,7 +1543,10 @@ def read_message() -> Optional[Dict[str, Any]]:
 
 def write_message(message: Dict[str, Any]) -> None:
     """
-    Write a length-prefixed message to stdout.
+    Write a message to stdout in packet mode.
+    
+    With Erlang ports in packet mode, we just write the JSON directly
+    and the port system handles the length header.
     
     Args:
         message: Dictionary to send as JSON
@@ -1569,7 +1564,7 @@ def write_message(message: Dict[str, Any]) -> None:
         
         # Debug log
         with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Writing message, length: {length}, bytes: {message_bytes[:100]}...\n")
+            f.write(f"[{time.time()}] Writing message, length: {length}, data: {message_bytes[:100]}...\n")
             f.flush()
         
         # Write length header (4 bytes, big-endian) + message
@@ -1588,6 +1583,7 @@ def write_message(message: Dict[str, Any]) -> None:
             f.write(f"[{time.time()}] BrokenPipeError - connection closed by client\n")
             f.flush()
         # Don't exit - in pool mode, we should continue and wait for next client
+        # Re-raise to let the main loop handle it appropriately
         raise
     except Exception as e:
         print(f"Error writing message: {e}", file=sys.stderr)
@@ -1679,11 +1675,18 @@ def main():
                 f.flush()
             
             if message is None:
-                print("No more messages, exiting", file=sys.stderr)
-                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                    f.write(f"[{time.time()}] No more messages, exiting\n")
-                    f.flush()
-                break
+                # In pool-worker mode, continue waiting for next client instead of exiting
+                if cmd_args.mode == 'pool-worker':
+                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                        f.write(f"[{time.time()}] No message received, continuing to wait for next client\n")
+                        f.flush()
+                    continue
+                else:
+                    print("No more messages, exiting", file=sys.stderr)
+                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                        f.write(f"[{time.time()}] No more messages, exiting\n")
+                        f.flush()
+                    break
             
             # Extract message components
             request_id = message.get('id')

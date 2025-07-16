@@ -4,6 +4,8 @@ defmodule PoolExample.CLI do
   
   Provides command-line access to different pool testing scenarios.
   """
+  
+  require Logger
 
   def main(args) do
     args
@@ -54,7 +56,19 @@ defmodule PoolExample.CLI do
 
   defp process({["all"], _opts}) do
     setup_environment()
-    PoolExample.run_all_tests()
+    
+    try do
+      PoolExample.run_all_tests()
+    rescue
+      error ->
+        IO.puts("❌ Test execution failed: #{inspect(error)}")
+        Logger.error("Test execution failed: #{inspect(error)}")
+    catch
+      :exit, reason ->
+        IO.puts("❌ Test execution exited: #{inspect(reason)}")
+        Logger.error("Test execution exited: #{inspect(reason)}")
+    end
+    
     shutdown_gracefully()
   end
 

@@ -3,7 +3,8 @@ import Config
 # General configuration for pool_example
 config :pool_example,
   pool_size: 4,
-  overflow: 2
+  overflow: 2,
+  dspy_io_logging: true  # Set to false to disable DSPy input/output logging
 
 # Configure DSPex for pooling
 config :dspex,
@@ -13,7 +14,7 @@ config :dspex,
 
 # Configure logger
 config :logger,
-  level: :info,
+  level: :error,
   format: "$time $metadata[$level] $message\n"
 
 # Import environment specific config

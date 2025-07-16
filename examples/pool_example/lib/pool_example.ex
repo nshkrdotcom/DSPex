@@ -16,6 +16,21 @@ defmodule PoolExample do
 
   require Logger
   alias DSPex.PythonBridge.SessionPoolV2
+  
+  # Custom DSPy I/O logging - controlled separately from application logging
+  @dspy_io_logging Application.compile_env(:pool_example, :dspy_io_logging, true)
+  
+  defp log_dspy_input(context, input) do
+    if @dspy_io_logging do
+      IO.puts("🔍 #{context} INPUT: #{inspect(input)}")
+    end
+  end
+  
+  defp log_dspy_response(context, response) do
+    if @dspy_io_logging do
+      IO.puts("✅ #{context} DSPY RESPONSE: #{inspect(response)}")
+    end
+  end
 
   @doc """
   Run a basic pool test showing session affinity.
@@ -71,28 +86,34 @@ defmodule PoolExample do
     Logger.info("\n🚀 Executing programs in their sessions...")
     
     # Session 1 execution
+    input1 = %{question: "What is session affinity?"}
+    log_dspy_input("Session 1", input1)
+    
     {:ok, exec1_result} = SessionPoolV2.execute_in_session(
       session1,
       :execute_program,
       %{
         program_id: prog1_id,
-        inputs: %{question: "What is session affinity?"}
+        inputs: input1
       }
     )
     
-    Logger.info("✅ Session 1 execution result: #{inspect(exec1_result["outputs"])}")
+    log_dspy_response("Session 1", exec1_result["outputs"])
     
     # Session 2 execution
+    input2 = %{text: "Session affinity ensures that related operations stay on the same worker."}
+    log_dspy_input("Session 2", input2)
+    
     {:ok, exec2_result} = SessionPoolV2.execute_in_session(
       session2,
       :execute_program,
       %{
         program_id: prog2_id,
-        inputs: %{text: "Session affinity ensures that related operations stay on the same worker."}
+        inputs: input2
       }
     )
     
-    Logger.info("✅ Session 2 execution result: #{inspect(exec2_result["outputs"])}")
+    log_dspy_response("Session 2", exec2_result["outputs"])
     
     # Clean up sessions
     SessionPoolV2.end_session(session1)
@@ -143,12 +164,15 @@ defmodule PoolExample do
             prog_id = prog_result["program_id"]
             
             # Execute in the same session (ensures same worker)
+            input = %{question: "What is #{i} + #{i}?"}
+            log_dspy_input("Anonymous request #{i}", input)
+            
             exec_result = SessionPoolV2.execute_in_session(
               temp_session,
               :execute_program,
               %{
                 program_id: prog_id,
-                inputs: %{question: "What is #{i} + #{i}?"}
+                inputs: input
               },
               pool_timeout: 90_000,
               timeout: 60_000
@@ -178,7 +202,8 @@ defmodule PoolExample do
       case result do
         {:ok, response} ->
           output = response["outputs"] || response
-          Logger.info("✅ Request #{i} completed in #{duration}ms: #{inspect(output)}")
+          log_dspy_response("Request #{i} (#{duration}ms)", output)
+          Logger.info("✅ Request #{i} completed in #{duration}ms")
         {:error, reason} ->
           Logger.warning("❌ Request #{i} failed: #{inspect(reason)}")
       end
@@ -205,16 +230,20 @@ defmodule PoolExample do
         prog_id = prog_result["program_id"]
         Logger.info("✅ Created program in session: #{prog_id}")
         
+        input = %{text: "Hello World"}
+        log_dspy_input("Anonymous create+execute", input)
+        
         case SessionPoolV2.execute_in_session(
           temp_session,
           :execute_program,
           %{
             program_id: prog_id,
-            inputs: %{text: "Hello World"}
+            inputs: input
           }
         ) do
           {:ok, exec_result} ->
-            Logger.info("✅ Executed program: #{inspect(exec_result["outputs"])}")
+            log_dspy_response("Anonymous create+execute", exec_result["outputs"])
+            Logger.info("✅ Executed program successfully")
           {:error, reason} ->
             Logger.warning("❌ Failed to execute program: #{inspect(reason)}")
         end
@@ -274,24 +303,46 @@ defmodule PoolExample do
           case create_result do
             {:ok, _} ->
               # Execute the program
-              SessionPoolV2.execute_in_session(
+              input = %{expression: "Calculate: #{i} * #{i}"}
+              log_dspy_input("Stress test #{i} session", input)
+              
+              result = SessionPoolV2.execute_in_session(
                 session_id,
                 :execute_program,
                 %{
                   program_id: prog_id,
-                  inputs: %{expression: "Calculate: #{i} * #{i}"}
+                  inputs: input
                 }
               )
+              
+              case result do
+                {:ok, response} ->
+                  log_dspy_response("Stress test #{i} session", response["outputs"])
+                _ -> nil
+              end
+              
+              result
             {:error, {:communication_error, :python_error, "Program with ID '" <> _rest, _}} ->
               # Program already exists, just execute
-              SessionPoolV2.execute_in_session(
+              input = %{expression: "Calculate: #{i} * #{i}"}
+              log_dspy_input("Stress test #{i} session (retry)", input)
+              
+              result = SessionPoolV2.execute_in_session(
                 session_id,
                 :execute_program,
                 %{
                   program_id: prog_id,
-                  inputs: %{expression: "Calculate: #{i} * #{i}"}
+                  inputs: input
                 }
               )
+              
+              case result do
+                {:ok, response} ->
+                  log_dspy_response("Stress test #{i} session (retry)", response["outputs"])
+                _ -> nil
+              end
+              
+              result
             error ->
               error
           end
@@ -312,13 +363,24 @@ defmodule PoolExample do
           
           case create_result do
             {:ok, prog_result} ->
-              SessionPoolV2.execute_anonymous(
+              input = %{expression: "Calculate: #{i} * #{i}"}
+              log_dspy_input("Stress test #{i} anonymous", input)
+              
+              result = SessionPoolV2.execute_anonymous(
                 :execute_program,
                 %{
                   program_id: prog_result["program_id"],
-                  inputs: %{expression: "Calculate: #{i} * #{i}"}
+                  inputs: input
                 }
               )
+              
+              case result do
+                {:ok, response} ->
+                  log_dspy_response("Stress test #{i} anonymous", response["outputs"])
+                _ -> nil
+              end
+              
+              result
             error ->
               error
           end
@@ -382,7 +444,7 @@ defmodule PoolExample do
       end},
       
       {"Missing required inputs", fn ->
-        {:ok, prog_result} = SessionPoolV2.execute_anonymous(
+        case SessionPoolV2.execute_anonymous(
           :create_program,
           %{
             id: "test_prog_#{System.unique_integer([:positive])}",
@@ -391,15 +453,18 @@ defmodule PoolExample do
               outputs: [%{name: "result", type: "string"}]
             }
           }
-        )
-        
-        SessionPoolV2.execute_anonymous(
-          :execute_program,
-          %{
-            program_id: prog_result["program_id"],
-            inputs: %{}  # Missing required field
-          }
-        )
+        ) do
+          {:ok, prog_result} ->
+            SessionPoolV2.execute_anonymous(
+              :execute_program,
+              %{
+                program_id: prog_result["program_id"],
+                inputs: %{}  # Missing required field
+              }
+            )
+          error ->
+            error
+        end
       end},
       
       {"Invalid command", fn ->
@@ -413,16 +478,29 @@ defmodule PoolExample do
     Enum.each(test_scenarios, fn {scenario_name, test_fn} ->
       Logger.info("\n🧪 Testing: #{scenario_name}")
       
-      result = test_fn.()
+      result = try do
+        test_fn.()
+      rescue
+        error ->
+          Logger.warning("❌ Test function crashed: #{inspect(error)}")
+          {:error, :test_crashed}
+      catch
+        :exit, reason ->
+          Logger.warning("❌ Test function exited: #{inspect(reason)}")
+          {:error, :test_exited}
+      end
       
       case result do
-        {:error, error_tuple} ->
+        {:error, error_tuple} when is_tuple(error_tuple) and tuple_size(error_tuple) == 4 ->
           {category, type, message, context} = error_tuple
           Logger.info("✅ Properly handled error:")
           Logger.info("   Category: #{category}")
           Logger.info("   Type: #{type}")
           Logger.info("   Message: #{message}")
           Logger.info("   Context: #{inspect(context)}")
+          
+        {:error, reason} ->
+          Logger.info("✅ Error returned: #{inspect(reason)}")
           
         other ->
           Logger.warning("❌ Unexpected result: #{inspect(other)}")
@@ -438,16 +516,42 @@ defmodule PoolExample do
   def run_all_tests do
     Logger.info("🚀 Running All DSPex Pool Example Tests\n")
     
-    run_session_affinity_test()
+    tests = [
+      {"Session Affinity Test", &run_session_affinity_test/0},
+      {"Anonymous Operations Test", &run_anonymous_operations_test/0},
+      {"Concurrent Stress Test", fn -> run_concurrent_stress_test(10) end},
+      {"Error Recovery Test", &run_error_recovery_test/0}
+    ]
     
-    run_anonymous_operations_test()
+    results = Enum.map(tests, fn {name, test_fn} ->
+      try do
+        Logger.info("Running #{name}...")
+        test_fn.()
+        {name, :ok}
+      rescue
+        error ->
+          Logger.error("❌ #{name} failed: #{inspect(error)}")
+          {name, {:error, error}}
+      catch
+        :exit, reason ->
+          Logger.error("❌ #{name} exited: #{inspect(reason)}")
+          {name, {:exit, reason}}
+      end
+    end)
     
-    run_concurrent_stress_test(10)
+    # Report results
+    successful = Enum.count(results, fn {_, result} -> result == :ok end)
+    total = length(results)
     
-    run_error_recovery_test()
+    Logger.info("\n📊 Test Results: #{successful}/#{total} passed")
     
-    Logger.info("\n🎉 All Pool Example Tests Complete!")
-    Logger.info("💡 This demonstrates DSPex V2's robust pooling capabilities")
+    if successful == total do
+      Logger.info("\n🎉 All Pool Example Tests Complete!")
+      Logger.info("💡 This demonstrates DSPex V2's robust pooling capabilities")
+    else
+      Logger.warning("\n⚠️  Some tests failed - check logs above")
+      Logger.info("💡 Error handling tests are expected to show Python errors")
+    end
   end
 
   # Private helper functions

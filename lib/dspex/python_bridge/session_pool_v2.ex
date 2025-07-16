@@ -263,7 +263,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
                  %{expected_id: request_id, actual_id: other_id, worker_id: worker.worker_id}}
 
               Logger.error("Response mismatch from worker #{worker.worker_id}: #{inspect(error)}")
-              {{:error, error}, :close}
+              # Response mismatch is recoverable - keep worker but track failure
+              {{:error, error}, :error}
 
             {:error, _id, reason} ->
               error =
@@ -280,7 +281,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
                  %{decode_reason: reason, worker_id: worker.worker_id}}
 
               Logger.error("Decode error from worker #{worker.worker_id}: #{inspect(error)}")
-              {{:error, error}, :close}
+              # Decode errors might be recoverable - keep worker
+              {{:error, error}, :error}
           end
 
         {^port, {:exit_status, status}} ->
@@ -299,7 +301,8 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
             {:timeout_error, :command_timeout, "Command timed out after #{timeout}ms",
              %{timeout_ms: timeout, worker_id: worker.worker_id, command: command}}
 
-          {{:error, error}, :close}
+          # Single timeout is recoverable - keep worker
+          {{:error, error}, :error}
       end
     catch
       :exit, {:timeout, _} ->
@@ -307,13 +310,15 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
           {:timeout_error, :command_timeout, "Command timed out after #{timeout}ms",
            %{timeout_ms: timeout, worker_id: worker.worker_id, command: command}}
 
-        {{:error, error}, :close}
+        # Exit timeout is recoverable - keep worker
+        {{:error, error}, :error}
 
       :error, {:badarg, _} ->
         error =
           {:communication_error, :port_send_failed, "Port.command/2 failed - port may be closed",
            %{worker_id: worker.worker_id}}
 
+        # Port send failure is likely fatal - remove worker
         {{:error, error}, :close}
 
       kind, error ->
@@ -321,9 +326,11 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
           {:system_error, :command_error, "Unexpected error during command execution",
            %{error_kind: kind, error: error, worker_id: worker.worker_id}}
 
+        # System errors are likely fatal - remove worker
         {{:error, error_tuple}, :close}
     end
   end
+
 
   ## Session Management Functions
 
@@ -452,9 +459,9 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
       worker: {worker_module, []},
       pool_size: pool_size,
       max_overflow: overflow,
-      # Use lazy initialization to avoid sequential worker creation during startup
-      # Workers will be created on-demand or during pre-warming
-      lazy: true,
+      # Use eager initialization to pre-create workers for better performance
+      # Workers will be created at startup to avoid creation delays
+      lazy: false,
       name: pool_name
     ]
 

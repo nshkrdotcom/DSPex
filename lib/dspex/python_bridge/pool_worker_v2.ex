@@ -27,7 +27,11 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
     :current_session,
     :stats,
     :health_status,
-    :started_at
+    :started_at,
+    # Failure tracking for worker lifecycle management
+    consecutive_failures: 0,
+    last_failure_time: nil,
+    failure_threshold: 3
   ]
 
   ## NimblePool Callbacks
@@ -126,16 +130,36 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
 
     # Update stats
     updated_state = update_checkin_stats(worker_state, checkin_type)
+    
+    # Track failures or successes for recoverable errors
+    final_state = case checkin_type do
+      :ok -> 
+        # Success - reset failure count
+        updated_state
+        |> Map.put(:consecutive_failures, 0)
+        |> Map.put(:last_failure_time, nil)
+      :error ->
+        # Recoverable error - increment failure count
+        current_time = :erlang.system_time(:millisecond)
+        consecutive_failures = Map.get(updated_state, :consecutive_failures, 0) + 1
+        
+        updated_state
+        |> Map.put(:consecutive_failures, consecutive_failures)
+        |> Map.put(:last_failure_time, current_time)
+      _ ->
+        # Other types (like :close) - no change
+        updated_state
+    end
 
     # Determine if worker should be removed first
-    if should_remove_worker?(updated_state, checkin_type) do
-      Logger.debug("Worker #{worker_state.worker_id} will be removed")
+    if should_remove_worker?(final_state, checkin_type) do
+      Logger.debug("Worker #{worker_state.worker_id} will be removed (failures: #{Map.get(final_state, :consecutive_failures, 0)})")
       {:remove, :closed, pool_state}
     else
       # Reconnect port to worker process to keep Python bridge alive
-      case reconnect_port_to_worker(updated_state) do
+      case reconnect_port_to_worker(final_state) do
         :ok ->
-          {:ok, updated_state, pool_state}
+          {:ok, final_state, pool_state}
 
         {:error, :port_already_closed} when checkin_type == :ok ->
           # For successful operations, port closure is non-fatal
@@ -448,13 +472,22 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
         # Continue waiting for our response
         wait_for_init_response(worker_state, request_id)
 
+      {:"$gen_call", _from, {:checkout, _checkout_type, _opts}} = checkout_msg ->
+        # Buffer checkout requests during initialization instead of logging warnings
+        # This prevents message queue pollution
+        Logger.debug("Buffering checkout request during initialization")
+        # Put the message back in the mailbox for later processing
+        send(self(), checkout_msg)
+        # Continue waiting for our response
+        wait_for_init_response(worker_state, request_id)
+
       other ->
-        Logger.warning("Unexpected message during init: #{inspect(other)}, continuing to wait...")
+        Logger.debug("Unexpected message during init: #{inspect(other)}, continuing to wait...")
         # Continue waiting for our response
         wait_for_init_response(worker_state, request_id)
     after
-      2000 ->
-        Logger.error("Init ping timeout after 2 seconds for worker #{worker_state.worker_id}")
+      10000 ->
+        Logger.error("Init ping timeout after 10 seconds for worker #{worker_state.worker_id}")
         # Check if port is still alive
         port_info = Port.info(worker_state.port)
         Logger.error("Port info at timeout: #{inspect(port_info)}")
@@ -507,9 +540,14 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
     }
   end
 
-  defp should_remove_worker?(_worker_state, checkin_type) do
+  defp should_remove_worker?(worker_state, checkin_type) do
     case checkin_type do
       :close -> true
+      :error -> 
+        # Check if worker has exceeded failure threshold
+        consecutive_failures = Map.get(worker_state, :consecutive_failures, 0)
+        failure_threshold = Map.get(worker_state, :failure_threshold, 3)
+        consecutive_failures >= failure_threshold
       _ -> false
     end
   end
