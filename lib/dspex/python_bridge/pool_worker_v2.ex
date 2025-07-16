@@ -130,30 +130,36 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
 
     # Update stats
     updated_state = update_checkin_stats(worker_state, checkin_type)
-    
+
     # Track failures or successes for recoverable errors
-    final_state = case checkin_type do
-      :ok -> 
-        # Success - reset failure count
-        updated_state
-        |> Map.put(:consecutive_failures, 0)
-        |> Map.put(:last_failure_time, nil)
-      :error ->
-        # Recoverable error - increment failure count
-        current_time = :erlang.system_time(:millisecond)
-        consecutive_failures = Map.get(updated_state, :consecutive_failures, 0) + 1
-        
-        updated_state
-        |> Map.put(:consecutive_failures, consecutive_failures)
-        |> Map.put(:last_failure_time, current_time)
-      _ ->
-        # Other types (like :close) - no change
-        updated_state
-    end
+    final_state =
+      case checkin_type do
+        :ok ->
+          # Success - reset failure count
+          updated_state
+          |> Map.put(:consecutive_failures, 0)
+          |> Map.put(:last_failure_time, nil)
+
+        :error ->
+          # Recoverable error - increment failure count
+          current_time = :erlang.system_time(:millisecond)
+          consecutive_failures = Map.get(updated_state, :consecutive_failures, 0) + 1
+
+          updated_state
+          |> Map.put(:consecutive_failures, consecutive_failures)
+          |> Map.put(:last_failure_time, current_time)
+
+        _ ->
+          # Other types (like :close) - no change
+          updated_state
+      end
 
     # Determine if worker should be removed first
     if should_remove_worker?(final_state, checkin_type) do
-      Logger.debug("Worker #{worker_state.worker_id} will be removed (failures: #{Map.get(final_state, :consecutive_failures, 0)})")
+      Logger.debug(
+        "Worker #{worker_state.worker_id} will be removed (failures: #{Map.get(final_state, :consecutive_failures, 0)})"
+      )
+
       {:remove, :closed, pool_state}
     else
       # Reconnect port to worker process to keep Python bridge alive
@@ -542,13 +548,17 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
 
   defp should_remove_worker?(worker_state, checkin_type) do
     case checkin_type do
-      :close -> true
-      :error -> 
+      :close ->
+        true
+
+      :error ->
         # Check if worker has exceeded failure threshold
         consecutive_failures = Map.get(worker_state, :consecutive_failures, 0)
         failure_threshold = Map.get(worker_state, :failure_threshold, 3)
         consecutive_failures >= failure_threshold
-      _ -> false
+
+      _ ->
+        false
     end
   end
 
@@ -710,6 +720,7 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
           else
             run_environment_validation()
           end
+
         [] ->
           run_environment_validation()
       end

@@ -331,7 +331,6 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     end
   end
 
-
   ## Session Management Functions
 
   @doc """
