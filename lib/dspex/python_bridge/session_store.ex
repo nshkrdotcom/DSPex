@@ -213,6 +213,75 @@ defmodule DSPex.PythonBridge.SessionStore do
     GenServer.call(server, {:session_exists, session_id})
   end
 
+  ## Global Program Storage API
+
+  @doc """
+  Stores a program globally, accessible to any worker.
+
+  This is used for anonymous operations where programs need to be
+  accessible across different pool workers.
+
+  ## Parameters
+
+  - `program_id` - Unique program identifier
+  - `program_data` - Program data to store
+
+  ## Returns
+
+  `:ok` if successful, `{:error, reason}` if failed.
+  """
+  @spec store_global_program(String.t(), map()) :: :ok | {:error, term()}
+  def store_global_program(program_id, program_data) when is_binary(program_id) do
+    store_global_program(__MODULE__, program_id, program_data)
+  end
+
+  @spec store_global_program(GenServer.server(), String.t(), map()) :: :ok | {:error, term()}
+  def store_global_program(server, program_id, program_data) when is_binary(program_id) do
+    GenServer.call(server, {:store_global_program, program_id, program_data})
+  end
+
+  @doc """
+  Retrieves a globally stored program.
+
+  ## Parameters
+
+  - `program_id` - The program identifier
+
+  ## Returns
+
+  `{:ok, program_data}` if found, `{:error, :not_found}` if not found.
+  """
+  @spec get_global_program(String.t()) :: {:ok, map()} | {:error, :not_found}
+  def get_global_program(program_id) when is_binary(program_id) do
+    get_global_program(__MODULE__, program_id)
+  end
+
+  @spec get_global_program(GenServer.server(), String.t()) :: {:ok, map()} | {:error, :not_found}
+  def get_global_program(server, program_id) when is_binary(program_id) do
+    GenServer.call(server, {:get_global_program, program_id})
+  end
+
+  @doc """
+  Deletes a globally stored program.
+
+  ## Parameters
+
+  - `program_id` - The program identifier
+
+  ## Returns
+
+  `:ok` always (idempotent operation).
+  """
+  @spec delete_global_program(String.t()) :: :ok
+  def delete_global_program(program_id) when is_binary(program_id) do
+    delete_global_program(__MODULE__, program_id)
+  end
+
+  @spec delete_global_program(GenServer.server(), String.t()) :: :ok
+  def delete_global_program(server, program_id) when is_binary(program_id) do
+    GenServer.call(server, {:delete_global_program, program_id})
+  end
+
   ## GenServer Callbacks
 
   @impl true
@@ -231,6 +300,18 @@ defmodule DSPex.PythonBridge.SessionStore do
         {:decentralized_counters, true}
       ])
 
+    # Create global programs table
+    global_programs_table_name = :"#{table_name}_global_programs"
+    global_programs_table =
+      :ets.new(global_programs_table_name, [
+        :set,
+        :public,
+        :named_table,
+        {:read_concurrency, true},
+        {:write_concurrency, true},
+        {:decentralized_counters, true}
+      ])
+
     cleanup_interval = Keyword.get(opts, :cleanup_interval, @cleanup_interval)
     default_ttl = Keyword.get(opts, :default_ttl, @default_ttl)
 
@@ -240,17 +321,21 @@ defmodule DSPex.PythonBridge.SessionStore do
     state = %{
       table: table,
       table_name: table_name,
+      global_programs_table: global_programs_table,
+      global_programs_table_name: global_programs_table_name,
       cleanup_interval: cleanup_interval,
       default_ttl: default_ttl,
       stats: %{
         sessions_created: 0,
         sessions_deleted: 0,
         sessions_expired: 0,
-        cleanup_runs: 0
+        cleanup_runs: 0,
+        global_programs_stored: 0,
+        global_programs_deleted: 0
       }
     }
 
-    Logger.info("SessionStore started with table #{table}")
+    Logger.info("SessionStore started with table #{table} and global programs table #{global_programs_table}")
     {:ok, state}
   end
 
@@ -362,6 +447,37 @@ defmodule DSPex.PythonBridge.SessionStore do
       end
 
     {:reply, exists, state}
+  end
+
+  @impl true
+  def handle_call({:store_global_program, program_id, program_data}, _from, state) do
+    # Store with timestamp for potential TTL cleanup
+    timestamp = System.monotonic_time(:second)
+    program_entry = {program_id, program_data, timestamp}
+    
+    :ets.insert(state.global_programs_table, program_entry)
+    
+    new_stats = Map.update!(state.stats, :global_programs_stored, &(&1 + 1))
+    {:reply, :ok, %{state | stats: new_stats}}
+  end
+
+  @impl true
+  def handle_call({:get_global_program, program_id}, _from, state) do
+    case :ets.lookup(state.global_programs_table, program_id) do
+      [{^program_id, program_data, _timestamp}] ->
+        {:reply, {:ok, program_data}, state}
+      
+      [] ->
+        {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  @impl true
+  def handle_call({:delete_global_program, program_id}, _from, state) do
+    :ets.delete(state.global_programs_table, program_id)
+    
+    new_stats = Map.update!(state.stats, :global_programs_deleted, &(&1 + 1))
+    {:reply, :ok, %{state | stats: new_stats}}
   end
 
   @impl true

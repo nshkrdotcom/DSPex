@@ -155,14 +155,36 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     operation_timeout = Keyword.get(opts, :timeout, @default_operation_timeout)
 
     try do
-      NimblePool.checkout!(
+      result = NimblePool.checkout!(
         pool_name,
         :anonymous,
         fn _from, worker ->
-          execute_with_worker(worker, command, args, operation_timeout, nil)
+          execute_with_worker(worker, command, args, operation_timeout, "anonymous")
         end,
         pool_timeout
       )
+
+      # Handle global program storage for anonymous operations
+      case result do
+        {:ok, response} when command == :create_program ->
+          program_id = Map.get(response, "program_id")
+          Logger.info("🔄 Storing anonymous program globally: #{program_id}")
+          
+          case store_anonymous_program_globally(args, response) do
+            {:error, reason} ->
+              Logger.warning(
+                "Anonymous program created successfully but failed to store globally: #{inspect(reason)}"
+              )
+
+            :ok ->
+              Logger.info("✅ Anonymous program stored globally: #{program_id}")
+          end
+
+        _ ->
+          :ok
+      end
+
+      result
     catch
       :exit, {:timeout, _} ->
         {:error,
@@ -192,6 +214,19 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
 
     # Enhance args with session data for stateless workers
     enhanced_args = enhance_args_with_session_data(args, session_id, command)
+
+    # Debug logging for cross-worker execution
+    if command == :execute_program do
+      program_id = Map.get(args, :program_id)
+      has_program_data = Map.has_key?(enhanced_args, :program_data)
+      Logger.info("🔍 Execute program on worker #{worker.worker_id}: program_id=#{program_id}, has_program_data=#{has_program_data}, session_id=#{session_id}")
+      
+      if has_program_data do
+        Logger.info("✅ Program data included for cross-worker execution")
+      else
+        Logger.warning("❌ NO program data found for program #{program_id} on worker #{worker.worker_id}")
+      end
+    end
 
     try do
       request_payload = Protocol.encode_request(request_id, command, enhanced_args)
@@ -407,12 +442,11 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     pool_name = :"#{genserver_name}_pool"
 
     # Start NimblePool with simple worker configuration
-    # Enable lazy initialization to avoid blocking pool startup on worker initialization
     pool_config = [
       worker: {worker_module, []},
       pool_size: pool_size,
       max_overflow: overflow,
-      # Pre-start workers to ensure immediate availability for concurrent requests
+      # Start workers immediately to avoid delays on first requests
       lazy: false,
       name: pool_name
     ]
@@ -437,12 +471,6 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
         Logger.info(
           "Minimal session pool V2 started with #{pool_size} workers, #{overflow} overflow"
         )
-
-        # Phase 2B: Disabled pre-warming to avoid interference with worker initialization
-        # spawn(fn ->
-        #   :timer.sleep(100)  # Let pool fully initialize first
-        #   ensure_minimum_workers(state)
-        # end)
 
         {:ok, state}
 
@@ -553,8 +581,6 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
       try do
         # Increased timeout
         NimblePool.stop(state.pool_name, :shutdown, 15_000)
-        # Wait for confirmation that pool is actually stopped
-        :timer.sleep(100)
       catch
         # Ignore shutdown errors in tests
         _, _ -> :ok
@@ -601,26 +627,45 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   # For stateless workers, this function fetches necessary session data
   # from the SessionStore and includes it in the command arguments.
   defp enhance_args_with_session_data(args, session_id, command) do
-    base_args = if session_id, do: Map.put(args, :session_id, session_id), else: args
+    base_args = if session_id, do: Map.put(args, :session_id, session_id), else: Map.put(args, :session_id, "anonymous")
 
-    # For execute_program commands with named sessions, fetch program data from SessionStore
-    if command == :execute_program and session_id != nil and session_id != "anonymous" do
+    # For execute_program commands, fetch program data
+    if command == :execute_program do
       program_id = Map.get(args, :program_id)
 
       if program_id do
-        case SessionStore.get_session(session_id) do
-          {:ok, session} ->
-            program_data = Map.get(session.programs, program_id)
+        cond do
+          # Named session: check SessionStore
+          session_id != nil and session_id != "anonymous" ->
+            case SessionStore.get_session(session_id) do
+              {:ok, session} ->
+                program_data = Map.get(session.programs, program_id)
 
-            if program_data do
-              Map.put(base_args, :program_data, program_data)
-            else
-              Logger.debug("Program #{program_id} not found in session #{session_id}")
-              base_args
+                if program_data do
+                  Map.put(base_args, :program_data, program_data)
+                else
+                  Logger.debug("Program #{program_id} not found in session #{session_id}")
+                  base_args
+                end
+
+              {:error, reason} ->
+                Logger.debug("Session #{session_id} not found: #{inspect(reason)}")
+                base_args
             end
 
-          {:error, reason} ->
-            Logger.debug("Session #{session_id} not found: #{inspect(reason)}")
+          # Anonymous session: check global program storage
+          session_id == "anonymous" ->
+            case SessionStore.get_global_program(program_id) do
+              {:ok, program_data} ->
+                Logger.info("✅ Found global program #{program_id} for anonymous execution")
+                Map.put(base_args, :program_data, program_data)
+
+              {:error, :not_found} ->
+                Logger.warning("❌ Global program #{program_id} not found for anonymous execution")
+                base_args
+            end
+
+          true ->
             base_args
         end
       else
@@ -632,15 +677,18 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
   end
 
   # Stores program data in the SessionStore after successful creation.
-  defp store_program_data_after_creation(session_id, create_args, create_response) do
+  defp store_program_data_after_creation(session_id, _create_args, create_response) do
     if session_id != nil and session_id != "anonymous" do
       program_id = Map.get(create_response, "program_id")
 
       if program_id do
-        # Extract serializable program data from creation args
+        # Extract complete serializable program data from Python response
         program_data = %{
           program_id: program_id,
-          signature_def: Map.get(create_args, :signature, %{}),
+          signature_def: Map.get(create_response, "signature_def", Map.get(create_response, "signature", %{})),
+          signature_class: Map.get(create_response, "signature_class"),
+          field_mapping: Map.get(create_response, "field_mapping", %{}),
+          fallback_used: Map.get(create_response, "fallback_used", false),
           created_at: System.system_time(:second),
           execution_count: 0,
           last_executed: nil,
@@ -674,7 +722,30 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
     end
   end
 
-  # Phase 2B: Pre-warm workers to reduce checkout delays
+  # Stores anonymous program data in global storage.
+  defp store_anonymous_program_globally(_create_args, create_response) do
+    program_id = Map.get(create_response, "program_id")
+
+    if program_id do
+      # Extract complete serializable program data from Python response
+      program_data = %{
+        program_id: program_id,
+        signature_def: Map.get(create_response, "signature_def", Map.get(create_response, "signature", %{})),
+        signature_class: Map.get(create_response, "signature_class"),
+        field_mapping: Map.get(create_response, "field_mapping", %{}),
+        fallback_used: Map.get(create_response, "fallback_used", false),
+        created_at: System.system_time(:second),
+        execution_count: 0,
+        last_executed: nil,
+        program_type: Map.get(create_response, "program_type", "predict"),
+        signature: Map.get(create_response, "signature", %{})
+      }
+
+      SessionStore.store_global_program(program_id, program_data)
+    else
+      {:error, :no_program_id}
+    end
+  end
 
   ## Supervisor Integration
 

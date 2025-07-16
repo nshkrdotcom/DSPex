@@ -421,7 +421,11 @@ class DSPyBridge:
                 "program_id": program_id,
                 "status": "created",
                 "signature": signature_def,
-                "program_type": program_type
+                "program_type": program_type,
+                "signature_class": signature_class.__name__ if signature_class else None,
+                "field_mapping": field_mapping,
+                "fallback_used": fallback_used,
+                "signature_def": signature_def
             }
             
         except Exception as e:
@@ -558,6 +562,14 @@ class DSPyBridge:
             field_mapping = program_data.get('field_mapping', {})
             fallback_used = program_data.get('fallback_used', False)
             
+            # Debug logging to understand the recreation process
+            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                f.write(f"[{time.time()}] DEBUG _recreate_program_from_data: signature_def: {signature_def}\n")
+                f.write(f"[{time.time()}] DEBUG _recreate_program_from_data: signature_class: {signature_class}\n")
+                f.write(f"[{time.time()}] DEBUG _recreate_program_from_data: field_mapping: {field_mapping}\n")
+                f.write(f"[{time.time()}] DEBUG _recreate_program_from_data: fallback_used: {fallback_used}\n")
+                f.flush()
+            
             # Recreate the program object
             if signature_class and not fallback_used and signature_def:
                 # Try to recreate the dynamic signature
@@ -591,6 +603,10 @@ class DSPyBridge:
             return recreated_info
             
         except Exception as e:
+            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                f.write(f"[{time.time()}] ERROR _recreate_program_from_data failed: {e}\n")
+                f.write(f"[{time.time()}] ERROR _recreate_program_from_data traceback: {traceback.format_exc()}\n")
+                f.flush()
             raise RuntimeError(f"Failed to recreate program from data: {str(e)}")
     
     
@@ -614,18 +630,26 @@ class DSPyBridge:
         
         # Get program based on mode
         if self.mode == "pool-worker":
-            session_id = args.get('session_id')
-            if session_id and session_id != "anonymous":
-                # For named sessions, the program data should be passed in the request
-                # by the Elixir side which fetched it from SessionStore
-                program_data = args.get('program_data')
-                if not program_data:
-                    raise ValueError(f"Program not found: {program_id} (no program data provided)")
+            # Check if program_data is provided (works for both named and anonymous sessions)
+            program_data = args.get('program_data')
+            if program_data is not None:
+                # Use program_data when provided (cross-worker execution for both named and anonymous sessions)
+                # by the Elixir side which fetched it from SessionStore or global storage
+                
+                # Debug logging to see what we actually received
+                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                    f.write(f"[{time.time()}] DEBUG execute_program: program_data type: {type(program_data)}\n")
+                    f.write(f"[{time.time()}] DEBUG execute_program: program_data value: {program_data}\n")
+                    f.write(f"[{time.time()}] DEBUG execute_program: program_data is None: {program_data is None}\n")
+                    f.write(f"[{time.time()}] DEBUG execute_program: not program_data: {not program_data}\n")
+                    if isinstance(program_data, dict):
+                        f.write(f"[{time.time()}] DEBUG execute_program: program_data keys: {list(program_data.keys())}\n")
+                    f.flush()
                 
                 # Recreate the program object from the stored data
                 program_info = self._recreate_program_from_data(program_data)
             else:
-                # Anonymous sessions use local storage (temporary)
+                # Fall back to local storage when no program_data is provided
                 if not hasattr(self, 'programs') or program_id not in self.programs:
                     raise ValueError(f"Program not found: {program_id}")
                 program_info = self.programs[program_id]
