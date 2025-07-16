@@ -123,7 +123,7 @@ defmodule PoolExample do
         # Use a unique temporary session for each operation to ensure same worker
         temp_session = "temp_#{i}_#{System.unique_integer([:positive])}"
         
-        # Create program in the temporary session
+        # Create program in the temporary session with explicit timeout
         create_result = SessionPoolV2.execute_in_session(
           temp_session,
           :create_program,
@@ -133,7 +133,9 @@ defmodule PoolExample do
               inputs: [%{name: "question", type: "string"}],
               outputs: [%{name: "answer", type: "string"}]
             }
-          }
+          },
+          pool_timeout: 90_000,
+          timeout: 60_000
         )
         
         result = case create_result do
@@ -147,7 +149,9 @@ defmodule PoolExample do
               %{
                 program_id: prog_id,
                 inputs: %{question: "What is #{i} + #{i}?"}
-              }
+              },
+              pool_timeout: 90_000,
+              timeout: 60_000
             )
             
             # Clean up the temporary session
@@ -167,8 +171,8 @@ defmodule PoolExample do
       end)
     end
     
-    # Collect results
-    results = Task.await_many(tasks, 30_000)
+    # Collect results with longer timeout to account for worker initialization
+    results = Task.await_many(tasks, 120_000)
     
     Enum.each(results, fn {i, result, duration} ->
       case result do
@@ -325,8 +329,8 @@ defmodule PoolExample do
       end)
     end
     
-    # Collect all results
-    results = Task.await_many(tasks, 60_000)
+    # Collect all results with longer timeout for stress test
+    results = Task.await_many(tasks, 180_000)
     end_time = System.monotonic_time(:millisecond)
     total_duration = end_time - start_time
     

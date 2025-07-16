@@ -452,8 +452,9 @@ defmodule DSPex.PythonBridge.SessionPoolV2 do
       worker: {worker_module, []},
       pool_size: pool_size,
       max_overflow: overflow,
-      # Start workers immediately to avoid delays on first requests
-      lazy: false,
+      # Use lazy initialization to avoid sequential worker creation during startup
+      # Workers will be created on-demand or during pre-warming
+      lazy: true,
       name: pool_name
     ]
 

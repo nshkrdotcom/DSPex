@@ -1583,11 +1583,12 @@ def write_message(message: Dict[str, Any]) -> None:
             f.flush()
         
     except BrokenPipeError:
-        # Pipe was closed by the other end, exit gracefully
+        # Pipe was closed by the other end
         with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] BrokenPipeError - exiting\n")
+            f.write(f"[{time.time()}] BrokenPipeError - connection closed by client\n")
             f.flush()
-        sys.exit(0)
+        # Don't exit - in pool mode, we should continue and wait for next client
+        raise
     except Exception as e:
         print(f"Error writing message: {e}", file=sys.stderr)
         with open('/tmp/dspy_bridge_debug.log', 'a') as f:
@@ -1723,6 +1724,12 @@ def main():
                 }
                 write_message(response)
                 
+            except BrokenPipeError:
+                # Client disconnected, continue to next message
+                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                    f.write(f"[{time.time()}] BrokenPipeError in command handling - client disconnected\n")
+                    f.flush()
+                continue
             except Exception as e:
                 # Debug log
                 with open('/tmp/dspy_bridge_debug.log', 'a') as f:
@@ -1730,14 +1737,21 @@ def main():
                     f.write(f"[{time.time()}] Traceback: {traceback.format_exc()}\n")
                     f.flush()
                 
-                # Send error response
-                error_response = {
-                    'id': request_id,
-                    'success': False,
-                    'error': str(e),
-                    'timestamp': time.time()
-                }
-                write_message(error_response)
+                try:
+                    # Send error response
+                    error_response = {
+                        'id': request_id,
+                        'success': False,
+                        'error': str(e),
+                        'timestamp': time.time()
+                    }
+                    write_message(error_response)
+                except BrokenPipeError:
+                    # Client disconnected while sending error
+                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
+                        f.write(f"[{time.time()}] BrokenPipeError sending error response - client disconnected\n")
+                        f.flush()
+                    continue
                 
                 # Log error details
                 print(f"Command error: {e}", file=sys.stderr)

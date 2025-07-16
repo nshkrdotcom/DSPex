@@ -146,6 +146,24 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
 
           {:remove, :port_closed_after_success, pool_state}
 
+        {:error, :port_closed_during_connect} when checkin_type == :ok ->
+          # For successful operations, port closure is non-fatal
+          # The worker completed its task successfully, just spawn a new one
+          Logger.info(
+            "Worker #{worker_state.worker_id} port closed during reconnect after successful operation, removing worker"
+          )
+
+          {:remove, :port_closed_after_success, pool_state}
+
+        {:error, :port_closed} when checkin_type == :ok ->
+          # For successful operations, port closure is non-fatal
+          # The worker completed its task successfully, just spawn a new one
+          Logger.info(
+            "Worker #{worker_state.worker_id} port closed after successful operation, removing worker"
+          )
+
+          {:remove, :port_closed_after_success, pool_state}
+
         {:error, reason} ->
           Logger.error(
             "Worker #{worker_state.worker_id} port reconnection failed: #{inspect(reason)}"
@@ -435,8 +453,8 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
         # Continue waiting for our response
         wait_for_init_response(worker_state, request_id)
     after
-      5000 ->
-        Logger.error("Init ping timeout after 5 seconds for worker #{worker_state.worker_id}")
+      2000 ->
+        Logger.error("Init ping timeout after 2 seconds for worker #{worker_state.worker_id}")
         # Check if port is still alive
         port_info = Port.info(worker_state.port)
         Logger.error("Port info at timeout: #{inspect(port_info)}")
@@ -593,6 +611,10 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
         # Retry immediately for transient port issues
         reconnect_port_to_worker_with_retry(worker_state, worker_pid, attempts - 1)
 
+      {:error, :port_closed_during_connect} when attempts > 1 ->
+        # Retry immediately for transient port issues
+        reconnect_port_to_worker_with_retry(worker_state, worker_pid, attempts - 1)
+
       {:error, reason} ->
         Logger.debug(
           "[#{worker_state.worker_id}] Port reconnection failed after #{4 - attempts} attempts: #{inspect(reason)}"
@@ -640,6 +662,23 @@ defmodule DSPex.PythonBridge.PoolWorkerV2 do
   end
 
   defp validate_and_cache_environment do
+    # Use a global lock to prevent multiple workers from validating simultaneously
+    :global.trans({:env_validation_lock, node()}, fn ->
+      # Check cache again inside the lock
+      case :ets.lookup(@env_cache_table, :env_info) do
+        [{:env_info, env_info, timestamp}] ->
+          if System.os_time(:second) - timestamp < 3600 do
+            {:ok, env_info}
+          else
+            run_environment_validation()
+          end
+        [] ->
+          run_environment_validation()
+      end
+    end)
+  end
+
+  defp run_environment_validation do
     Logger.info("Running environment validation (will be cached for subsequent workers)")
 
     case DSPex.PythonBridge.EnvironmentCheck.validate_environment() do

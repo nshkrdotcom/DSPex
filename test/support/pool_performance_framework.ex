@@ -430,8 +430,11 @@ defmodule DSPex.PoolPerformanceFramework do
         process_count: length(Process.list())
       }
 
-      # Wait for next interval
-      :timer.sleep(sample_interval_ms)
+      # Wait for next interval using receive instead of sleep
+      receive do
+      after
+        sample_interval_ms -> :ok
+      end
 
       collect_system_samples(pool_info, end_time_us, sample_interval_ms, [sample | acc])
     end

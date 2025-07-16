@@ -376,8 +376,11 @@ defmodule DSPex.EnhancedPoolTestHelpers do
       # Collect current performance sample
       sample = collect_single_performance_sample(pool_info, current_time)
 
-      # Wait for next sample interval
-      :timer.sleep(interval_ms)
+      # Wait for next sample interval using receive instead of sleep
+      receive do
+      after
+        interval_ms -> :ok
+      end
 
       collect_performance_samples(pool_info, start_time, end_time, interval_ms, [sample | acc])
     end
