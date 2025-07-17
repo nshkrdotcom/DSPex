@@ -2,11 +2,21 @@
 
 # Advanced DSPy-Integrated Signatures Example
 # Demonstrates complex multi-step reasoning, data pipelines, and real-world business scenarios
-# Run with: elixir advanced_signature_example.exs
+# Run with: elixir examples/advanced_signature_example.exs
+
+# Configure for single mode (signatures work with single adapter)
+Application.put_env(:dspex, :pooling_enabled, false)
 
 Mix.install([
   {:dspex, path: "."}
 ])
+
+# Configure logging and test mode
+Logger.configure(level: :info)
+System.put_env("TEST_MODE", "mock_adapter")
+
+# Start the application
+{:ok, _} = Application.ensure_all_started(:dspex)
 
 defmodule AdvancedSignatureExample do
   @moduledoc """
@@ -689,3 +699,7 @@ IO.puts("🚀 Running Advanced Examples...")
 IO.puts("================================")
 
 AdvancedSignatureExample.run_all_advanced_examples()
+
+# AUTOMATIC: DSPex application stops automatically when script ends
+IO.puts("\n🎉 All examples complete - automatic cleanup on script exit!")
+IO.puts("💡 No manual Application.stop needed - supervision tree handles it!")

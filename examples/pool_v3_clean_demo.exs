@@ -80,6 +80,6 @@ end
 # Run the demo
 CleanPoolDemo.run()
 
-# CRITICAL: Stop the application to trigger cleanup
-IO.puts("\n🛑 Stopping DSPex application to clean up Python processes...")
-Application.stop(:dspex)
+# AUTOMATIC: DSPex application stops automatically when script ends
+IO.puts("\n🎉 Script complete - DSPex cleanup is automatic!")
+IO.puts("💡 No manual Application.stop needed - supervision tree handles it!")

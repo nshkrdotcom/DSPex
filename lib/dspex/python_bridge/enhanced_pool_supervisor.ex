@@ -44,14 +44,20 @@ defmodule DSPex.PythonBridge.EnhancedPoolSupervisor do
         Logger.info("V3 pool enabled - starting components")
 
         [
+          # Pool goes FIRST so it shuts down LAST (reverse order)
+          %{
+            id: DSPex.Python.Pool,
+            start: {DSPex.Python.Pool, :start_link, [[
+              name: DSPex.Python.Pool,
+              size: config.pool_size || 8
+            ]]},
+            restart: :permanent,
+            shutdown: 15_000,  # Give pool 15 seconds to clean up Python processes
+            type: :worker
+          },
           DSPex.Python.Registry,
           DSPex.Python.ProcessRegistry,
-          DSPex.Python.WorkerSupervisor,
-          {DSPex.Python.Pool,
-           [
-             name: DSPex.Python.Pool,
-             size: config.pool_size || 8
-           ]}
+          DSPex.Python.WorkerSupervisor
           | children
         ]
       else

@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 
-# Debug logging - write to file immediately to debug startup issues
+# Debug logging disabled to prevent massive log files
 import sys
 import os
-with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-    f.write(f"=== DSPy Bridge Starting ===\n")
-    f.write(f"PID: {os.getpid()}\n")
-    f.write(f"Args: {sys.argv}\n")
-    f.write(f"Python: {sys.executable}\n")
-    f.write(f"Working Dir: {os.getcwd()}\n")
-    f.flush()
+
+# DEBUG LOGGING DISABLED - define no-op function to prevent 172GB log files
+def debug_log(message):
+    """No-op debug logging to prevent massive log file spam"""
+    pass
 
 """
 DSPy Bridge for Elixir Integration
@@ -191,9 +189,7 @@ class DSPyBridge:
             Status information including timestamp
         """
         # Debug log
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] ping() called with args: {args}\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
         
         response = {
             "status": "ok",
@@ -211,9 +207,7 @@ class DSPyBridge:
             response["current_session"] = self.current_session
             
         # Debug log
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] ping() returning: {response}\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
             
         return response
     
@@ -287,24 +281,15 @@ class DSPyBridge:
                 
                 # Test the LM configuration with a simple call
                 try:
-                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                        f.write(f"[{time.time()}] DEBUG: Testing LM with simple call\n")
-                        f.flush()
+                    pass  # DEBUG LOGGING DISABLED
                     
                     # Try a simple DSPy call to verify the LM is working
                     simple_test = dspy.Predict("question -> answer")
                     test_result = simple_test(question="What is 1+1?")
                     
-                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                        f.write(f"[{time.time()}] DEBUG: LM test result: {test_result}\n")
-                        f.write(f"[{time.time()}] DEBUG: LM test type: {type(test_result)}\n")
-                        if hasattr(test_result, '__dict__'):
-                            f.write(f"[{time.time()}] DEBUG: LM test dict: {test_result.__dict__}\n")
-                        f.flush()
+                    pass  # DEBUG LOGGING DISABLED
                 except Exception as e:
-                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                        f.write(f"[{time.time()}] DEBUG: LM test failed: {e}\n")
-                        f.flush()
+                    pass  # DEBUG LOGGING DISABLED
                 
                 return {
                     "status": "configured",
@@ -366,15 +351,10 @@ class DSPyBridge:
                     signature_class, field_mapping = self._get_or_create_signature_class(signature_def)
                     program = dspy.Predict(signature_class)
                     fallback_used = False
-                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                        f.write(f"[{time.time()}] Created dynamic program with signature: {signature_class.__name__}\n")
-                        f.flush()
+                    pass  # DEBUG LOGGING DISABLED
                 except Exception as e:
                     # RESILIENT FALLBACK
-                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                        f.write(f"[{time.time()}] Dynamic signature creation failed: {e}. Falling back to Q/A.\n")
-                        f.write(traceback.format_exc() + "\n")
-                        f.flush()
+                    pass  # DEBUG LOGGING DISABLED
                     program = dspy.Predict("question -> answer")
                     signature_class = None  # Indicate fallback was used
                     field_mapping = {}
@@ -385,9 +365,7 @@ class DSPyBridge:
                 signature_class = None
                 field_mapping = {}
                 fallback_used = False
-                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                    f.write(f"[{time.time()}] Using legacy Q&A signature (dynamic disabled or incomplete signature)\n")
-                    f.flush()
+                pass  # DEBUG LOGGING DISABLED
             
             # Store program based on mode
             program_info = {
@@ -446,9 +424,7 @@ class DSPyBridge:
         signature_key = json.dumps(signature_def, sort_keys=True)
         
         if signature_key not in self.signature_cache:
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] Cache miss for signature: {signature_key}. Creating new class.\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             self.signature_cache[signature_key] = self._create_signature_class(signature_def)
         
         return self.signature_cache[signature_key]
@@ -563,12 +539,7 @@ class DSPyBridge:
             fallback_used = program_data.get('fallback_used', False)
             
             # Debug logging to understand the recreation process
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] DEBUG _recreate_program_from_data: signature_def: {signature_def}\n")
-                f.write(f"[{time.time()}] DEBUG _recreate_program_from_data: signature_class: {signature_class}\n")
-                f.write(f"[{time.time()}] DEBUG _recreate_program_from_data: field_mapping: {field_mapping}\n")
-                f.write(f"[{time.time()}] DEBUG _recreate_program_from_data: fallback_used: {fallback_used}\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             
             # Recreate the program object
             if signature_class and not fallback_used and signature_def:
@@ -603,10 +574,7 @@ class DSPyBridge:
             return recreated_info
             
         except Exception as e:
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] ERROR _recreate_program_from_data failed: {e}\n")
-                f.write(f"[{time.time()}] ERROR _recreate_program_from_data traceback: {traceback.format_exc()}\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             raise RuntimeError(f"Failed to recreate program from data: {str(e)}")
     
     
@@ -637,14 +605,7 @@ class DSPyBridge:
                 # by the Elixir side which fetched it from SessionStore or global storage
                 
                 # Debug logging to see what we actually received
-                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                    f.write(f"[{time.time()}] DEBUG execute_program: program_data type: {type(program_data)}\n")
-                    f.write(f"[{time.time()}] DEBUG execute_program: program_data value: {program_data}\n")
-                    f.write(f"[{time.time()}] DEBUG execute_program: program_data is None: {program_data is None}\n")
-                    f.write(f"[{time.time()}] DEBUG execute_program: not program_data: {not program_data}\n")
-                    if isinstance(program_data, dict):
-                        f.write(f"[{time.time()}] DEBUG execute_program: program_data keys: {list(program_data.keys())}\n")
-                    f.flush()
+                pass  # DEBUG LOGGING DISABLED
                 
                 # Recreate the program object from the stored data
                 program_info = self._recreate_program_from_data(program_data)
@@ -685,11 +646,7 @@ class DSPyBridge:
             # Determine execution mode based on signature and fallback status
             is_dynamic = program_info.get('signature_class') is not None and not program_info.get('fallback_used', False)
             
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] DEBUG: About to execute program with inputs: {inputs}\n")
-                f.write(f"[{time.time()}] DEBUG: Is dynamic: {is_dynamic}\n")
-                f.write(f"[{time.time()}] DEBUG: Program type: {type(program)}\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             
             if is_dynamic:
                 # Dynamic execution with field mapping
@@ -711,9 +668,7 @@ class DSPyBridge:
                 question = inputs.get('question', list(inputs.values())[0] if inputs else '')
                 result = program(question=question)
             
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] DEBUG: Program execution returned successfully\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             
             # Update execution statistics
             program_info['execution_count'] += 1
@@ -722,18 +677,12 @@ class DSPyBridge:
             # Monitor memory after AI operation
             memory_info = self._get_memory_usage()
             if memory_info.get("percent", 0) > 80:
-                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                    f.write(f"[{time.time()}] High memory usage after AI operation: {memory_info}\n")
-                    f.write(f"[{time.time()}] Worker ID: {self.worker_id}, Session: {session_id}\n")
-                    f.flush()
+                pass  # DEBUG LOGGING DISABLED
                 # Force garbage collection to free memory
                 gc.collect()
             
             # Debug: Write what we got from DSPy to debug log
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] DEBUG: DSPy result type: {type(result)}\n")
-                f.write(f"[{time.time()}] DEBUG: DSPy result class: {result.__class__.__name__}\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             
             # Extract outputs based on execution mode
             signature_def = program_info.get('signature_def', program_info.get('signature', {}))
@@ -751,9 +700,7 @@ class DSPyBridge:
                             else:
                                 # Fallback for safety
                                 outputs[original_name] = f"Field '{sanitized_name}' not found in prediction."
-                                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                                    f.write(f"[{time.time()}] Warning: Output field '{sanitized_name}' not found in result\n")
-                                    f.flush()
+                                pass  # DEBUG LOGGING DISABLED
                 else:
                     # Fallback to original field names for backward compatibility
                     output_fields = [field['name'] for field in signature_def.get('outputs', [])]
@@ -768,9 +715,7 @@ class DSPyBridge:
                 # Legacy Q&A output extraction
                 try:
                     outputs["answer"] = result.answer
-                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                        f.write(f"[{time.time()}] DEBUG: Using legacy Q&A output: {result.answer}\n")
-                        f.flush()
+                    pass  # DEBUG LOGGING DISABLED
                 except AttributeError:
                     # Try to extract from result object
                     if hasattr(result, '__dict__'):
@@ -784,9 +729,7 @@ class DSPyBridge:
             
             # Final validation - ensure we have some outputs
             if not outputs:
-                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                    f.write(f"[{time.time()}] WARNING: No outputs extracted, using emergency fallback\n")
-                    f.flush()
+                pass  # DEBUG LOGGING DISABLED
                 
                 # Emergency fallback for unexpected cases
                 if hasattr(result, '__dict__'):
@@ -799,9 +742,7 @@ class DSPyBridge:
                 if not outputs:
                     outputs["result"] = str(result) if result else "No result"
             
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] DEBUG: Final outputs: {outputs}\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             
             return {
                 "program_id": program_id,
@@ -843,9 +784,7 @@ class DSPyBridge:
             else:
                 # List all programs across all sessions - not supported without session affinity
                 # In the new architecture, we don't maintain a local registry of all sessions
-                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                    f.write(f"[{time.time()}] list_programs called without session_id in pool-worker mode\n")
-                    f.flush()
+                pass  # DEBUG LOGGING DISABLED
         else:
             # Check if programs exists (it might not in pool-worker mode)
             if hasattr(self, 'programs'):
@@ -1045,9 +984,7 @@ class DSPyBridge:
             
         # In the new architecture, session cleanup is handled by the centralized store
         # We just need to acknowledge the cleanup request
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] cleanup_session called for session: {session_id}\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
         
         # Force garbage collection to clean up any local references
         gc.collect()
@@ -1308,9 +1245,7 @@ class DSPyBridge:
             Session data dictionary or None if not found
         """
         try:
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] get_session_from_store called for session: {session_id}\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             
             # In pool-worker mode, we need to get session data from the Elixir SessionStore
             # For now, we'll use a simple approach where we assume session data 
@@ -1325,16 +1260,12 @@ class DSPyBridge:
             # The real solution would be to implement a session data cache
             # or extend the protocol to fetch data on demand
             
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] SessionStore communication not yet implemented - returning None\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             
             return None
             
         except Exception as e:
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] Error getting session from store: {e}\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             return None
 
     def update_session_in_store(self, session_id: str, operation: str, key: str, value: Any) -> bool:
@@ -1354,9 +1285,7 @@ class DSPyBridge:
             True if successful, False otherwise
         """
         try:
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] update_session_in_store called for session: {session_id}, operation: {operation}, key: {key}\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             
             # In pool-worker mode, we communicate with Elixir via the established protocol
             if self.mode == "pool-worker":
@@ -1387,9 +1316,7 @@ class DSPyBridge:
                 return False
             
         except Exception as e:
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] Error updating session in store: {e}\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             return False
 
     def get_session_data(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -1413,9 +1340,7 @@ class DSPyBridge:
         try:
             # In the new architecture, Python workers don't store session data locally
             # This handler is mainly for debugging or special cases
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] get_session_data called for session: {session_id}\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             
             return {
                 "session_id": session_id,
@@ -1449,9 +1374,7 @@ class DSPyBridge:
             key = args.get('key')
             value = args.get('value')
             
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] update_session_data called for session: {session_id}, operation: {operation}\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             
             # In the new architecture, Python workers don't store session data locally
             # This handler acknowledges the update but doesn't store anything locally
@@ -1477,9 +1400,7 @@ def read_message() -> Optional[Dict[str, Any]]:
         Parsed JSON message or None if EOF/error
     """
     # Debug log
-    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-        f.write(f"[{time.time()}] read_message() called\n")
-        f.flush()
+    pass  # DEBUG LOGGING DISABLED
     
     try:
         # Read the 4-byte length header with proper blocking
@@ -1502,42 +1423,28 @@ def read_message() -> Optional[Dict[str, Any]]:
             data += chunk
         
         # Debug log
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Read length: {length}, data: {len(data)} bytes\n")
-            if len(data) > 0:
-                f.write(f"[{time.time()}] JSON data: {data[:100]}...\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
         
         # Parse JSON directly
         message_str = data.decode('utf-8')
         
         # Debug log
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Message string: {message_str}\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
         
         parsed = json.loads(message_str)
         
         # Debug log
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Parsed message: {json.dumps(parsed)}\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
         
         return parsed
         
     except (EOFError, json.JSONDecodeError, UnicodeDecodeError) as e:
         print(f"Error reading message: {e}", file=sys.stderr)
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Error in read_message: {e}\n")
-            f.write(f"[{time.time()}] Traceback: {traceback.format_exc()}\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
         return None
     except Exception as e:
         print(f"Unexpected error reading message: {e}", file=sys.stderr)
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Unexpected error in read_message: {e}\n")
-            f.write(f"[{time.time()}] Traceback: {traceback.format_exc()}\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
         return None
 
 
@@ -1552,9 +1459,7 @@ def write_message(message: Dict[str, Any]) -> None:
         message: Dictionary to send as JSON
     """
     # Debug log
-    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-        f.write(f"[{time.time()}] write_message() called with: {json.dumps(message)}\n")
-        f.flush()
+    pass  # DEBUG LOGGING DISABLED
     
     try:
         # Encode message as JSON
@@ -1563,9 +1468,7 @@ def write_message(message: Dict[str, Any]) -> None:
         length = len(message_bytes)
         
         # Debug log
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Writing message, length: {length}, data: {message_bytes[:100]}...\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
         
         # Write length header (4 bytes, big-endian) + message
         sys.stdout.buffer.write(struct.pack('>I', length))
@@ -1573,24 +1476,17 @@ def write_message(message: Dict[str, Any]) -> None:
         sys.stdout.buffer.flush()
         
         # Debug log
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Message written and flushed\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
         
     except BrokenPipeError:
         # Pipe was closed by the other end
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] BrokenPipeError - connection closed by client\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
         # Don't exit - in pool mode, we should continue and wait for next client
         # Re-raise to let the main loop handle it appropriately
         raise
     except Exception as e:
         print(f"Error writing message: {e}", file=sys.stderr)
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Error in write_message: {e}\n")
-            f.write(f"[{time.time()}] Traceback: {traceback.format_exc()}\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
 
 
 def get_logging_mode():
@@ -1659,9 +1555,7 @@ def main():
     Reads messages from stdin, processes commands, and writes responses to stdout.
     """
     # Debug log that main started
-    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-        f.write(f"Main function started\n")
-        f.flush()
+    pass  # DEBUG LOGGING DISABLED
     
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='DSPy Bridge for Elixir Integration')
@@ -1671,18 +1565,14 @@ def main():
     cmd_args = parser.parse_args()
     
     # Debug log parsed args
-    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-        f.write(f"Parsed args: mode={cmd_args.mode}, worker_id={cmd_args.worker_id}\n")
-        f.flush()
+    pass  # DEBUG LOGGING DISABLED
     
     # Create bridge with specified mode
     bridge = DSPyBridge(mode=cmd_args.mode, worker_id=cmd_args.worker_id)
     
     # Set up signal handlers for graceful shutdown
     def handle_signal(signum, frame):
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Received signal {signum} (worker_id: {cmd_args.worker_id})\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
         # For pool workers, just exit cleanly
         if cmd_args.mode == 'pool-worker':
             sys.exit(0)
@@ -1692,10 +1582,7 @@ def main():
     
     # Register exit handler for diagnostics
     def exit_handler():
-        with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-            f.write(f"[{time.time()}] Python bridge exiting (worker_id: {cmd_args.worker_id}, mode: {cmd_args.mode})\n")
-            f.write(f"[{time.time()}] Memory usage: {bridge._get_memory_usage()}\n")
-            f.flush()
+        pass  # DEBUG LOGGING DISABLED
     
     atexit.register(exit_handler)
     
@@ -1705,46 +1592,30 @@ def main():
     print(f"DSPy available: {DSPY_AVAILABLE}", file=sys.stderr)
     
     # Debug log stdin info
-    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-        f.write(f"[{time.time()}] stdin info:\n")
-        f.write(f"  isatty: {sys.stdin.isatty()}\n")
-        f.write(f"  fileno: {sys.stdin.fileno()}\n")
-        f.write(f"  mode: {getattr(sys.stdin, 'mode', 'N/A')}\n")
-        f.write(f"  buffer: {sys.stdin.buffer}\n")
-        f.flush()
+    pass  # DEBUG LOGGING DISABLED
     
     # Debug log
-    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-        f.write(f"[{time.time()}] Entering main loop\n")
-        f.flush()
+    pass  # DEBUG LOGGING DISABLED
     
     try:
         while True:
             # Debug log
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] Waiting for message...\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             
             # Read incoming message
             message = read_message()
             
             # Debug log
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] Message received: {message}\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             
             if message is None:
                 # In pool-worker mode, continue waiting for next client instead of exiting
                 if cmd_args.mode == 'pool-worker':
-                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                        f.write(f"[{time.time()}] No message received, continuing to wait for next client\n")
-                        f.flush()
+                    pass  # DEBUG LOGGING DISABLED
                     continue
                 else:
                     print("No more messages, exiting", file=sys.stderr)
-                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                        f.write(f"[{time.time()}] No more messages, exiting\n")
-                        f.flush()
+                    pass  # DEBUG LOGGING DISABLED
                     break
             
             # Extract message components
@@ -1753,29 +1624,21 @@ def main():
             args = message.get('args', {})
             
             # Debug log
-            with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                f.write(f"[{time.time()}] Processing: id={request_id}, command={command}\n")
-                f.flush()
+            pass  # DEBUG LOGGING DISABLED
             
             if request_id is None or command is None:
                 print(f"Invalid message format: {message}", file=sys.stderr)
-                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                    f.write(f"[{time.time()}] Invalid message format\n")
-                    f.flush()
+                pass  # DEBUG LOGGING DISABLED
                 continue
             
             try:
                 # Execute command
-                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                    f.write(f"[{time.time()}] Executing command: {command}\n")
-                    f.flush()
+                pass  # DEBUG LOGGING DISABLED
                 
                 result = bridge.handle_command(command, args)
                 
                 # Debug log
-                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                    f.write(f"[{time.time()}] Command result: {json.dumps(result)}\n")
-                    f.flush()
+                pass  # DEBUG LOGGING DISABLED
                 
                 # Send success response
                 response = {
@@ -1788,9 +1651,7 @@ def main():
                 
             except BrokenPipeError:
                 # Client disconnected, continue to next message
-                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                    f.write(f"[{time.time()}] BrokenPipeError in command handling - client disconnected\n")
-                    f.flush()
+                pass  # DEBUG LOGGING DISABLED
                 continue
             except Exception as e:
                 # Get logging configuration
@@ -1799,13 +1660,7 @@ def main():
                 show_stack_trace = should_show_stack_trace(str(e), logging_config)
                 
                 # Debug log
-                with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                    f.write(f"[{time.time()}] Command error: {e}\n")
-                    f.write(f"[{time.time()}] Is test error: {is_test_error}\n")
-                    f.write(f"[{time.time()}] Show stack trace: {show_stack_trace}\n")
-                    if logging_config['debug_mode'] or not is_test_error:
-                        f.write(f"[{time.time()}] Traceback: {traceback.format_exc()}\n")
-                    f.flush()
+                pass  # DEBUG LOGGING DISABLED
                 
                 try:
                     # Send error response
@@ -1818,9 +1673,7 @@ def main():
                     write_message(error_response)
                 except BrokenPipeError:
                     # Client disconnected while sending error
-                    with open('/tmp/dspy_bridge_debug.log', 'a') as f:
-                        f.write(f"[{time.time()}] BrokenPipeError sending error response - client disconnected\n")
-                        f.flush()
+                    pass  # DEBUG LOGGING DISABLED
                     continue
                 
                 # Conditional error output based on logging configuration

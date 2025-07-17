@@ -89,6 +89,9 @@ defmodule DSPex.Python.Pool do
 
   @impl true
   def init(opts) do
+    # CRITICAL: Trap exits to ensure terminate/2 is called
+    Process.flag(:trap_exit, true)
+    
     size = opts[:size] || @default_size
 
     state = %__MODULE__{
@@ -288,7 +291,8 @@ defmodule DSPex.Python.Pool do
 
   @impl true
   def terminate(reason, state) do
-    Logger.warning("🛑 Pool shutting down: #{inspect(reason)}")
+    Logger.warning("🛑 Pool.terminate/2 CALLED with reason: #{inspect(reason)}")
+    Logger.warning("🛑 Pool state: #{inspect(Map.take(state, [:workers, :python_pids]))}")
     
     # Kill only OUR Python processes, not all processes on the system
     killed_count = kill_pool_worker_processes(state)

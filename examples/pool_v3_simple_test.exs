@@ -1,15 +1,27 @@
 #!/usr/bin/env elixir
 
-# Simple test to debug V3 pool
+# Simple V3 Pool Test with Streamlined Setup
+# Run with: elixir examples/pool_v3_simple_test.exs
+
+# Configure pooling BEFORE loading DSPex
+Application.put_env(:dspex, :pooling_enabled, true)
+Application.put_env(:dspex, :pool_config, %{
+  v2_enabled: false,
+  v3_enabled: true,
+  pool_size: 2
+})
+
 Mix.install([{:dspex, path: "."}])
 
-# Start components
-{:ok, _} = Supervisor.start_link([DSPex.Python.Registry], strategy: :one_for_one)
-{:ok, _} = DSPex.Python.WorkerSupervisor.start_link([])
-{:ok, _} = DSPex.Python.Pool.start_link(size: 2)
+# Configure logging and test mode
+Logger.configure(level: :info)
+System.put_env("TEST_MODE", "mock_adapter")
 
-# Wait for initialization
-Process.sleep(5000)
+# Start the application (handles all pool setup automatically)
+{:ok, _} = Application.ensure_all_started(:dspex)
+
+# Wait for pool initialization
+Process.sleep(2000)
 
 # Check pool stats
 IO.puts("\nPool stats:")
@@ -39,3 +51,6 @@ case DSPex.Python.Pool.execute("ping", %{test: true}) do
   {:error, reason} ->
     IO.puts("Error: #{inspect(reason)}")
 end
+
+# AUTOMATIC: DSPex application stops automatically when script ends
+IO.puts("\n✅ Test complete - automatic cleanup on script exit!")

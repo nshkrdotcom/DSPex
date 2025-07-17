@@ -1,7 +1,15 @@
 #!/usr/bin/env elixir
 
-# Quick test to validate GlobalPoolManager integration
+# GlobalPoolManager Integration Test with Streamlined Setup  
 # Run with: elixir examples/test_global_manager.exs
+
+# Configure pooling BEFORE loading DSPex
+Application.put_env(:dspex, :pooling_enabled, true)
+Application.put_env(:dspex, :pool_config, %{
+  v2_enabled: false,
+  v3_enabled: true,
+  pool_size: 4
+})
 
 Mix.install([
   {:dspex, path: "."}
@@ -17,16 +25,8 @@ defmodule GlobalManagerTest do
     IO.puts("\n🧪 Testing GlobalPoolManager Integration")
     IO.puts("=" |> String.duplicate(50))
     
-    # Start the application
+    # Start the application (pool config already set)
     {:ok, _} = Application.ensure_all_started(:dspex)
-    
-    # Configure for V3 pool
-    Application.put_env(:dspex, :pool_config, %{
-      v2_enabled: false,
-      v3_enabled: true,
-      pool_size: 4
-    })
-    Application.put_env(:dspex, :pooling_enabled, true)
     
     test_global_pool_startup()
     test_global_status()
@@ -73,3 +73,6 @@ end
 
 # Run the test
 GlobalManagerTest.run()
+
+# AUTOMATIC: DSPex application stops automatically when script ends
+IO.puts("\n🎉 Test complete - automatic cleanup on script exit!")
