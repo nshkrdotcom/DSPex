@@ -31,33 +31,50 @@ defmodule DSPex.Python.DemoRunner do
     size = Keyword.get(opts, :size, 8)
     _cleanup_timeout = Keyword.get(opts, :cleanup_timeout, 5000)
     
-    Logger.info("🚀 Starting V3 Pool with global cleanup (size: #{size})")
-    
-    # Use GlobalPoolManager for automatic orphaned process cleanup
-    case DSPex.Python.GlobalPoolManager.start_global_pool(size: size) do
-      {:ok, pool_pid, cleanup_report} ->
-        Logger.info("✅ Global cleanup report: #{inspect(cleanup_report)}")
+    # Check if pool is already running (from application supervisor)
+    case Process.whereis(DSPex.Python.Pool) do
+      nil ->
+        # No pool running, start one with global cleanup
+        Logger.info("🚀 Starting V3 Pool with global cleanup (size: #{size})")
         
-        # Link to ensure cleanup happens when demo exits
-        Process.link(pool_pid)
-        
-        try do
-          # Run the user's function
-          result = fun.()
-          Logger.info("✅ Demo completed successfully")
-          result
-        catch
-          kind, error ->
-            Logger.error("❌ Demo failed: #{inspect({kind, error})}")
-            reraise error, __STACKTRACE__
-        after
-          # Cleanup is handled automatically by GlobalPoolManager via heartbeat monitoring
-          Logger.info("🧹 Demo finished - automatic cleanup will handle orphaned processes")
+        case DSPex.Python.GlobalPoolManager.start_global_pool(size: size) do
+          {:ok, pool_pid, cleanup_report} ->
+            Logger.info("✅ Global cleanup report: #{inspect(cleanup_report)}")
+            
+            # Link to ensure cleanup happens when demo exits
+            Process.link(pool_pid)
+            
+            run_demo_function(fun)
+            
+          {:error, reason} ->
+            Logger.error("❌ Failed to start global pool: #{inspect(reason)}")
+            {:error, reason}
         end
         
-      {:error, reason} ->
-        Logger.error("❌ Failed to start global pool: #{inspect(reason)}")
-        {:error, reason}
+      pool_pid when is_pid(pool_pid) ->
+        # Pool already running (from application supervisor)
+        Logger.info("✅ Using existing V3 pool: #{inspect(pool_pid)}")
+        
+        # Link to ensure we notice if pool dies
+        Process.link(pool_pid)
+        
+        run_demo_function(fun)
+    end
+  end
+  
+  defp run_demo_function(fun) do
+    try do
+      # Run the user's function
+      result = fun.()
+      Logger.info("✅ Demo completed successfully")
+      result
+    catch
+      kind, error ->
+        Logger.error("❌ Demo failed: #{inspect({kind, error})}")
+        reraise error, __STACKTRACE__
+    after
+      # Cleanup is handled automatically by application supervisor or GlobalPoolManager
+      Logger.info("🧹 Demo finished - automatic cleanup will handle Python processes")
     end
   end
   

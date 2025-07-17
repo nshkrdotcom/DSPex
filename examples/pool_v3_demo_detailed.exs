@@ -3,6 +3,14 @@
 # DSPex V3 Pool Demo with Detailed Input/Output Logging
 # Run with: elixir examples/pool_v3_demo_detailed.exs
 
+# Configure pooling BEFORE loading DSPex to prevent standalone bridge from starting
+Application.put_env(:dspex, :pooling_enabled, true)
+Application.put_env(:dspex, :pool_config, %{
+  v2_enabled: false,
+  v3_enabled: true,
+  pool_size: 8
+})
+
 Mix.install([
   {:dspex, path: "."},
   {:benchee, "~> 1.0"}
@@ -21,25 +29,10 @@ defmodule PoolV3DetailedDemo do
     IO.puts("\n🚀 DSPex Pool V3 Demo - Detailed Input/Output Logging")
     IO.puts("=" |> String.duplicate(60))
     
-    # Configure for V3 pool (before starting application)
-    Application.put_env(:dspex, :pool_config, %{
-      v2_enabled: false,
-      v3_enabled: true,
-      pool_size: 8
-    })
-    Application.put_env(:dspex, :pooling_enabled, true)
-    
-    # Start only essential dependencies, not the full DSPex application
-    {:ok, _} = Application.ensure_all_started(:logger)
-    {:ok, _} = Application.ensure_all_started(:jason)
-    {:ok, _} = Application.ensure_all_started(:telemetry)
-    
-    # Start pools
-    IO.puts("\n⏱️  Starting V3 Pool (Concurrent)...")
-    {v3_time, pool_pid} = :timer.tc(fn -> start_v3_pool() end)
-    IO.puts("✅ V3 Pool started in #{v3_time / 1000}ms")
-    
-    try do
+    # Use DemoRunner for automatic cleanup
+    DSPex.Python.DemoRunner.with_pool([size: 8], fn ->
+      IO.puts("\n✅ V3 Pool started with global cleanup guarantees")
+      
       # Demo operations with detailed logging
       demo_detailed_operations()
       
@@ -49,33 +42,12 @@ defmodule PoolV3DetailedDemo do
       # Show pool stats
       show_pool_stats()
       
-      IO.puts("\n✨ Demo complete!")
-    after
-      # CRITICAL: Always shut down the pool to clean up Python processes
-      IO.puts("🛑 Shutting down pool...")
-      if Process.alive?(pool_pid) do
-        GenServer.stop(pool_pid, :normal, 10000)
-        IO.puts("✅ Pool shut down successfully")
-      else
-        IO.puts("⚠️ Pool was already dead")
-      end
-    end
+      IO.puts("\n✨ Demo operations completed!")
+    end)
+    
+    IO.puts("\n✅ Demo complete - all Python processes have been terminated!")
   end
   
-  defp start_v3_pool do
-    # Use GlobalPoolManager for automatic orphaned process cleanup
-    IO.puts("🌍 Starting V3 pool with global cleanup...")
-    
-    case DSPex.Python.GlobalPoolManager.start_global_pool(size: 8) do
-      {:ok, pool_pid, cleanup_report} ->
-        IO.puts("✅ Global cleanup report: #{inspect(cleanup_report)}")
-        pool_pid
-        
-      {:error, reason} ->
-        IO.puts("❌ Failed to start global pool: #{inspect(reason)}")
-        exit(:failed_to_start_pool)
-    end
-  end
   
   defp demo_detailed_operations do
     IO.puts("\n🔍 Detailed Operations Demo")
