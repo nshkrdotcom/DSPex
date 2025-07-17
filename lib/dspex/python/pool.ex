@@ -23,7 +23,8 @@ defmodule DSPex.Python.Pool do
     :busy,
     :request_queue,
     :stats,
-    :initialized
+    :initialized,
+    :python_pids  # Track Python PIDs for cleanup
   ]
 
   # Client API
@@ -102,7 +103,8 @@ defmodule DSPex.Python.Pool do
         errors: 0,
         queue_timeouts: 0
       },
-      initialized: false
+      initialized: false,
+      python_pids: MapSet.new()  # Track Python PIDs
     }
 
     # Start concurrent worker initialization
@@ -284,7 +286,72 @@ defmodule DSPex.Python.Pool do
     {:noreply, state}
   end
 
+  @impl true
+  def terminate(reason, state) do
+    Logger.warning("🛑 Pool shutting down: #{inspect(reason)}")
+    
+    # Kill only OUR Python processes, not all processes on the system
+    killed_count = kill_pool_worker_processes(state)
+    
+    Logger.warning("✅ Pool shutdown completed - killed #{killed_count} worker processes")
+    :ok
+  end
+
   # Private Functions
+
+  defp kill_pool_worker_processes(state) do
+    Logger.warning("🔥 Killing Python processes for pool workers...")
+    
+    # Get all workers from this pool
+    worker_ids = state.workers || []
+    
+    killed_count = Enum.reduce(worker_ids, 0, fn worker_id, acc ->
+      # Get Python PID from ProcessRegistry
+      case DSPex.Python.ProcessRegistry.get_worker_info(worker_id) do
+        {:ok, %{python_pid: python_pid}} when is_integer(python_pid) ->
+          case kill_python_process(python_pid, worker_id) do
+            :ok -> 
+              Logger.warning("✅ Killed Python process #{python_pid} for worker #{worker_id}")
+              acc + 1
+            :error -> 
+              Logger.warning("⚠️ Failed to kill Python process #{python_pid} for worker #{worker_id}")
+              acc
+          end
+        _ ->
+          Logger.warning("⚠️ No Python PID found for worker #{worker_id}")
+          acc
+      end
+    end)
+    
+    # Also try to get Python PIDs from the tracked set if available
+    tracked_pids = MapSet.to_list(state.python_pids || MapSet.new())
+    
+    additional_killed = Enum.reduce(tracked_pids, 0, fn python_pid, acc ->
+      case kill_python_process(python_pid, "tracked") do
+        :ok -> 
+          Logger.warning("✅ Killed tracked Python process #{python_pid}")
+          acc + 1
+        :error -> 
+          acc
+      end
+    end)
+    
+    killed_count + additional_killed
+  end
+  
+  defp kill_python_process(python_pid, _worker_id) when is_integer(python_pid) do
+    try do
+      # Use SIGKILL for immediate termination
+      case System.cmd("kill", ["-KILL", "#{python_pid}"], stderr_to_stdout: true) do
+        {_output, 0} ->
+          :ok
+        {_error, _} ->
+          :error
+      end
+    rescue
+      _ -> :error
+    end
+  end
 
   defp start_workers_concurrently(count) do
     1..count

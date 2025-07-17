@@ -21,10 +21,7 @@ defmodule PoolV3DetailedDemo do
     IO.puts("\n🚀 DSPex Pool V3 Demo - Detailed Input/Output Logging")
     IO.puts("=" |> String.duplicate(60))
     
-    # Start the application
-    {:ok, _} = Application.ensure_all_started(:dspex)
-    
-    # Configure for V3 pool
+    # Configure for V3 pool (before starting application)
     Application.put_env(:dspex, :pool_config, %{
       v2_enabled: false,
       v3_enabled: true,
@@ -32,32 +29,52 @@ defmodule PoolV3DetailedDemo do
     })
     Application.put_env(:dspex, :pooling_enabled, true)
     
+    # Start only essential dependencies, not the full DSPex application
+    {:ok, _} = Application.ensure_all_started(:logger)
+    {:ok, _} = Application.ensure_all_started(:jason)
+    {:ok, _} = Application.ensure_all_started(:telemetry)
+    
     # Start pools
     IO.puts("\n⏱️  Starting V3 Pool (Concurrent)...")
-    v3_time = :timer.tc(fn -> start_v3_pool() end) |> elem(0)
+    {v3_time, pool_pid} = :timer.tc(fn -> start_v3_pool() end)
     IO.puts("✅ V3 Pool started in #{v3_time / 1000}ms")
     
-    # Demo operations with detailed logging
-    demo_detailed_operations()
-    
-    # Demo concurrent execution with sample inputs/outputs
-    demo_concurrent_with_details()
-    
-    # Show pool stats
-    show_pool_stats()
-    
-    IO.puts("\n✨ Demo complete!")
+    try do
+      # Demo operations with detailed logging
+      demo_detailed_operations()
+      
+      # Demo concurrent execution with sample inputs/outputs
+      demo_concurrent_with_details()
+      
+      # Show pool stats
+      show_pool_stats()
+      
+      IO.puts("\n✨ Demo complete!")
+    after
+      # CRITICAL: Always shut down the pool to clean up Python processes
+      IO.puts("🛑 Shutting down pool...")
+      if Process.alive?(pool_pid) do
+        GenServer.stop(pool_pid, :normal, 10000)
+        IO.puts("✅ Pool shut down successfully")
+      else
+        IO.puts("⚠️ Pool was already dead")
+      end
+    end
   end
   
   defp start_v3_pool do
-    # Start the V3 components with ProcessRegistry for orphan tracking
-    {:ok, _} = Supervisor.start_link([
-      DSPex.Python.Registry,
-      DSPex.Python.ProcessRegistry  # ← Added for orphan detection
-    ], strategy: :one_for_one)
-    {:ok, _} = DSPex.Python.WorkerSupervisor.start_link([])
-    {:ok, _} = DSPex.Python.Pool.start_link(size: 8)
-    {:ok, _} = DSPex.PythonBridge.SessionStore.start_link()
+    # Use GlobalPoolManager for automatic orphaned process cleanup
+    IO.puts("🌍 Starting V3 pool with global cleanup...")
+    
+    case DSPex.Python.GlobalPoolManager.start_global_pool(size: 8) do
+      {:ok, pool_pid, cleanup_report} ->
+        IO.puts("✅ Global cleanup report: #{inspect(cleanup_report)}")
+        pool_pid
+        
+      {:error, reason} ->
+        IO.puts("❌ Failed to start global pool: #{inspect(reason)}")
+        exit(:failed_to_start_pool)
+    end
   end
   
   defp demo_detailed_operations do

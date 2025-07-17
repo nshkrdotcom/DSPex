@@ -15,7 +15,7 @@ defmodule DSPex.Python.Worker do
   alias DSPex.PythonBridge.Protocol
 
   @health_check_interval 30_000
-  @init_timeout 10_000
+  @init_timeout 20_000  # Increased timeout for Python startup
 
   defstruct [
     :id,
@@ -95,6 +95,16 @@ defmodule DSPex.Python.Worker do
           python_pid,
           fingerprint
         )
+        
+        # Register with application cleanup for hard guarantee
+        if python_pid do
+          try do
+            DSPex.Python.ApplicationCleanup.register_python_process(python_pid)
+          rescue
+            _ -> 
+              Logger.warning("ApplicationCleanup not available during worker init")
+          end
+        end
 
         # Send initialization ping
         {:ok, state, {:continue, :initialize}}
@@ -106,6 +116,8 @@ defmodule DSPex.Python.Worker do
 
   @impl true
   def handle_continue(:initialize, state) do
+    Logger.info("🔄 Worker #{state.id} starting initialization with Python PID #{state.python_pid}")
+    
     # Send initialization ping
     request_id = System.unique_integer([:positive])
 
@@ -115,8 +127,11 @@ defmodule DSPex.Python.Worker do
         "initialization" => true
       })
 
+    Logger.debug("📤 Worker #{state.id} sending init ping with request_id #{request_id}")
+
     case Port.command(state.port, request) do
       true ->
+        Logger.debug("✅ Worker #{state.id} sent ping command successfully")
         # Wait for ping response
         receive do
           {port, {:data, data}} when port == state.port ->
@@ -141,6 +156,9 @@ defmodule DSPex.Python.Worker do
             end
         after
           @init_timeout ->
+            Logger.error("⏰ Worker #{state.id} initialization timeout after #{@init_timeout}ms")
+            Logger.error("   Python PID: #{state.python_pid}")
+            Logger.error("   Port info: #{inspect(Port.info(state.port))}")
             {:stop, :initialization_timeout, state}
         end
 
@@ -189,6 +207,10 @@ defmodule DSPex.Python.Worker do
     {:reply, state.stats, state}
   end
 
+  def handle_call(:get_python_pid, _from, state) do
+    {:reply, state.python_pid, state}
+  end
+
   @impl true
   def handle_info({port, {:data, data}}, %{port: port} = state) do
     Logger.debug("Worker #{state.id} received data from port")
@@ -215,8 +237,33 @@ defmodule DSPex.Python.Worker do
   end
 
   def handle_info({:EXIT, port, reason}, %{port: port} = state) do
-    Logger.error("Python port exited: #{inspect(reason)}")
+    Logger.error("🔥 Worker #{state.id} port exited: #{inspect(reason)}")
+    Logger.error("   Python PID: #{state.python_pid}")
+    Logger.error("   Worker was in state: #{state.health_status}")
     {:stop, {:port_exited, reason}, state}
+  end
+
+  def handle_info({port, {:exit_status, status}}, %{port: port} = state) do
+    # Status 137 = SIGKILL, which happens during normal pool shutdown
+    if status == 137 do
+      Logger.debug("Worker #{state.id} terminated by pool shutdown (status 137)")
+    else
+      Logger.error("🔥 Worker #{state.id} port exited with status #{status}")
+      Logger.error("   Python PID: #{state.python_pid}")
+      Logger.error("   Worker was in state: #{state.health_status}")
+      
+      # Check if Python process is still alive
+      if state.python_pid do
+        case System.cmd("kill", ["-0", "#{state.python_pid}"], stderr_to_stdout: true) do
+          {_, 0} -> 
+            Logger.error("   ⚠️ Python process #{state.python_pid} is STILL ALIVE after port death!")
+          {_, _} -> 
+            Logger.error("   💀 Python process #{state.python_pid} is dead")
+        end
+      end
+    end
+    
+    {:stop, {:port_exit, status}, state}
   end
 
   def handle_info(:health_check, state) do
@@ -245,15 +292,50 @@ defmodule DSPex.Python.Worker do
   end
 
   @impl true
+  def handle_cast(:prepare_shutdown, state) do
+    Logger.info("Worker #{state.id} preparing for graceful shutdown")
+    # Could send shutdown signal to Python process here
+    {:noreply, state}
+  end
+
+  @impl true
   def terminate(reason, state) do
-    Logger.info("Worker #{state.id} terminating: #{inspect(reason)}")
+    # Don't log warnings for normal pool shutdown (port exit with status 137)
+    case reason do
+      {:port_exit, 137} ->
+        Logger.debug("Worker #{state.id} terminated by pool shutdown")
+      _ ->
+        Logger.warning("🔥 Worker #{state.id} terminating: #{inspect(reason)}")
+    end
 
     # Unregister from process tracking
     DSPex.Python.ProcessRegistry.unregister_worker(state.id)
+    
+    # Unregister from application cleanup tracking
+    if state.python_pid do
+      try do
+        DSPex.Python.ApplicationCleanup.unregister_python_process(state.python_pid)
+      rescue
+        _ -> :ok  # ApplicationCleanup may have already shutdown
+      end
+    end
 
-    # Close the port gracefully
+    # Always kill Python process when worker terminates
+    # ApplicationCleanup provides the hard guarantee for app shutdown
     if state.port && Port.info(state.port) do
+      # Get the Python process PID before closing port
+      python_pid = case Port.info(state.port, :os_pid) do
+        {:os_pid, pid} -> pid
+        _ -> state.python_pid  # Fallback to stored PID
+      end
+      
+      # Close the port first
       Port.close(state.port)
+      
+      # Then kill the Python process if we have its PID
+      if python_pid do
+        terminate_python_process(python_pid, state.id)
+      end
     end
 
     :ok
@@ -294,11 +376,45 @@ defmodule DSPex.Python.Worker do
     "dspex_worker_#{worker_id}_#{timestamp}_#{random}"
   end
 
+  defp terminate_python_process(python_pid, worker_id) when is_integer(python_pid) do
+    Logger.warning("🔥 Terminating Python process #{python_pid} for worker #{worker_id}")
+    
+    try do
+      # Try graceful termination first
+      case System.cmd("kill", ["-TERM", "#{python_pid}"], stderr_to_stdout: true) do
+        {_output, 0} ->
+          Logger.warning("✅ Sent SIGTERM to Python process #{python_pid}")
+          
+          # Wait briefly for graceful shutdown
+          Process.sleep(500)
+          
+          # Force kill if still alive
+          case System.cmd("kill", ["-KILL", "#{python_pid}"], stderr_to_stdout: true) do
+            {_output, 0} ->
+              Logger.warning("✅ Force killed Python process #{python_pid}")
+            {_error, _} ->
+              Logger.warning("⚠️ Python process #{python_pid} already dead")
+          end
+          
+        {_error, _} ->
+          # Process already dead or kill failed
+          Logger.warning("⚠️ Python process #{python_pid} already dead or kill failed")
+      end
+    rescue
+      e ->
+        Logger.warning("💥 Exception killing Python process #{python_pid}: #{inspect(e)}")
+    end
+  end
+  
+  defp terminate_python_process(nil, worker_id) do
+    Logger.warning("⚠️ No Python PID to terminate for worker #{worker_id}")
+  end
+
   defp handle_response(request_id, result, state) do
     case Map.pop(state.pending_requests, request_id) do
       {nil, _pending} ->
         # Unknown request ID
-        Logger.warning("Received response for unknown request: #{request_id}")
+        Logger.warning("Received response for unknown request: #{request_id}. Pending requests: #{inspect(Map.keys(state.pending_requests))}")
         {:noreply, state}
 
       {{:health_check, start_time}, pending} ->
@@ -344,4 +460,5 @@ defmodule DSPex.Python.Worker do
     end)
     |> Map.update!(:total_time, &(&1 + duration))
   end
+
 end
