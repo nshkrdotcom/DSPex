@@ -63,6 +63,17 @@ The DSPex V3 Pool represents a major architectural advancement, delivering **100
   - TTL-based session expiration
   - Global program sharing
 
+#### 6. **DSPex.Python.ProcessRegistry** - Orphaned Process Management
+- **Location**: `lib/dspex/python/process_registry.ex`
+- **Purpose**: Cross-reference tracking of Python processes for intelligent cleanup
+- **Features**:
+  - OS-level PID mapping (Worker ID ↔ Elixir PID ↔ Python PID)
+  - Process fingerprinting for unique identification
+  - Automatic cleanup of dead worker entries
+  - 100% active worker protection during cleanup
+
+📖 **[Complete Process Management Documentation →](README_PROCESS_MANAGEMENT.md)**
+
 ## 🔧 Configuration
 
 ### Basic Pool Configuration

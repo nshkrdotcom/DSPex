@@ -80,8 +80,10 @@ end
 - Queue-based request distribution with automatic failover
 - ETS-backed session store with program CRUD operations
 - Comprehensive monitoring and real-time statistics
+- **Intelligent orphaned process cleanup** with 100% active worker protection
 
 📖 **[Complete V3 Pool Documentation →](README_V3_POOLER.md)**
+📖 **[Process Management & Cleanup System →](README_PROCESS_MANAGEMENT.md)**
 
 ### 🏗️ **Planned Stages (In Development)**
 
@@ -170,6 +172,9 @@ elixir examples/pool_v3_demo.exs
 
 # V3 Pool with detailed input/output logging
 elixir examples/pool_v3_demo_detailed.exs
+
+# Clean up orphaned Python processes intelligently
+./kill_python.sh
 
 # All layers sequentially
 mix test.all

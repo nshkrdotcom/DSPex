@@ -50,8 +50,11 @@ defmodule PoolV3DetailedDemo do
   end
   
   defp start_v3_pool do
-    # Start the V3 components
-    {:ok, _} = Supervisor.start_link([DSPex.Python.Registry], strategy: :one_for_one)
+    # Start the V3 components with ProcessRegistry for orphan tracking
+    {:ok, _} = Supervisor.start_link([
+      DSPex.Python.Registry,
+      DSPex.Python.ProcessRegistry  # ← Added for orphan detection
+    ], strategy: :one_for_one)
     {:ok, _} = DSPex.Python.WorkerSupervisor.start_link([])
     {:ok, _} = DSPex.Python.Pool.start_link(size: 8)
     {:ok, _} = DSPex.PythonBridge.SessionStore.start_link()

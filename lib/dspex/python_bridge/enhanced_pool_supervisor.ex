@@ -45,6 +45,7 @@ defmodule DSPex.PythonBridge.EnhancedPoolSupervisor do
 
         [
           DSPex.Python.Registry,
+          DSPex.Python.ProcessRegistry,
           DSPex.Python.WorkerSupervisor,
           {DSPex.Python.Pool,
            [

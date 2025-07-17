@@ -20,6 +20,9 @@ defmodule DSPex.Python.Worker do
   defstruct [
     :id,
     :port,
+    :python_pid,
+    :fingerprint,
+    :start_time,
     :busy,
     :pending_requests,
     :health_status,
@@ -67,19 +70,31 @@ defmodule DSPex.Python.Worker do
   @impl true
   def init(opts) do
     worker_id = Keyword.fetch!(opts, :id)
+    fingerprint = generate_fingerprint(worker_id)
 
-    # Start Python process
-    case start_python_port() do
-      {:ok, port} ->
+    # Start Python process with fingerprint
+    case start_python_port(fingerprint) do
+      {:ok, port, python_pid} ->
         # Send initial ping to verify connection
         state = %__MODULE__{
           id: worker_id,
           port: port,
+          python_pid: python_pid,
+          fingerprint: fingerprint,
+          start_time: System.system_time(:second),
           busy: false,
           pending_requests: %{},
           health_status: :initializing,
           stats: %{requests: 0, errors: 0, total_time: 0}
         }
+
+        # Register worker with process tracking
+        DSPex.Python.ProcessRegistry.register_worker(
+          worker_id,
+          self(),
+          python_pid,
+          fingerprint
+        )
 
         # Send initialization ping
         {:ok, state, {:continue, :initialize}}
@@ -233,6 +248,9 @@ defmodule DSPex.Python.Worker do
   def terminate(reason, state) do
     Logger.info("Worker #{state.id} terminating: #{inspect(reason)}")
 
+    # Unregister from process tracking
+    DSPex.Python.ProcessRegistry.unregister_worker(state.id)
+
     # Close the port gracefully
     if state.port && Port.info(state.port) do
       Port.close(state.port)
@@ -243,23 +261,37 @@ defmodule DSPex.Python.Worker do
 
   # Private Functions
 
-  defp start_python_port do
+  defp start_python_port(_fingerprint) do
     python_path = System.find_executable("python3") || System.find_executable("python")
     script_path = Path.join(:code.priv_dir(:dspex), "python/dspy_bridge.py")
 
+    # Use same port options as working V2 pool worker
     port_opts = [
-      {:args, [script_path, "--mode", "pool-worker"]},
-      {:packet, 4},
       :binary,
-      :exit_status
+      :exit_status,
+      {:packet, 4},
+      {:args, [script_path, "--mode", "pool-worker"]}
     ]
 
     try do
       port = Port.open({:spawn_executable, python_path}, port_opts)
-      {:ok, port}
+      
+      # Extract Python process PID
+      python_pid = case Port.info(port, :os_pid) do
+        {:os_pid, pid} -> pid
+        _ -> nil
+      end
+      
+      {:ok, port, python_pid}
     rescue
       e -> {:error, e}
     end
+  end
+
+  defp generate_fingerprint(worker_id) do
+    timestamp = System.system_time(:nanosecond)
+    random = :rand.uniform(1_000_000)
+    "dspex_worker_#{worker_id}_#{timestamp}_#{random}"
   end
 
   defp handle_response(request_id, result, state) do
