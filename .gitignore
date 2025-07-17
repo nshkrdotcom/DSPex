@@ -159,3 +159,9 @@ priv/python/__pycache__/
 
 repomix*.xml
 
+# Snakepit extracted project
+snakepit/
+
+# Snakepit DSPy adapter project
+snakepit_dspy/
+
