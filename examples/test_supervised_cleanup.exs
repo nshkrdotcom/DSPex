@@ -71,6 +71,7 @@ end
 # Run the test
 SupervisedCleanupTest.run()
 
-# AUTOMATIC: DSPex application stops automatically when script ends
-IO.puts("\n🎉 Test complete - automatic cleanup on script exit!")
-IO.puts("💡 No manual Process.exit or cleanup needed - supervision tree handles it!")
+# Ensure proper cleanup by explicitly stopping the application
+IO.puts("\n🛑 Stopping DSPex application to ensure cleanup...")
+Application.stop(:dspex)
+IO.puts("\n🎉 Test complete - application stopped cleanly!")

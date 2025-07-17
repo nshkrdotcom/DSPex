@@ -700,6 +700,7 @@ IO.puts("================================")
 
 AdvancedSignatureExample.run_all_advanced_examples()
 
-# AUTOMATIC: DSPex application stops automatically when script ends
-IO.puts("\n🎉 All examples complete - automatic cleanup on script exit!")
-IO.puts("💡 No manual Application.stop needed - supervision tree handles it!")
+# Ensure proper cleanup by explicitly stopping the application
+IO.puts("\n🛑 Stopping DSPex application to ensure cleanup...")
+Application.stop(:dspex)
+IO.puts("\n🎉 All examples complete - application stopped cleanly!")

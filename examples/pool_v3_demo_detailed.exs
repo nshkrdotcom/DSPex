@@ -211,3 +211,8 @@ end
 
 # Run the demo
 PoolV3DetailedDemo.run()
+
+# Ensure proper cleanup by explicitly stopping the application
+IO.puts("\n🛑 Stopping DSPex application to ensure cleanup...")
+Application.stop(:dspex)
+IO.puts("✅ Demo complete - application stopped cleanly!")

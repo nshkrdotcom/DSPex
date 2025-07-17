@@ -55,6 +55,14 @@ defmodule DSPex.PythonBridge.EnhancedPoolSupervisor do
             shutdown: 15_000,  # Give pool 15 seconds to clean up Python processes
             type: :worker
           },
+          # ApplicationCleanup provides the ultimate safety net for Python process cleanup
+          %{
+            id: DSPex.Python.ApplicationCleanup,
+            start: {DSPex.Python.ApplicationCleanup, :start_link, []},
+            restart: :permanent,
+            shutdown: 5_000,  # Quick shutdown to ensure cleanup runs
+            type: :worker
+          },
           DSPex.Python.Registry,
           DSPex.Python.ProcessRegistry,
           DSPex.Python.WorkerSupervisor
@@ -69,6 +77,23 @@ defmodule DSPex.PythonBridge.EnhancedPoolSupervisor do
       if config.v2_enabled do
         Logger.info("V2 pool enabled - starting components")
 
+        # Add ApplicationCleanup if not already added by V3
+        children_with_cleanup = 
+          if not config.v3_enabled and not Enum.any?(children, &match?(%{id: DSPex.Python.ApplicationCleanup}, &1)) do
+            [
+              %{
+                id: DSPex.Python.ApplicationCleanup,
+                start: {DSPex.Python.ApplicationCleanup, :start_link, []},
+                restart: :permanent,
+                shutdown: 5_000,
+                type: :worker
+              }
+              | children
+            ]
+          else
+            children
+          end
+
         [
           {DSPex.PythonBridge.SessionPoolV2,
            [
@@ -82,7 +107,7 @@ defmodule DSPex.PythonBridge.EnhancedPoolSupervisor do
              health_check_interval: 30_000,
              session_cleanup_interval: 300_000
            ]}
-          | children
+          | children_with_cleanup
         ]
       else
         children

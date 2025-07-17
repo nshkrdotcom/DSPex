@@ -74,5 +74,7 @@ end
 # Run the test
 GlobalManagerTest.run()
 
-# AUTOMATIC: DSPex application stops automatically when script ends
-IO.puts("\n🎉 Test complete - automatic cleanup on script exit!")
+# Ensure proper cleanup by explicitly stopping the application
+IO.puts("\n🛑 Stopping DSPex application to ensure cleanup...")
+Application.stop(:dspex)
+IO.puts("\n🎉 Test complete - application stopped cleanly!")
