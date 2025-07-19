@@ -123,6 +123,36 @@ defmodule DSPex do
   @spec run_pipeline(Pipeline.t(), map(), keyword()) :: {:ok, term()} | {:error, term()}
   defdelegate run_pipeline(pipeline, input, opts \\ []), to: Pipeline, as: :run
 
+  # LLM operations
+
+  @doc """
+  Create a new LLM client for direct model interactions.
+
+  ## Examples
+
+      # Using InstructorLite
+      {:ok, client} = DSPex.lm_client(
+        adapter: :instructor_lite,
+        provider: :openai,
+        api_key: System.get_env("OPENAI_API_KEY")
+      )
+      
+      # Using HTTP adapter
+      {:ok, client} = DSPex.lm_client(
+        adapter: :http,
+        provider: :anthropic,
+        api_key: System.get_env("ANTHROPIC_API_KEY")
+      )
+  """
+  @spec lm_client(keyword()) :: {:ok, map()} | {:error, term()}
+  defdelegate lm_client(opts), to: DSPex.LLM.Client, as: :new
+
+  @doc """
+  Generate text using an LLM client.
+  """
+  @spec lm_generate(map(), String.t() | list(map()), keyword()) :: {:ok, map()} | {:error, term()}
+  defdelegate lm_generate(client, prompt, opts \\ []), to: DSPex.LLM.Client, as: :generate
+
   # Utility functions
 
   @doc """

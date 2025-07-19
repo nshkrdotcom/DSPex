@@ -138,23 +138,61 @@ end
 
 defmodule DSPex.Native.LMClient do
   @moduledoc """
-  Native LLM client with provider abstraction.
+  Native LLM client with adapter pattern for flexible provider support.
   """
   
-  @providers %{
-    openai: DSPex.Native.Providers.OpenAI,
-    anthropic: DSPex.Native.Providers.Anthropic,
-    google: DSPex.Native.Providers.Google,
-    # ... more providers
+  @behaviour DSPex.LLM.Adapter
+  
+  # Available adapters, easily extensible
+  @adapters %{
+    instructor_lite: DSPex.LLM.Adapters.InstructorLite,
+    http: DSPex.LLM.Adapters.HTTP,
+    python: DSPex.LLM.Adapters.Python,
+    # Add more adapters as needed
   }
   
-  def configure(provider, config) do
-    module = @providers[provider] || DSPex.Python.Providers.LiteLLM
-    module.configure(config)
+  def configure(adapter_type, provider, config) do
+    adapter = @adapters[adapter_type] || raise "Unknown adapter: #{adapter_type}"
+    adapter.configure(provider, config)
   end
   
   def generate(client, prompt, opts \\ []) do
-    client.module.generate(client.config, prompt, opts)
+    client.adapter.generate(client, prompt, opts)
+  end
+end
+
+defmodule DSPex.LLM.Adapter do
+  @moduledoc """
+  Behaviour for LLM adapters, allowing easy switching between implementations.
+  """
+  
+  @callback configure(provider :: atom(), config :: map()) :: {:ok, client :: map()} | {:error, term()}
+  @callback generate(client :: map(), prompt :: String.t(), opts :: keyword()) :: {:ok, response :: map()} | {:error, term()}
+  @callback stream(client :: map(), prompt :: String.t(), opts :: keyword()) :: {:ok, stream :: Enumerable.t()} | {:error, term()}
+end
+
+defmodule DSPex.LLM.Adapters.InstructorLite do
+  @moduledoc """
+  Adapter using InstructorLite for structured LLM interactions.
+  """
+  
+  @behaviour DSPex.LLM.Adapter
+  
+  def configure(provider, config) do
+    # Configure InstructorLite with the specified provider
+    {:ok, %{adapter: __MODULE__, provider: provider, config: config}}
+  end
+  
+  def generate(client, prompt, opts) do
+    # Use InstructorLite for structured generation
+    InstructorLite.instruct(
+      %{input: [%{role: "user", content: prompt}]},
+      Keyword.merge(opts, adapter_context: client.config)
+    )
+  end
+  
+  def stream(_client, _prompt, _opts) do
+    {:error, :streaming_not_supported}
   end
 end
 

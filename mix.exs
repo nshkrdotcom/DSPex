@@ -10,6 +10,7 @@ defmodule DSPex.MixProject do
       deps: deps(),
       dialyzer: dialyzer(),
       aliases: aliases(),
+      elixirc_paths: elixirc_paths(Mix.env()),
       preferred_cli_env: [
         check: :test,
         "check.ci": :test,
@@ -34,9 +35,15 @@ defmodule DSPex.MixProject do
     [
       # Core dependencies
       {:snakepit, github: "nshkrdotcom/snakepit"},
+      {:sinter, "~> 0.0.1"},
       {:jason, "~> 1.4"},
       {:telemetry, "~> 1.2"},
       {:telemetry_poller, "~> 1.0"},
+
+      # LLM adapters
+      {:instructor_lite, "~> 1.0"},
+      {:gemini_ex, "~> 0.0.3"},
+      {:req, "~> 0.5 or ~> 1.0"},
 
       # Development dependencies
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
@@ -44,6 +51,10 @@ defmodule DSPex.MixProject do
       {:ex_doc, "~> 0.31", only: :dev, runtime: false}
     ]
   end
+
+  # Specifies which paths to compile per environment
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   defp dialyzer do
     [

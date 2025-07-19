@@ -25,7 +25,8 @@ defmodule DSPex.Router do
     signature: DSPex.Native.Signature,
     template: DSPex.Native.Template,
     validator: DSPex.Native.Validator,
-    metrics: DSPex.Native.Metrics
+    metrics: DSPex.Native.Metrics,
+    lm_client: DSPex.LLM.Client
   }
 
   # Python module mappings

@@ -20,6 +20,7 @@ DSPex V2 is a complete rewrite that creates a native Elixir DSPy implementation 
 - Signatures: Always native (fast parsing, no Python overhead)
 - Templates: Native EEx implementation
 - Validators: Native for simple validations
+- LLM Clients: Adapter pattern with InstructorLite, HTTP, or Python backends
 - Complex ML: Delegate to Python (e.g., ColBERTv2, miprov2)
 
 ### 3. Protocol-Agnostic Bridge
@@ -51,6 +52,7 @@ DSPex V2 is a complete rewrite that creates a native Elixir DSPy implementation 
    - Template - EEx-based templating
    - Validator - Data validation
    - Metrics - Performance tracking
+   - LMClient - Adapter-based LLM integration
 
 5. **DSPex.Python.*** - Python bridge
    - Bridge - Snakepit integration
@@ -112,17 +114,23 @@ Three-layer testing architecture:
    - Create bridge scripts for DSPy modules
    - Test end-to-end integration
 
-2. **Additional Native Modules**
+2. **LLM Adapter Implementation**
+   - Add InstructorLite to dependencies
+   - Implement InstructorLite adapter
+   - Create HTTP adapter for direct API calls
+   - Test adapter switching and configuration
+
+3. **Additional Native Modules**
    - Implement more DSPy modules natively
    - Focus on performance-critical operations
    - Maintain API compatibility
 
-3. **Performance Optimization**
+4. **Performance Optimization**
    - Profile router decisions
    - Optimize serialization
    - Add caching where beneficial
 
-4. **Advanced Features**
+5. **Advanced Features**
    - Streaming support (pending Snakepit implementation)
    - Distributed execution
    - Model management

@@ -28,7 +28,9 @@ defmodule DSPex.Python.PoolManager do
   @doc """
   Check pool status.
   """
-  @spec status() :: %{status: :running | :not_available | :error, stats: map()} | %{status: :not_available | :error}
+  @spec status() ::
+          %{status: :running | :not_available | :error, stats: map()}
+          | %{status: :not_available | :error}
   def status do
     case Snakepit.get_stats() do
       stats when is_map(stats) ->

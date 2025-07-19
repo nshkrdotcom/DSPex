@@ -55,15 +55,16 @@ defmodule DSPex.Native.Template do
       # Create a module with the compiled template
       module_name = Module.concat([__MODULE__, Compiled, fun_name])
 
-      {:module, ^module_name, _, _} = Module.create(
-        module_name,
-        quote do
-          def render(var!(assigns)) do
-            unquote(ast)
-          end
-        end,
-        Macro.Env.location(__ENV__)
-      )
+      {:module, ^module_name, _, _} =
+        Module.create(
+          module_name,
+          quote do
+            def render(var!(assigns)) do
+              unquote(ast)
+            end
+          end,
+          Macro.Env.location(__ENV__)
+        )
 
       # Return a function that calls the compiled template
       fun = fn context ->
