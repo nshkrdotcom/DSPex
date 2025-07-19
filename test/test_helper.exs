@@ -1,4 +1,4 @@
-ExUnit.start()
+ExUnit.start(exclude: [:live])
 
 # Configure test mode based on environment variable
 test_mode = System.get_env("TEST_MODE", "mock_adapter")
