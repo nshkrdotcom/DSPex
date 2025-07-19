@@ -6,6 +6,7 @@ defmodule DSPex.MixProject do
       app: :dspex,
       version: "0.1.0",
       elixir: "~> 1.18",
+      erlang: "~> 27.0",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       dialyzer: dialyzer(),
@@ -18,7 +19,13 @@ defmodule DSPex.MixProject do
         "test.protocol": :test,
         "test.integration": :test,
         "test.all": :test
-      ]
+      ],
+      # Hex package configuration
+      description: description(),
+      package: package(),
+      docs: docs(),
+      name: "DSPex",
+      source_url: "https://github.com/nshkrdotcom/dspex"
     ]
   end
 
@@ -132,4 +139,68 @@ defmodule DSPex.MixProject do
 
     IO.puts("✅ All test layers completed!")
   end
+
+  defp description do
+    "DSPex: Native Elixir implementation of DSPy with Python integration via Snakepit. Enables gradual migration from Python DSPy to native Elixir implementations while supporting mixed execution pipelines."
+  end
+
+  defp package do
+    [
+      name: "dspex",
+      maintainers: ["NSHkr <ZeroTrust@NSHkr.com>"],
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => "https://github.com/nshkrdotcom/dspex",
+        "Documentation" => "https://hexdocs.pm/dspex"
+      },
+      files: ~w(lib priv .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
+    ]
+  end
+
+  defp docs do
+    [
+      main: "DSPex",
+      logo: "assets/logo.png",
+      extras: [
+        "README.md",
+        "CHANGELOG.md"
+      ],
+      groups_for_modules: [
+        "Core API": [
+          DSPex,
+          DSPex.Router,
+          DSPex.Pipeline
+        ],
+        "Native Implementations": [
+          DSPex.Native.Signature,
+          DSPex.Native.Template,
+          DSPex.Native.Validator,
+          DSPex.Native.Metrics
+        ],
+        "Python Bridge": [
+          DSPex.Python.Bridge,
+          DSPex.Python.Registry,
+          DSPex.Python.PoolManager
+        ]
+      ],
+      before_closing_body_tag: &mermaid_js/1
+    ]
+  end
+
+  defp mermaid_js(:html) do
+    """
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: document.body.className.includes("dark") ? "dark" : "default"
+        });
+        mermaid.init(undefined, ".language-mermaid");
+      });
+    </script>
+    """
+  end
+
+  defp mermaid_js(_), do: ""
 end
