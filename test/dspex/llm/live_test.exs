@@ -4,11 +4,11 @@ defmodule DSPex.LLM.LiveTest do
   alias DSPex.LLM.Client
   alias DSPex.TestSchemas.{SimpleResponse, MathProblem, CodeExample}
 
-  @moduletag :live_test
+  @moduletag :live
 
   # To run these tests:
   # 1. Set GEMINI_API_KEY environment variable
-  # 2. Run: mix test test/dspex/llm/live_test.exs --include live_test --exclude skip
+  # 2. Run: mix test test/dspex/llm/live_test.exs --include live --exclude skip
 
   describe "InstructorLite with Gemini" do
     test "creates default client with Gemini configuration" do

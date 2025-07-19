@@ -1,5 +1,9 @@
 # DSPex
 
+<p align="center">
+  <img src="assets/dspex-logo.svg" alt="DSPex Logo" width="200" height="200">
+</p>
+
 DSPex is a native Elixir implementation of [DSPy](https://github.com/stanfordnlp/dspy) (Declarative Self-improving Language Programs) that provides a unified interface for working with Large Language Models. It combines high-performance native Elixir implementations with Python DSPy integration through [Snakepit](https://github.com/nshkrdotcom/snakepit) for complex ML tasks.
 
 ## Features
@@ -227,7 +231,7 @@ mix dialyzer         # Type checking
 
 1. **InstructorLite + Gemini**: InstructorLite generates JSON schemas with `additionalProperties` that Gemini doesn't accept. Use the native Gemini adapter for Gemini models.
 
-2. **Python Environment**: Ensure Python with DSPy is properly installed for Python bridge features.
+2. **Python Environment**: Python with DSPy is required for Python bridge features. See [Snakepit setup instructions](https://github.com/nshkrdotcom/snakepit) for Python environment configuration.
 
 ## Roadmap
 

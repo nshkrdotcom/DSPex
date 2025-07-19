@@ -153,14 +153,14 @@ defmodule DSPex.MixProject do
         "GitHub" => "https://github.com/nshkrdotcom/dspex",
         "Documentation" => "https://hexdocs.pm/dspex"
       },
-      files: ~w(lib priv .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
+      files: ~w(lib priv assets .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
     ]
   end
 
   defp docs do
     [
       main: "DSPex",
-      logo: "assets/logo.png",
+      logo: "assets/dspex-logo.svg",
       extras: [
         "README.md",
         "CHANGELOG.md"
