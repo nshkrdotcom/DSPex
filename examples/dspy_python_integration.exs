@@ -123,15 +123,6 @@ defmodule DSPyPythonIntegration do
     end
   end
   
-  defp extract_result_value(result) when is_map(result) do
-    case result do
-      %{"value" => value} -> value
-      %{"type" => "str", "value" => value} -> value
-      _ -> inspect(result)
-    end
-  end
-  
-  defp extract_result_value(result), do: result
 
   defp python_working? do
     case Snakepit.execute("ping", %{}) do
