@@ -68,7 +68,7 @@ defmodule DSPex.Native.Template do
 
       # Return a function that calls the compiled template
       fun = fn context ->
-        assigns = atomize_keys(context)
+        assigns = DSPex.Native.Template.atomize_keys(context)
         apply(module_name, :render, [assigns])
       end
 
@@ -110,7 +110,8 @@ defmodule DSPex.Native.Template do
 
   # Private functions
 
-  defp atomize_keys(map) when is_map(map) do
+  @doc false
+  def atomize_keys(map) when is_map(map) do
     Map.new(map, fn
       {k, v} when is_binary(k) -> {String.to_atom(k), v}
       {k, v} when is_atom(k) -> {k, v}
