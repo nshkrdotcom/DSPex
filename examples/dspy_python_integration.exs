@@ -153,11 +153,11 @@ defmodule DSPyPythonIntegration do
     case Snakepit.execute("configure_lm", %{
       "provider" => "google", 
       "api_key" => api_key,
-      "model" => "gemini-2.0-flash-exp"
+      "model" => "gemini/gemini-2.0-flash-exp"
     }) do
       {:ok, result} ->
         IO.puts("      ✅ DSPy configured successfully with Gemini")
-        IO.puts("      📄 Model: gemini-2.0-flash-exp") 
+        IO.puts("      📄 Model: gemini/gemini-2.0-flash-exp") 
         if result["status"] == "ok" do
           IO.puts("      🔧 Configuration applied")
         end

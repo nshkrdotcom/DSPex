@@ -163,6 +163,14 @@ defmodule DSPex.Python.Bridge do
     {:error, error}
   end
 
+  defp handle_response(%{"status" => "ok", "result" => result}) do
+    {:ok, convert_response(result)}
+  end
+
+  defp handle_response(%{"status" => "error"} = response) do
+    {:error, response}
+  end
+
   defp handle_response(response) do
     Logger.warning("Unexpected response format: #{inspect(response)}")
     {:ok, response}

@@ -19,7 +19,7 @@ def test_gemini_direct():
         genai.configure(api_key=api_key)
         
         # Test with the specific model mentioned
-        model_name = "gemini-2.0-flash-exp"  # Updated model name
+        model_name = "gemini/gemini-2.0-flash-exp"  # Updated model name
         try:
             model = genai.GenerativeModel(model_name)
             response = model.generate_content("What is 2+2? Answer with just the number.")

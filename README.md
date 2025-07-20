@@ -15,6 +15,15 @@ DSPex is a native Elixir implementation of [DSPy](https://github.com/stanfordnlp
 - 📊 **Smart Routing**: Automatically chooses the best implementation (native vs Python)
 - 🏃 **Streaming Support**: Real-time streaming for supported providers (e.g., Gemini)
 
+## DSPy Integration
+
+DSPex provides comprehensive wrappers for all DSPy modules through Snakepit. See [DSPy Integration Guide](./README_DSPY_INTEGRATION.md) for details on:
+
+- All available DSPy modules (Predict, ChainOfThought, ReAct, etc.)
+- Optimizers (BootstrapFewShot, MIPRO, COPRO, etc.)  
+- Retrievers (ColBERTv2, 20+ vector databases)
+- Complete examples and usage patterns
+
 ## Installation
 
 Add `dspex` to your list of dependencies in `mix.exs`:
@@ -32,10 +41,10 @@ end
 ### Basic LLM Interaction
 
 ```elixir
-# Configure a client
+# Configure a client (Gemini 2.0 Flash recommended - fast and free tier)
 {:ok, client} = DSPex.lm_client(
   adapter: :gemini,
-  api_key: System.get_env("GEMINI_API_KEY"),
+  api_key: System.get_env("GOOGLE_API_KEY") || System.get_env("GEMINI_API_KEY"),
   model: "gemini-2.0-flash-exp"
 )
 
@@ -88,7 +97,7 @@ Native Google Gemini API integration with streaming support:
 ```elixir
 {:ok, client} = DSPex.lm_client(
   adapter: :gemini,
-  api_key: System.get_env("GEMINI_API_KEY"),
+  api_key: System.get_env("GOOGLE_API_KEY") || System.get_env("GEMINI_API_KEY"),
   model: "gemini-2.0-flash-exp",
   generation_config: %{
     temperature: 0.7,
@@ -117,9 +126,9 @@ end
 
 {:ok, client} = DSPex.lm_client(
   adapter: :instructor_lite,
-  provider: :openai,
-  api_key: System.get_env("OPENAI_API_KEY"),
-  model: "gpt-4o-mini"
+  provider: :gemini,
+  api_key: System.get_env("GOOGLE_API_KEY") || System.get_env("GEMINI_API_KEY"),
+  model: "gemini-2.0-flash-exp"
 )
 
 {:ok, person} = DSPex.lm_generate(
@@ -143,21 +152,39 @@ Generic adapter for any HTTP-based LLM API:
 
 ## Examples
 
-The `examples/` directory contains several example scripts:
+The `examples/` directory contains comprehensive examples demonstrating DSPex capabilities:
 
-- **qa_with_gemini_ex.exs** - Comprehensive Gemini usage including streaming, batch processing, and creative writing
-- **qa_simple_instructor_lite.exs** - Simple Q&A without structured output
-- **qa_with_instructor_lite.exs** - Structured data extraction with Ecto schemas
+### DSPy Integration Examples (`examples/dspy/`)
+
+- **00_dspy_mock_demo.exs** - Basic test to verify DSPy integration is working
+- **01_question_answering_pipeline.exs** - Core DSPy modules: Predict, ChainOfThought, optimization
+- **02_code_generation_system.exs** - Advanced reasoning with ProgramOfThought, ReAct, and Retry
+- **03_document_analysis_rag.exs** - Retrieval-augmented generation with ColBERTv2 and vector databases
+- **04_optimization_showcase.exs** - All DSPy optimizers and advanced features
+
+### Other Examples
+
 - **advanced_signature_example.exs** - Complex business scenarios:
   - Document intelligence and analysis
   - Customer support automation
   - Financial risk assessment
   - Product recommendation systems
 
-Run examples with:
+Run examples with any LLM provider:
 ```bash
-mix run examples/qa_with_gemini_ex.exs
+# With Gemini (recommended - fast and free tier)
+export GOOGLE_API_KEY=your-gemini-api-key
+mix run examples/dspy/01_question_answering_pipeline.exs
+
+# With OpenAI
+export OPENAI_API_KEY=your-openai-api-key
+# Then update the example's LM configuration
+
+# With Anthropic, Cohere, or any other provider
+# Set the appropriate API key and update the example's configuration
 ```
+
+**Note**: DSPy examples default to Gemini 2.0 Flash for its speed and free tier, but work with any supported LLM provider.
 
 ## Architecture
 

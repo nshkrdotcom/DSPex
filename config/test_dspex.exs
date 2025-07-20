@@ -12,7 +12,7 @@ config :dspex, :pool_debug_mode, true
 # Configure DSPy-specific settings
 config :dspex, :dspy_config,
   # Use Gemini as the default model
-  default_model: "gemini-2.0-flash-exp",
+  default_model: "gemini/gemini-2.0-flash-exp",
   api_key_env: "GEMINI_API_KEY",
 
   # Test-specific timeouts

@@ -53,7 +53,7 @@ defmodule ComprehensiveDSPyGemini do
       adapter: :gemini,
       provider: :gemini,
       api_key: api_key,
-      model: "gemini-2.0-flash-exp",
+      model: "gemini/gemini-2.0-flash-exp",
       temperature: 0.7,
       max_tokens: 1024
     ])
@@ -184,7 +184,7 @@ defmodule ComprehensiveDSPyGemini do
     case Snakepit.execute("configure_lm", %{
       "provider" => "google",
       "api_key" => api_key,
-      "model" => "gemini-2.0-flash-exp"
+      "model" => "gemini/gemini-2.0-flash-exp"
     }) do
       {:ok, result} ->
         IO.puts("   ✅ DSPy configured with Gemini")

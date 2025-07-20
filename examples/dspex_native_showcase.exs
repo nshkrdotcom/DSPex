@@ -59,7 +59,7 @@ defmodule DSPexNativeShowcase do
       adapter: :gemini,
       provider: :gemini,
       api_key: api_key,
-      model: "gemini-2.0-flash-exp",
+      model: "gemini/gemini-2.0-flash-exp",
       temperature: 0.7,
       max_tokens: 1024
     ]

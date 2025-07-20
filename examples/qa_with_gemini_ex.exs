@@ -24,7 +24,7 @@ defmodule QAWithGeminiEx do
       adapter: :gemini,
       provider: :gemini,
       api_key: System.get_env("GEMINI_API_KEY"),
-      model: "gemini-2.0-flash-exp"
+      model: "gemini/gemini-2.0-flash-exp"
     ]
     
     case DSPex.LLM.Client.new(config) do

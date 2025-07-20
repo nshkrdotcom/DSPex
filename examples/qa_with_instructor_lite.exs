@@ -62,7 +62,7 @@ defmodule QAWithInstructorLite do
       adapter: :instructor_lite,
       provider: :gemini,
       api_key: System.get_env("GEMINI_API_KEY"),
-      model: "gemini-2.0-flash-exp",
+      model: "gemini/gemini-2.0-flash-exp",
       response_model: Answer
     ]
     
@@ -151,7 +151,7 @@ defmodule QAWithInstructorLite do
       adapter: :instructor_lite,
       provider: :gemini,
       api_key: System.get_env("GEMINI_API_KEY"),
-      model: "gemini-2.0-flash-exp",
+      model: "gemini/gemini-2.0-flash-exp",
       response_model: CountryInfo
     ]
     

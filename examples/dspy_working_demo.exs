@@ -86,7 +86,7 @@ defmodule DSPyWorkingDemo do
     case Snakepit.execute("configure_lm", %{
       "provider" => "google",
       "api_key" => api_key,
-      "model" => "gemini-2.0-flash-exp"
+      "model" => "gemini/gemini-2.0-flash-exp"
     }) do
       {:ok, result} ->
         IO.puts("   ✅ DSPy configured with Gemini")

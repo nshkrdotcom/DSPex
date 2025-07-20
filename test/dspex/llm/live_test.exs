@@ -17,7 +17,7 @@ defmodule DSPex.LLM.LiveTest do
 
       assert client.adapter_type == :instructor_lite
       assert client.provider == :gemini
-      assert client.config.model == "gemini-2.0-flash-exp"
+      assert client.config.model == "gemini/gemini-2.0-flash-exp"
     end
 
     test "generates simple text response with HTTP adapter" do

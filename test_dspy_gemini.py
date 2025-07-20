@@ -30,7 +30,7 @@ def test_gemini_dspy():
         # This is a basic test to verify the connection works
         
         # Test direct Gemini connection first
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini/gemini-2.0-flash-exp')
         response = model.generate_content('What is 2+2? Please answer with just the number.')
         
         print(f"✅ Direct Gemini test successful: {response.text.strip()}")
@@ -39,7 +39,7 @@ def test_gemini_dspy():
         try:
             # DSPy might have different ways to configure Gemini
             # This is a placeholder that may need updates based on DSPy docs
-            lm = dspy.LM(model='gemini-2.0-flash-exp', api_key=api_key)
+            lm = dspy.LM(model='gemini/gemini-2.0-flash-exp', api_key=api_key)
             dspy.configure(lm=lm)
             
             # Simple signature test

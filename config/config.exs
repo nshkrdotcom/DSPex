@@ -4,14 +4,14 @@ import Config
 config :dspex, :llm,
   default_adapter: :instructor_lite,
   default_provider: :gemini,
-  default_model: "gemini-2.0-flash-exp",
+  default_model: "gemini/gemini-2.0-flash-exp",
   adapters: [
     instructor_lite: [
       default_provider: :gemini,
       providers: [
         gemini: [
           api_key: {:system, "GEMINI_API_KEY"},
-          model: "gemini-2.0-flash-exp"
+          model: "gemini/gemini-2.0-flash-exp"
         ],
         openai: [
           api_key: {:system, "OPENAI_API_KEY"}
@@ -24,7 +24,7 @@ config :dspex, :llm,
     gemini: [
       auth_strategy: :gemini,
       api_key: {:system, "GEMINI_API_KEY"},
-      model: "gemini-2.0-flash-exp"
+      model: "gemini/gemini-2.0-flash-exp"
     ],
     http: [
       timeout: 60_000,
