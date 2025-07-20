@@ -160,6 +160,7 @@ defmodule DSPex.MixProject do
   defp docs do
     [
       main: "DSPex",
+      assets: %{"assets" => "assets"},
       logo: "assets/dspex-logo.svg",
       extras: [
         "README.md",
