@@ -70,7 +70,6 @@ defmodule SimplePoolProof do
   defp wait_for_pool_warmup do
     # Give pools time to initialize Python workers
     IO.puts "  ⏱️  Waiting 5 seconds for Python workers to initialize..."
-    Process.sleep(5000)
     
     # Try a simple health check to verify pool is ready
     case DSPex.Adapters.PythonPoolV2.health_check() do

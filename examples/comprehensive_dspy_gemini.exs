@@ -177,7 +177,6 @@ defmodule ComprehensiveDSPyGemini do
     {:ok, _} = Application.ensure_all_started(:dspex)
     {:ok, _} = Application.ensure_all_started(:snakepit)
     
-    Process.sleep(2000)
   end
 
   defp configure_dspy(api_key) do

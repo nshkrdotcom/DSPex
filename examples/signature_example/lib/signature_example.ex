@@ -266,13 +266,10 @@ defmodule SignatureExample do
     Logger.info("🚀 Running All DSPex Dynamic Signature Examples\n")
     
     run_text_analysis_example()
-    Process.sleep(1000)
     
     run_translation_example()
-    Process.sleep(1000)
     
     run_content_enhancement_example()
-    Process.sleep(1000)
     
     run_creative_writing_example()
     

@@ -81,8 +81,7 @@ defmodule QAWithGeminiEx do
           on_complete: on_complete
         ]) do
           {:ok, _} ->
-            # Wait a bit for streaming to complete
-            Process.sleep(5000)
+            # Streaming completed
             
           {:error, reason} ->
             IO.puts("\nStreaming error: #{inspect(reason)}")

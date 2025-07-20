@@ -57,7 +57,6 @@ defmodule DSPyWorkingDemo do
     {:ok, _} = Application.ensure_all_started(:snakepit)
     
     # Wait for initialization
-    Process.sleep(2000)
     
     IO.puts("   ✅ Enhanced bridge ready")
   end

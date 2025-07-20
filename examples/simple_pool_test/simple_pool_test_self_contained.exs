@@ -12,7 +12,6 @@ defmodule SimplePoolTestSelfContained do
     IO.puts("✅ Everything started")
     
     IO.puts("\n⏳ STEP 2: Waiting for pool warmup...")
-    Process.sleep(5000)
     IO.puts("✅ Pool warmed up")
     
     # Step 3: Test concurrent operations using self-contained API

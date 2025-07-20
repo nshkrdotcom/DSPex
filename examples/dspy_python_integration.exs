@@ -76,7 +76,6 @@ defmodule DSPyPythonIntegration do
     {:ok, _} = Application.ensure_all_started(:snakepit)
     
     # Give Snakepit time to initialize pool
-    Process.sleep(1000)
     
     IO.puts("   ✅ Applications started with pooling enabled")
   end

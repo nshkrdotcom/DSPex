@@ -22,7 +22,6 @@ defmodule SimplePoolTest do
     
     # Step 2: Wait for warmup
     IO.puts "\n⏳ STEP 2: Waiting for pool warmup..."
-    Process.sleep(5000)
     IO.puts "✅ Pool warmed up"
     
     # Step 3: Test concurrent operations separately 
