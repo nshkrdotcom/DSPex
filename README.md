@@ -248,10 +248,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-[Add your license here]
+MIT
 
 ## Acknowledgments
 
 - [DSPy](https://github.com/stanfordnlp/dspy) - The original Python implementation
 - [Snakepit](https://github.com/nshkrdotcom/snakepit) - Python integration for Elixir
-- [InstructorLite](https://github.com/thmsmlr/instructor_lite) - Structured output library
+- [InstructorLite](https://github.com/martosaur/instructor_lite) - Structured output library
