@@ -42,7 +42,6 @@ defmodule DSPex.MixProject do
     [
       # Core dependencies
       {:snakepit, "~> 0.3.1"},
-      {:msgpax, "~> 2.3", override: true},
       {:sinter, "~> 0.0.1"},
       {:jason, "~> 1.4"},
       {:telemetry, "~> 1.2"},
