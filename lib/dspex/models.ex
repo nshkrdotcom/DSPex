@@ -1,10 +1,10 @@
 defmodule DSPex.Models do
   @moduledoc """
   Model configuration registry for DSPex.
-  
+
   Defines available models and their provider prefixes for use with DSPy.
   """
-  
+
   @models %{
     # Gemini models
     "gemini-2.0-flash-lite" => %{
@@ -12,14 +12,14 @@ defmodule DSPex.Models do
       full_name: "gemini/gemini-2.0-flash-lite"
     },
     "gemini-1.5-pro" => %{
-      provider: "gemini", 
+      provider: "gemini",
       full_name: "gemini/gemini-1.5-pro"
     },
     "gemini-1.5-flash" => %{
       provider: "gemini",
       full_name: "gemini/gemini-1.5-flash"
     },
-    
+
     # OpenAI models
     "gpt-4" => %{
       provider: "openai",
@@ -33,7 +33,7 @@ defmodule DSPex.Models do
       provider: "openai",
       full_name: "openai/gpt-3.5-turbo"
     },
-    
+
     # Anthropic models
     "claude-3-opus" => %{
       provider: "anthropic",
@@ -43,19 +43,19 @@ defmodule DSPex.Models do
       provider: "anthropic",
       full_name: "anthropic/claude-3-sonnet"
     },
-    
+
     # Mock models for testing
     "mock-gemini" => %{
       provider: "mock",
       full_name: "mock/gemini"
     }
   }
-  
+
   @doc """
   Get the full model name with provider prefix for DSPy.
-  
+
   ## Examples
-  
+
       iex> DSPex.Models.get_full_name("gemini-2.0-flash-lite")
       "gemini/gemini-2.0-flash-lite"
       
@@ -65,10 +65,11 @@ defmodule DSPex.Models do
   def get_full_name(model_name) do
     case @models[model_name] do
       %{full_name: full_name} -> full_name
-      nil -> model_name  # Return as-is if not in registry
+      # Return as-is if not in registry
+      nil -> model_name
     end
   end
-  
+
   @doc """
   Get the provider for a model.
   """
@@ -78,21 +79,21 @@ defmodule DSPex.Models do
       nil -> nil
     end
   end
-  
+
   @doc """
   Check if a model is registered.
   """
   def registered?(model_name) do
     Map.has_key?(@models, model_name)
   end
-  
+
   @doc """
   List all registered models.
   """
   def list_models do
     Map.keys(@models)
   end
-  
+
   @doc """
   List models by provider.
   """

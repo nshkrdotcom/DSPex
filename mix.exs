@@ -4,7 +4,7 @@ defmodule DSPex.MixProject do
   def project do
     [
       app: :dspex,
-      version: "0.1.0",
+      version: "0.1.1",
       elixir: "~> 1.18",
       erlang: "~> 27.0",
       start_permanent: Mix.env() == :prod,
@@ -41,7 +41,7 @@ defmodule DSPex.MixProject do
   defp deps do
     [
       # Core dependencies
-      {:snakepit, path: "./snakepit"},
+      {:snakepit, "~> 0.3.1"},
       {:msgpax, "~> 2.3", override: true},
       {:sinter, "~> 0.0.1"},
       {:jason, "~> 1.4"},

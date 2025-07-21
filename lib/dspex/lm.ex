@@ -28,7 +28,7 @@ defmodule DSPex.LM do
   def configure(model, opts \\ []) do
     # Look up the full model name with provider prefix
     full_model_name = DSPex.Models.get_full_name(model)
-    
+
     lm_config =
       %{
         model: full_model_name,
