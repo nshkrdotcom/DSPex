@@ -26,9 +26,12 @@ defmodule DSPex.LM do
       DSPex.LM.configure("ollama/llama2", api_base: "http://localhost:11434")
   """
   def configure(model, opts \\ []) do
+    # Look up the full model name with provider prefix
+    full_model_name = DSPex.Models.get_full_name(model)
+    
     lm_config =
       %{
-        model: model,
+        model: full_model_name,
         api_key: opts[:api_key],
         api_base: opts[:api_base],
         temperature: opts[:temperature],
