@@ -2,7 +2,7 @@
 
 ## Overview
 
-DSPex provides comprehensive Elixir wrappers for [DSPy](https://github.com/stanfordnlp/dspy) functionality through the high-performance [Snakepit](./snakepit) bridge. This integration enables you to use all DSPy modules, optimizers, and retrievers with idiomatic Elixir APIs while maintaining full compatibility with the Python ecosystem.
+DSPex provides comprehensive Elixir wrappers for [DSPy](https://github.com/stanfordnlp/dspy) functionality through the high-performance Snakepit bridge. This integration enables you to use all DSPy modules, optimizers, and retrievers with idiomatic Elixir APIs while maintaining full compatibility with the Python ecosystem.
 
 ## Architecture
 
@@ -127,7 +127,7 @@ DSPex.LM.azure("my-deployment",
 
 ## Examples
 
-See the [examples directory](./examples/dspy/) for complete demonstrations:
+See the examples directory for complete demonstrations:
 
 1. **Question Answering Pipeline** - Multi-stage QA with retrieval
 2. **Code Generation System** - Planning, implementation, and testing
@@ -143,7 +143,7 @@ See the [examples directory](./examples/dspy/) for complete demonstrations:
 
 ## Future: Dual Implementation Support
 
-DSPex is designed to support both Python DSPy and native Elixir implementations. As modules are ported to native Elixir, they will automatically be used for better performance while maintaining the same API. See [Dual Implementation Architecture](./docs/DUAL_IMPLEMENTATION_SUPPORT_SEAMLESS_20250719.md) for details.
+DSPex is designed to support both Python DSPy and native Elixir implementations. As modules are ported to native Elixir, they will automatically be used for better performance while maintaining the same API.
 
 ## Requirements
 

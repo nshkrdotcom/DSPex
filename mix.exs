@@ -164,6 +164,7 @@ defmodule DSPex.MixProject do
       logo: "assets/dspex-logo.svg",
       extras: [
         "README.md",
+        "README_DSPY_INTEGRATION.md",
         "CHANGELOG.md"
       ],
       groups_for_modules: [
