@@ -31,7 +31,7 @@ Add `dspex` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:dspex, "~> 0.1.1"}
+    {:dspex, "~> 0.1.2"}
   ]
 end
 ```
@@ -45,7 +45,7 @@ end
 {:ok, client} = DSPex.lm_client(
   adapter: :gemini,
   api_key: System.get_env("GOOGLE_API_KEY") || System.get_env("GEMINI_API_KEY"),
-  model: "gemini-2.0-flash-exp"
+  model: "gemini-2.0-flash-lite"
 )
 
 # Generate a response
@@ -98,7 +98,7 @@ Native Google Gemini API integration with streaming support:
 {:ok, client} = DSPex.lm_client(
   adapter: :gemini,
   api_key: System.get_env("GOOGLE_API_KEY") || System.get_env("GEMINI_API_KEY"),
-  model: "gemini-2.0-flash-exp",
+  model: "gemini-2.0-flash-lite",
   generation_config: %{
     temperature: 0.7,
     max_output_tokens: 1000
@@ -128,7 +128,7 @@ end
   adapter: :instructor_lite,
   provider: :gemini,
   api_key: System.get_env("GOOGLE_API_KEY") || System.get_env("GEMINI_API_KEY"),
-  model: "gemini-2.0-flash-exp"
+  model: "gemini-2.0-flash-lite"
 )
 
 {:ok, person} = DSPex.lm_generate(
@@ -161,9 +161,18 @@ The `examples/` directory contains comprehensive examples demonstrating DSPex ca
 - **02_code_generation_system.exs** - Advanced reasoning with ProgramOfThought, ReAct, and Retry
 - **03_document_analysis_rag.exs** - Retrieval-augmented generation with ColBERTv2 and vector databases
 - **04_optimization_showcase.exs** - All DSPy optimizers and advanced features
+- **05_streaming_inference_pipeline.exs** - Streaming ML inference demonstrations
+- **simple_qa_demo.exs** - Simple question-answering with DSPy
+- **grpc_qa_demo.exs** - DSPy over gRPC transport (requires Snakepit v0.3.3+)
+- **debug_qa_demo.exs** - Debugging tools for DSPy integration
+- **adapter_comparison.exs** - Compare EnhancedPython vs gRPC adapters
 
-### Other Examples
+### Quick Start Examples
 
+- **qa_with_gemini_ex.exs** - Native Gemini adapter example
+- **qa_with_instructor_lite.exs** - Structured output with InstructorLite
+- **dspy_python_integration.exs** - Python DSPy bridge demonstration
+- **comprehensive_dspy_gemini.exs** - Full DSPy features with Gemini
 - **advanced_signature_example.exs** - Complex business scenarios:
   - Document intelligence and analysis
   - Customer support automation
@@ -174,17 +183,20 @@ Run examples with any LLM provider:
 ```bash
 # With Gemini (recommended - fast and free tier)
 export GOOGLE_API_KEY=your-gemini-api-key
-mix run examples/dspy/01_question_answering_pipeline.exs
+mix run examples/dspy/simple_qa_demo.exs
+
+# Run gRPC transport demo (requires gRPC dependencies)
+mix run examples/dspy/grpc_qa_demo.exs
 
 # With OpenAI
 export OPENAI_API_KEY=your-openai-api-key
-# Then update the example's LM configuration
+# Then update the example's config.exs
 
 # With Anthropic, Cohere, or any other provider
-# Set the appropriate API key and update the example's configuration
+# Set the appropriate API key and update config.exs
 ```
 
-**Note**: DSPy examples default to Gemini 2.0 Flash for its speed and free tier, but work with any supported LLM provider.
+**Note**: DSPy examples default to Gemini 2.0 Flash Lite for its speed and free tier, but work with any supported LLM provider.
 
 ## Architecture
 

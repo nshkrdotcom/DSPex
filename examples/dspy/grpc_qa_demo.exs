@@ -14,10 +14,14 @@ require Logger
 Application.load(:snakepit)
 Application.load(:dspex)
 
-# Configure Snakepit for gRPC
+# Configure Snakepit for gRPC with DSPy adapter
 Application.put_env(:snakepit, :pooling_enabled, true)
 Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.GRPCPython)
-Application.put_env(:snakepit, :pool_config, %{pool_size: 1})
+Application.put_env(:snakepit, :pool_config, %{
+  pool_size: 1,
+  # Use the DSPy-enabled gRPC adapter
+  adapter_args: ["--adapter", "snakepit_bridge.adapters.dspy_grpc.DSPyGRPCHandler"]
+})
 
 # Configure gRPC settings
 Application.put_env(:snakepit, :grpc_config, %{
@@ -88,7 +92,8 @@ defmodule GRPCDemo do
       question: "What is the speed of light?"
     })
     
-    answer = get_in(result, ["result", "prediction_data", "answer"]) || "No answer found"
+    # Extract the answer from the result
+    answer = get_in(result, ["result", "outputs", "answer"]) || "No answer found"
     IO.puts("Q: What is the speed of light?")
     IO.puts("A: #{answer}")
     
@@ -100,8 +105,9 @@ defmodule GRPCDemo do
       question: "Why is the sky blue?"
     })
     
-    reasoning = get_in(result, ["result", "prediction_data", "reasoning"]) || "No reasoning found"
-    answer = get_in(result, ["result", "prediction_data", "answer"]) || "No answer found"
+    # Extract the reasoning and answer from the result
+    reasoning = get_in(result, ["result", "outputs", "reasoning"]) || "No reasoning found"
+    answer = get_in(result, ["result", "outputs", "answer"]) || "No answer found"
     
     IO.puts("Q: Why is the sky blue?")
     IO.puts("\nReasoning: #{reasoning}")
@@ -116,7 +122,8 @@ defmodule GRPCDemo do
       question: "In which country is the Eiffel Tower located?"
     })
     
-    answer = get_in(result, ["result", "prediction_data", "answer"]) || "No answer found"
+    # Extract the answer from the result
+    answer = get_in(result, ["result", "outputs", "answer"]) || "No answer found"
     IO.puts("Context: Paris is the capital of France. The Eiffel Tower is in Paris.")
     IO.puts("Q: In which country is the Eiffel Tower located?")
     IO.puts("A: #{answer}")

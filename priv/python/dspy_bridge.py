@@ -243,8 +243,14 @@ class DSPyBridge:
                 # Configure with proper LiteLLM format for Google AI Studio API (not Vertex AI)
                 try:
                     # Method 1: Force Google AI Studio with gemini/ prefix
+                    # Note: Use model as-is if it already has provider prefix
+                    if "/" in model:
+                        model_name = model
+                    else:
+                        model_name = f"gemini/{model}"
+                    
                     lm = dspy.LM(
-                        model=f"gemini/{model}",
+                        model=model_name,
                         api_key=api_key,
                         temperature=temperature
                     )
