@@ -153,7 +153,7 @@ defmodule DSPex.MixProject do
         "GitHub" => "https://github.com/nshkrdotcom/dspex",
         "Documentation" => "https://hexdocs.pm/dspex"
       },
-      files: ~w(lib priv/python/*.py priv/plts assets .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
+      files: ~w(lib priv/python/*.py .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
     ]
   end
 
