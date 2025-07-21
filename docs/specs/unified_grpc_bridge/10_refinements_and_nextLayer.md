@@ -21,14 +21,14 @@ The gRPC plan is not a lesser version of the vision; it's a different, lower-lev
 
 ```mermaid
 graph LR
-    subgraph "Omar's Vision (Cognitive Architecture)"
+    subgraph "Omar's&nbsp;Vision&nbsp;(Cognitive&nbsp;Architecture)"
         A["Cognitive Control Planes (e.g., Manager Agents)"]
         B["Multi-Objective Optimizers (SIMBA, BEACON)"]
         C["Self-Modifying Systems (Self-Scaffolding)"]
         D["Dynamic Team Composition (MABEAM)"]
     end
 
-    subgraph "Unified gRPC Bridge (Foundational Layer)"
+    subgraph "Unified&nbsp;gRPC&nbsp;Bridge&nbsp;(Foundational&nbsp;Layer)"
         E["Elixir SessionStore (Unified State)"]
         F["gRPC RPCs (Get/Set/WatchVariable)"]
         G["Python SessionContext (State Cache & Proxy)"]
