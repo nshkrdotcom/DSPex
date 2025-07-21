@@ -20,7 +20,7 @@ First, it's important to understand the different levels of abstraction:
 The gRPC plan is not a lesser version of the vision; it's a different, lower-level layer of the stack that is required to make the vision possible in a hybrid Elixir/Python environment.
 
 ```mermaid
-graph TD
+graph LR
     subgraph "Omar's Vision (Cognitive Architecture)"
         A["Cognitive Control Planes (e.g., Manager Agents)"]
         B["Multi-Objective Optimizers (SIMBA, BEACON)"]
