@@ -6,9 +6,7 @@
 # showing what's possible without Python dependencies.
 
 Mix.install([
-  {:dspex, path: Path.expand("..", __DIR__)},
-  {:gemini_ex, "~> 0.0.3"},
-  {:snakepit, github: "nshkrdotcom/snakepit"}
+  {:dspex, path: Path.expand("..", __DIR__)}
 ])
 
 defmodule DSPexNativeShowcase do
@@ -25,10 +23,13 @@ defmodule DSPexNativeShowcase do
   alias DSPex.{Native, LLM}
 
   def run do
-    IO.puts("🚀 === DSPex Native Features with Gemini 2.5 Flash ===\n")
+    IO.puts("🚀 === DSPex Native Features with Gemini ===\n")
     
-    # Check API key
-    api_key = System.get_env("GEMINI_API_KEY")
+    # Load config
+    config_path = Path.join(__DIR__, "config.exs")
+    config_data = Code.eval_file(config_path) |> elem(0)
+    api_key = config_data.api_key
+    
     unless api_key do
       IO.puts("❌ Error: Please set GEMINI_API_KEY environment variable")
       IO.puts("   Get an API key from: https://makersuite.google.com/app/apikey")
@@ -39,7 +40,7 @@ defmodule DSPexNativeShowcase do
     {:ok, _} = Application.ensure_all_started(:dspex)
     
     # Configure LLM client
-    client = configure_gemini_client(api_key)
+    client = configure_gemini_client(api_key, config_data)
     
     # Run native feature demonstrations
     demo_signature_system()
@@ -52,14 +53,14 @@ defmodule DSPexNativeShowcase do
 
   # === Configuration ===
   
-  defp configure_gemini_client(api_key) do
-    IO.puts("⚙️  Configuring Gemini 2.5 Flash Client...")
+  defp configure_gemini_client(api_key, config_data) do
+    IO.puts("⚙️  Configuring Gemini Client...")
     
     config = [
       adapter: :gemini,
       provider: :gemini,
       api_key: api_key,
-      model: "gemini/gemini-2.0-flash-exp",
+      model: config_data.model,
       temperature: 0.7,
       max_tokens: 1024
     ]

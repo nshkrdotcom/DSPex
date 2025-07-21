@@ -3,9 +3,7 @@
 # Question-Answer example using Gemini adapter (gemini_ex) with Gemini Flash 2.0
 
 Mix.install([
-  {:dspex, path: Path.expand("..", __DIR__)},
-  {:gemini_ex, "~> 0.0.3"},
-  {:sinter, "~> 0.0.1"}
+  {:dspex, path: Path.expand("..", __DIR__)}
 ])
 
 defmodule QAWithGeminiEx do
@@ -19,12 +17,16 @@ defmodule QAWithGeminiEx do
   def run do
     IO.puts("\n=== Question-Answer Example with Gemini Adapter ===\n")
     
+    # Load config
+    config_path = Path.join(__DIR__, "config.exs")
+    config_data = Code.eval_file(config_path) |> elem(0)
+    
     # Configure the LLM client
     config = [
       adapter: :gemini,
       provider: :gemini,
-      api_key: System.get_env("GEMINI_API_KEY"),
-      model: "gemini/gemini-2.0-flash-exp"
+      api_key: config_data.api_key,
+      model: config_data.model
     ]
     
     case DSPex.LLM.Client.new(config) do
@@ -82,7 +84,7 @@ defmodule QAWithGeminiEx do
         ]) do
           {:ok, _} ->
             # Streaming completed
-            
+            :ok
           {:error, reason} ->
             IO.puts("\nStreaming error: #{inspect(reason)}")
         end

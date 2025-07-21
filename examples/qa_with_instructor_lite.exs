@@ -5,8 +5,7 @@
 Mix.install([
   {:dspex, path: Path.expand("..", __DIR__)},
   {:instructor_lite, "~> 1.0"},
-  {:ecto, "~> 3.10"},
-  {:sinter, "~> 0.0.1"}
+  {:ecto, "~> 3.10"}
 ])
 
 defmodule QAWithInstructorLite do
@@ -57,12 +56,16 @@ defmodule QAWithInstructorLite do
   def run do
     IO.puts("\n=== Structured Q&A Example with InstructorLite Adapter ===\n")
     
+    # Load config
+    config_path = Path.join(__DIR__, "config.exs")
+    config_data = Code.eval_file(config_path) |> elem(0)
+    
     # Configure the LLM client with response model
     config = [
       adapter: :instructor_lite,
       provider: :gemini,
-      api_key: System.get_env("GEMINI_API_KEY"),
-      model: "gemini/gemini-2.0-flash-exp",
+      api_key: config_data.api_key,
+      model: config_data.model,
       response_model: Answer
     ]
     
@@ -147,11 +150,15 @@ defmodule QAWithInstructorLite do
   end
   
   defp demo_complex_schema do
+    # Load config
+    config_path = Path.join(__DIR__, "config.exs")
+    config_data = Code.eval_file(config_path) |> elem(0)
+    
     config = [
       adapter: :instructor_lite,
       provider: :gemini,
-      api_key: System.get_env("GEMINI_API_KEY"),
-      model: "gemini/gemini-2.0-flash-exp",
+      api_key: config_data.api_key,
+      model: config_data.model,
       response_model: CountryInfo
     ]
     

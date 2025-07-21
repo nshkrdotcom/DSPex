@@ -6,9 +6,7 @@
 # with explicit pooling configuration to ensure it works.
 
 Mix.install([
-  {:dspex, path: Path.expand("..", __DIR__)},
-  {:gemini_ex, "~> 0.0.3"},
-  {:snakepit, github: "nshkrdotcom/snakepit"}
+  {:dspex, path: Path.expand("..", __DIR__)}
 ])
 
 defmodule DSPyPythonIntegration do
@@ -17,10 +15,13 @@ defmodule DSPyPythonIntegration do
   """
 
   def run do
-    IO.puts("🐍 === DSPy Python Integration with Gemini 2.5 Flash ===\n")
+    IO.puts("🐍 === DSPy Python Integration with Gemini ===\n")
     
-    # Check API key
-    api_key = System.get_env("GEMINI_API_KEY")
+    # Load config
+    config_path = Path.join(__DIR__, "config.exs")
+    config_data = Code.eval_file(config_path) |> elem(0)
+    api_key = config_data.api_key
+    
     unless api_key do
       IO.puts("❌ Error: Please set GEMINI_API_KEY environment variable")
       IO.puts("   Get an API key from: https://makersuite.google.com/app/apikey")
@@ -38,7 +39,7 @@ defmodule DSPyPythonIntegration do
     
     # Test DSPy integration if Python works
     if python_working?() do
-      test_dspy_integration(api_key)
+      test_dspy_integration(api_key, config_data)
     else
       IO.puts("⚠️  Python environment issues detected. DSPy integration skipped.")
       show_python_setup_instructions()
@@ -132,11 +133,11 @@ defmodule DSPyPythonIntegration do
 
   # === DSPy Integration Testing ===
   
-  defp test_dspy_integration(api_key) do
+  defp test_dspy_integration(api_key, config_data) do
     IO.puts("\n🧠 Testing DSPy Integration:")
     
     # Test 1: DSPy Configuration
-    test_dspy_configuration(api_key)
+    test_dspy_configuration(api_key, config_data)
     
     # Test 2: Basic DSPy Modules
     test_basic_dspy_modules()
@@ -145,18 +146,18 @@ defmodule DSPyPythonIntegration do
     test_dspy_prediction()
   end
 
-  defp test_dspy_configuration(api_key) do
+  defp test_dspy_configuration(api_key, config_data) do
     IO.puts("   1️⃣  Testing DSPy Configuration:")
     
     # Use the enhanced bridge's DSPy configuration
     case Snakepit.execute("configure_lm", %{
       "provider" => "google", 
       "api_key" => api_key,
-      "model" => "gemini/gemini-2.0-flash-exp"
+      "model" => config_data.model
     }) do
       {:ok, result} ->
         IO.puts("      ✅ DSPy configured successfully with Gemini")
-        IO.puts("      📄 Model: gemini/gemini-2.0-flash-exp") 
+        IO.puts("      📄 Model: #{config_data.model}") 
         if result["status"] == "ok" do
           IO.puts("      🔧 Configuration applied")
         end

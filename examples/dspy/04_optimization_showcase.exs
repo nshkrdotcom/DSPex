@@ -18,11 +18,14 @@ Application.stop(:snakepit)
 # Initialize DSPex
 {:ok, _} = DSPex.Config.init()
 
-# Configure Gemini 2.0 Flash as default if available
-api_key = System.get_env("GOOGLE_API_KEY") || System.get_env("GEMINI_API_KEY")
+# Load config and configure Gemini as default if available
+config_path = Path.join(__DIR__, "../config.exs")
+config_data = Code.eval_file(config_path) |> elem(0)
+api_key = config_data.api_key
+
 if api_key do
-  IO.puts("Configuring Gemini 2.0 Flash as primary LM...")
-  DSPex.LM.configure("gemini/gemini-2.0-flash", api_key: api_key)
+  IO.puts("Configuring Gemini as primary LM...")
+  DSPex.LM.configure(config_data.model, api_key: api_key)
 end
 
 # Configure LM with different providers
@@ -59,8 +62,11 @@ defmodule OptimizationShowcase do
     IO.puts("1. Language Model Providers")
     IO.puts("---------------------------")
     
+    config_path = Path.join(__DIR__, "../config.exs")
+    config_data = Code.eval_file(config_path) |> elem(0)
+    
     providers = [
-      {:gemini, "gemini/gemini-2.0-flash-exp", System.get_env("GOOGLE_API_KEY") || System.get_env("GEMINI_API_KEY")},
+      {:gemini, config_data.model, config_data.api_key},
       {:openai, "gpt-4", System.get_env("OPENAI_API_KEY")},
       {:anthropic, "claude-3-opus-20240229", System.get_env("ANTHROPIC_API_KEY")},
       {:ollama, "llama2", nil}
@@ -85,10 +91,11 @@ defmodule OptimizationShowcase do
     end
     
     # Use Gemini or mock for the rest of the demo
-    api_key = System.get_env("GOOGLE_API_KEY") || System.get_env("GEMINI_API_KEY")
-    if api_key do
-      DSPex.LM.configure("gemini/gemini-2.0-flash", api_key: api_key)
-      IO.puts("\nUsing Gemini 2.0 Flash for optimization demos")
+    config_path = Path.join(__DIR__, "../config.exs")
+    config_data = Code.eval_file(config_path) |> elem(0)
+    if config_data.api_key do
+      DSPex.LM.configure(config_data.model, api_key: config_data.api_key)
+      IO.puts("\nUsing Gemini for optimization demos")
     else
       DSPex.LM.configure("mock/gemini")
       IO.puts("\nUsing mock LM for optimization demos (set GOOGLE_API_KEY for real results)")
@@ -230,9 +237,10 @@ defmodule OptimizationShowcase do
     IO.puts("Setting up mock advanced configuration...")
     
     # Basic LM configuration that works
-    api_key = System.get_env("GOOGLE_API_KEY") || System.get_env("GEMINI_API_KEY")
-    if api_key do
-      DSPex.LM.configure("gemini/gemini-2.0-flash", api_key: api_key, temperature: 0.7)
+    config_path = Path.join(__DIR__, "../config.exs")
+    config_data = Code.eval_file(config_path) |> elem(0)
+    if config_data.api_key do
+      DSPex.LM.configure(config_data.model, api_key: config_data.api_key, temperature: 0.7)
     else
       DSPex.LM.configure("mock/gemini")
     end

@@ -20,9 +20,13 @@ Application.stop(:snakepit)
 
 IO.puts("Testing LM Configuration...\n")
 
+# Load config
+config_path = Path.join(__DIR__, "../config.exs")
+config_data = Code.eval_file(config_path) |> elem(0)
+
 # Test 1: Check if we can create an LM
 IO.puts("1. Creating LM instance...")
-case Snakepit.Python.call("dspy.LM", %{model: "gemini/gemini-2.0-flash"}, store_as: "test_lm") do
+case Snakepit.Python.call("dspy.LM", %{model: config_data.model}, store_as: "test_lm") do
   {:ok, result} ->
     IO.puts("✓ LM created successfully")
     IO.inspect(result, label: "LM Result")

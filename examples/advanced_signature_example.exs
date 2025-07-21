@@ -5,9 +5,7 @@
 # Run with: elixir examples/advanced_signature_example.exs
 
 Mix.install([
-  {:dspex, path: Path.expand("..", __DIR__)},
-  {:gemini_ex, "~> 0.0.3"},
-  {:snakepit, github: "nshkrdotcom/snakepit"}
+  {:dspex, path: Path.expand("..", __DIR__)}
 ])
 
 defmodule AdvancedSignatureExample do
@@ -39,15 +37,18 @@ defmodule AdvancedSignatureExample do
   # === Client Configuration ===
   
   defp configure_client do
-    api_key = System.get_env("GEMINI_API_KEY")
+    # Load config
+    config_path = Path.join(__DIR__, "config.exs")
+    config_data = Code.eval_file(config_path) |> elem(0)
+    api_key = config_data.api_key
     
     config = if api_key && api_key != "" do
-      IO.puts("🔑 Using Gemini 2.0 Flash with API key")
+      IO.puts("🔑 Using Gemini with API key")
       [
         adapter: :gemini,
         provider: :gemini,
         api_key: api_key,
-        model: "gemini/gemini-2.0-flash-exp",
+        model: config_data.model,
         temperature: 0.7,
         max_tokens: 2048
       ]

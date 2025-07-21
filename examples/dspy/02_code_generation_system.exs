@@ -18,11 +18,14 @@ Application.stop(:snakepit)
 # Initialize DSPex
 {:ok, _} = DSPex.Config.init()
 
-# Configure Gemini 2.0 Flash as default language model
-api_key = System.get_env("GOOGLE_API_KEY") || System.get_env("GEMINI_API_KEY")
+# Load config and configure Gemini as default language model
+config_path = Path.join(__DIR__, "../config.exs")
+config_data = Code.eval_file(config_path) |> elem(0)
+api_key = config_data.api_key
+
 if api_key do
-  IO.puts("Configuring Gemini 2.0 Flash for code generation...")
-  DSPex.LM.configure("gemini/gemini-2.0-flash", api_key: api_key)
+  IO.puts("Configuring Gemini for code generation...")
+  DSPex.LM.configure(config_data.model, api_key: api_key)
 else
   IO.puts("WARNING: No Gemini API key found!")
   IO.puts("Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")

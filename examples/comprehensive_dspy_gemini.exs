@@ -6,9 +6,7 @@
 # Run with: elixir examples/comprehensive_dspy_gemini.exs
 
 Mix.install([
-  {:dspex, path: Path.expand("..", __DIR__)},
-  {:gemini_ex, "~> 0.0.3"},
-  {:snakepit, github: "nshkrdotcom/snakepit"}
+  {:dspex, path: Path.expand("..", __DIR__)}
 ])
 
 defmodule ComprehensiveDSPyGemini do
@@ -19,30 +17,33 @@ defmodule ComprehensiveDSPyGemini do
   alias DSPex.{Native, LLM}
 
   def run do
-    IO.puts("🚀 === Comprehensive DSPy + DSPex with Gemini 2.5 Flash ===\n")
+    IO.puts("🚀 === Comprehensive DSPy + DSPex with Gemini ===\n")
     
-    # Check API key
-    api_key = System.get_env("GEMINI_API_KEY")
+    # Load config
+    config_path = Path.join(__DIR__, "config.exs")
+    config_data = Code.eval_file(config_path) |> elem(0)
+    api_key = config_data.api_key
+    
     unless api_key do
       IO.puts("❌ Error: Please set GEMINI_API_KEY environment variable")
       System.halt(1)
     end
 
     # Part 1: Native DSPex Features
-    demo_native_features(api_key)
+    demo_native_features(api_key, config_data)
     
     # Part 2: Python DSPy Integration
-    demo_python_dspy(api_key)
+    demo_python_dspy(api_key, config_data)
     
     # Part 3: Mixed Pipeline
-    demo_mixed_pipeline(api_key)
+    demo_mixed_pipeline(api_key, config_data)
     
     IO.puts("\n✅ === Comprehensive Example Complete ===")
   end
 
   # === Part 1: Native DSPex Features ===
   
-  defp demo_native_features(api_key) do
+  defp demo_native_features(api_key, config_data) do
     IO.puts("\n🔧 === Part 1: Native DSPex Features ===\n")
     
     # Start DSPex
@@ -53,7 +54,7 @@ defmodule ComprehensiveDSPyGemini do
       adapter: :gemini,
       provider: :gemini,
       api_key: api_key,
-      model: "gemini/gemini-2.0-flash-exp",
+      model: config_data.model,
       temperature: 0.7,
       max_tokens: 1024
     ])
@@ -147,7 +148,7 @@ defmodule ComprehensiveDSPyGemini do
 
   # === Part 2: Python DSPy Integration ===
   
-  defp demo_python_dspy(api_key) do
+  defp demo_python_dspy(api_key, config_data) do
     IO.puts("\n\n🐍 === Part 2: Python DSPy Integration ===\n")
     
     # Configure enhanced bridge
@@ -155,7 +156,7 @@ defmodule ComprehensiveDSPyGemini do
     
     # Configure DSPy
     IO.puts("⚙️  2.1 Configuring Python DSPy:")
-    configure_dspy(api_key)
+    configure_dspy(api_key, config_data)
     
     # Create DSPy modules
     IO.puts("\n📚 2.2 Creating DSPy Modules:")
@@ -179,11 +180,11 @@ defmodule ComprehensiveDSPyGemini do
     
   end
 
-  defp configure_dspy(api_key) do
+  defp configure_dspy(api_key, config_data) do
     case Snakepit.execute("configure_lm", %{
       "provider" => "google",
       "api_key" => api_key,
-      "model" => "gemini/gemini-2.0-flash-exp"
+      "model" => config_data.model
     }) do
       {:ok, result} ->
         IO.puts("   ✅ DSPy configured with Gemini")
@@ -261,7 +262,7 @@ defmodule ComprehensiveDSPyGemini do
 
   # === Part 3: Mixed Pipeline ===
   
-  defp demo_mixed_pipeline(_api_key) do
+  defp demo_mixed_pipeline(_api_key, _config_data) do
     IO.puts("\n\n🔀 === Part 3: Mixed DSPex + DSPy Pipeline ===\n")
     
     # This demonstrates how to combine native and Python components

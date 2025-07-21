@@ -7,8 +7,10 @@ Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.EnhancedPython
 Application.put_env(:snakepit, :wire_protocol, :auto)
 Application.put_env(:snakepit, :pool_config, %{pool_size: 2})
 
-# Configure Gemini API key from environment
-api_key = System.get_env("GOOGLE_API_KEY") || System.get_env("GEMINI_API_KEY")
+# Load config
+config_path = Path.join(__DIR__, "../config.exs")
+config_data = Code.eval_file(config_path) |> elem(0)
+api_key = config_data.api_key
 
 # Stop and restart applications if already started
 Application.stop(:dspex)
@@ -24,10 +26,10 @@ IO.puts("\n✓ DSPex initialized successfully!")
 IO.puts("  DSPy version: #{config.dspy_version}")
 IO.puts("  Status: #{config.status}")
 
-# Configure Gemini 2.0 Flash as default LM
+# Configure Gemini as default LM
 if api_key do
-  IO.puts("\n✓ Configuring Gemini 2.0 Flash...")
-  {:ok, _} = DSPex.LM.configure("gemini/gemini-2.0-flash", api_key: api_key)
+  IO.puts("\n✓ Configuring Gemini...")
+  {:ok, _} = DSPex.LM.configure(config_data.model, api_key: api_key)
   IO.puts("  Gemini API key found and configured")
 else
   IO.puts("\n⚠ No Gemini API key found. Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")

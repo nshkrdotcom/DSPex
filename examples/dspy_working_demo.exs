@@ -5,9 +5,7 @@
 # Demonstrates confirmed working Python DSPy integration through enhanced Snakepit bridge
 
 Mix.install([
-  {:dspex, path: Path.expand("..", __DIR__)},
-  {:gemini_ex, "~> 0.0.3"},
-  {:snakepit, github: "nshkrdotcom/snakepit"}
+  {:dspex, path: Path.expand("..", __DIR__)}
 ])
 
 defmodule DSPyWorkingDemo do
@@ -20,8 +18,11 @@ defmodule DSPyWorkingDemo do
   def run do
     IO.puts("🎯 === Working DSPy Integration Demo ===\n")
     
-    # Check API key
-    api_key = System.get_env("GEMINI_API_KEY")
+    # Load config
+    config_path = Path.join(__DIR__, "config.exs")
+    config_data = Code.eval_file(config_path) |> elem(0)
+    api_key = config_data.api_key
+    
     unless api_key do
       IO.puts("❌ Error: Please set GEMINI_API_KEY environment variable")
       System.halt(1)
@@ -32,7 +33,7 @@ defmodule DSPyWorkingDemo do
     
     # Run working demos
     demo_environment_check()
-    demo_dspy_configuration(api_key)
+    demo_dspy_configuration(api_key, config_data)
     demo_module_creation()
     demo_prediction_with_correct_format()
     
@@ -79,13 +80,13 @@ defmodule DSPyWorkingDemo do
     end
   end
 
-  defp demo_dspy_configuration(api_key) do
+  defp demo_dspy_configuration(api_key, config_data) do
     IO.puts("\n⚙️  DSPy Configuration:")
     
     case Snakepit.execute("configure_lm", %{
       "provider" => "google",
       "api_key" => api_key,
-      "model" => "gemini/gemini-2.0-flash-exp"
+      "model" => config_data.model
     }) do
       {:ok, result} ->
         IO.puts("   ✅ DSPy configured with Gemini")
