@@ -43,7 +43,7 @@ defmodule DSPex.Native.Template do
 
   Returns a compiled template function that can be called with context.
   """
-  @spec compile(String.t()) :: {:ok, (map() -> any())} | {:error, term()}
+  @spec compile(binary()) :: {:ok, (map() -> any())} | {:error, Exception.t()}
   def compile(template) when is_binary(template) do
     try do
       # Generate a unique function name

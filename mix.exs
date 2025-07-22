@@ -41,7 +41,8 @@ defmodule DSPex.MixProject do
   defp deps do
     [
       # Core dependencies
-      {:snakepit, "~> 0.3.3"},
+      #      {:snakepit, "~> 0.3.3"},
+      {:snakepit, path: "./snakepit"},
       {:sinter, "~> 0.0.1"},
       {:jason, "~> 1.4"},
       {:telemetry, "~> 1.2"},

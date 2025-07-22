@@ -33,7 +33,12 @@ defmodule DSPex do
 
   # Type aliases for cleaner specs
   @type signature :: DSPex.Native.Signature.t()
-  @type signature_compiled :: map()
+  @type signature_compiled :: %{
+          signature: DSPex.Native.Signature.t(),
+          validator: (map() -> {:ok, map()} | {:error, term()}),
+          serializer: (map() -> {binary(), map()}),
+          compiled_at: DateTime.t()
+        }
 
   # Signatures - always native for performance
 
@@ -59,7 +64,7 @@ defmodule DSPex do
   @doc """
   Compile a signature for optimized repeated use.
   """
-  @spec compile_signature(String.t()) :: {:ok, signature_compiled()} | {:error, term()}
+  @spec compile_signature(binary()) :: {:ok, signature_compiled()} | {:error, term()}
   defdelegate compile_signature(spec), to: DSPex.Native.Signature, as: :compile
 
   # Module operations - routed to appropriate implementation
@@ -150,7 +155,11 @@ defmodule DSPex do
   @doc """
   Generate text using an LLM client.
   """
-  @spec lm_generate(map(), String.t() | list(map()), keyword()) :: {:ok, map()} | {:error, term()}
+  @spec lm_generate(
+          %{:adapter_module => atom(), any() => any()},
+          binary() | list(map()),
+          Keyword.t()
+        ) :: {:error, any()} | {:ok, map()}
   defdelegate lm_generate(client, prompt, opts \\ []), to: DSPex.LLM.Client, as: :generate
 
   # Utility functions
