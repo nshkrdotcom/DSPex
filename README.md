@@ -240,6 +240,11 @@ config :snakepit,
   pool_size: 4
 ```
 
+## Documentation
+
+- [Testing Guide](README_TESTING.md) - Comprehensive testing documentation
+- [Unified gRPC Bridge](README_UNIFIED_GRPC_BRIDGE.md) - DSPex integration with the gRPC bridge
+
 ## Testing
 
 DSPex uses a three-layer testing architecture:

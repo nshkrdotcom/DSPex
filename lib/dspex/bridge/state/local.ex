@@ -28,8 +28,8 @@ defmodule DSPex.Bridge.State.Local do
   @behaviour DSPex.Bridge.StateProvider
 
   require Logger
-  # Use local type modules to avoid dependency on Snakepit
-  alias __MODULE__.Types
+  # Use centralized type system
+  alias Snakepit.Bridge.Variables.Types
 
   defstruct [
     :agent_pid,
@@ -426,110 +426,6 @@ defmodule DSPex.Bridge.State.Local do
     Float.round(total_us / ops, 2)
   end
 
-  # Type system integration
-  defp get_type_module(:float), do: {:ok, Types.Float}
-  defp get_type_module(:integer), do: {:ok, Types.Integer}
-  defp get_type_module(:string), do: {:ok, Types.String}
-  defp get_type_module(:boolean), do: {:ok, Types.Boolean}
-  defp get_type_module(type), do: {:error, {:unknown_type, type}}
-end
-
-# Inline type modules for self-contained implementation
-# In production, would use Snakepit.Bridge.Variables.Types
-
-defmodule DSPex.Bridge.State.Local.Types.Float do
-  @moduledoc false
-
-  def validate(value) when is_float(value), do: {:ok, value}
-  def validate(value) when is_integer(value), do: {:ok, value * 1.0}
-  def validate(_), do: {:error, "must be a number"}
-
-  def validate_constraints(value, constraints) do
-    with :ok <- check_min(value, Map.get(constraints, :min)),
-         :ok <- check_max(value, Map.get(constraints, :max)) do
-      :ok
-    end
-  end
-
-  defp check_min(_value, nil), do: :ok
-  defp check_min(value, min) when value >= min, do: :ok
-  defp check_min(value, min), do: {:error, "value #{value} is below minimum #{min}"}
-
-  defp check_max(_value, nil), do: :ok
-  defp check_max(value, max) when value <= max, do: :ok
-  defp check_max(value, max), do: {:error, "value #{value} is above maximum #{max}"}
-end
-
-defmodule DSPex.Bridge.State.Local.Types.Integer do
-  @moduledoc false
-
-  def validate(value) when is_integer(value), do: {:ok, value}
-  def validate(_), do: {:error, "must be an integer"}
-
-  def validate_constraints(value, constraints) do
-    with :ok <- check_min(value, Map.get(constraints, :min)),
-         :ok <- check_max(value, Map.get(constraints, :max)) do
-      :ok
-    end
-  end
-
-  defp check_min(_value, nil), do: :ok
-  defp check_min(value, min) when value >= min, do: :ok
-  defp check_min(value, min), do: {:error, "value #{value} is below minimum #{min}"}
-
-  defp check_max(_value, nil), do: :ok
-  defp check_max(value, max) when value <= max, do: :ok
-  defp check_max(value, max), do: {:error, "value #{value} is above maximum #{max}"}
-end
-
-defmodule DSPex.Bridge.State.Local.Types.String do
-  @moduledoc false
-
-  def validate(value) when is_binary(value), do: {:ok, value}
-  def validate(_), do: {:error, "must be a string"}
-
-  def validate_constraints(value, constraints) do
-    with :ok <- check_min_length(value, Map.get(constraints, :min_length)),
-         :ok <- check_max_length(value, Map.get(constraints, :max_length)),
-         :ok <- check_pattern(value, Map.get(constraints, :pattern)) do
-      :ok
-    end
-  end
-
-  defp check_min_length(_value, nil), do: :ok
-  defp check_min_length(value, min) when byte_size(value) >= min, do: :ok
-
-  defp check_min_length(value, min),
-    do: {:error, "length #{byte_size(value)} is below minimum #{min}"}
-
-  defp check_max_length(_value, nil), do: :ok
-  defp check_max_length(value, max) when byte_size(value) <= max, do: :ok
-
-  defp check_max_length(value, max),
-    do: {:error, "length #{byte_size(value)} is above maximum #{max}"}
-
-  defp check_pattern(_value, nil), do: :ok
-
-  defp check_pattern(value, pattern) do
-    case Regex.compile(pattern) do
-      {:ok, regex} ->
-        if Regex.match?(regex, value) do
-          :ok
-        else
-          {:error, "does not match pattern #{pattern}"}
-        end
-
-      {:error, _} ->
-        {:error, "invalid pattern #{pattern}"}
-    end
-  end
-end
-
-defmodule DSPex.Bridge.State.Local.Types.Boolean do
-  @moduledoc false
-
-  def validate(value) when is_boolean(value), do: {:ok, value}
-  def validate(_), do: {:error, "must be a boolean"}
-
-  def validate_constraints(_value, _constraints), do: :ok
+  # Type system integration - delegate to centralized type system
+  defp get_type_module(type), do: Types.get_type_module(type)
 end
