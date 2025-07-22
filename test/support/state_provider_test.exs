@@ -23,7 +23,8 @@ defmodule DSPex.Bridge.StateProviderTest do
         end
 
         test "basic variable lifecycle" do
-          {:ok, state} = @provider.init(session_id: "test")
+          session_id = "test_lifecycle_#{System.unique_integer([:positive])}"
+          {:ok, state} = @provider.init(session_id: session_id)
 
           # Register
           assert {:ok, {var_id, state}} =
@@ -54,7 +55,8 @@ defmodule DSPex.Bridge.StateProviderTest do
         end
 
         test "batch operations" do
-          {:ok, state} = @provider.init(session_id: "test")
+          session_id = "test_batch_#{System.unique_integer([:positive])}"
+          {:ok, state} = @provider.init(session_id: session_id)
 
           # Register multiple
           {:ok, {_, state}} = @provider.register_variable(state, :a, :integer, 1, [])
@@ -83,7 +85,9 @@ defmodule DSPex.Bridge.StateProviderTest do
         end
 
         test "export and import state" do
-          {:ok, state1} = @provider.init(session_id: "test")
+          # Use unique session ID to avoid conflicts
+          session_id = "test_export_#{System.unique_integer([:positive])}"
+          {:ok, state1} = @provider.init(session_id: session_id)
 
           # Create some state
           {:ok, {_, state1}} = @provider.register_variable(state1, :x, :float, 3.14, [])
@@ -91,11 +95,12 @@ defmodule DSPex.Bridge.StateProviderTest do
 
           # Export
           assert {:ok, exported} = @provider.export_state(state1)
-          assert exported.session_id == "test"
+          assert exported.session_id == session_id
           assert map_size(exported.variables) == 2
 
           # Import into new backend
-          {:ok, state2} = @provider.init(session_id: "test2")
+          import_session_id = "test_import_#{System.unique_integer([:positive])}"
+          {:ok, state2} = @provider.init(session_id: import_session_id)
           assert {:ok, state2} = @provider.import_state(state2, exported)
 
           # Verify imported state
@@ -118,7 +123,8 @@ defmodule DSPex.Bridge.StateProviderTest do
         end
 
         test "missing variables return not_found" do
-          {:ok, state} = @provider.init(session_id: "test")
+          session_id = "test_missing_#{System.unique_integer([:positive])}"
+          {:ok, state} = @provider.init(session_id: session_id)
 
           assert {:error, :not_found} = @provider.get_variable(state, :nonexistent)
           assert {:error, :not_found} = @provider.delete_variable(state, :nonexistent)
@@ -131,7 +137,8 @@ defmodule DSPex.Bridge.StateProviderTest do
         end
 
         test "variable name and ID resolution" do
-          {:ok, state} = @provider.init(session_id: "test")
+          session_id = "test_resolution_#{System.unique_integer([:positive])}"
+          {:ok, state} = @provider.init(session_id: session_id)
 
           # Register with atom name
           {:ok, {var_id, state}} = @provider.register_variable(state, :myvar, :string, "test", [])
@@ -145,7 +152,8 @@ defmodule DSPex.Bridge.StateProviderTest do
         end
 
         test "metadata preservation" do
-          {:ok, state} = @provider.init(session_id: "test")
+          session_id = "test_metadata_#{System.unique_integer([:positive])}"
+          {:ok, state} = @provider.init(session_id: session_id)
 
           # Register with metadata
           {:ok, {_, state}} =
