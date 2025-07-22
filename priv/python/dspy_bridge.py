@@ -21,6 +21,7 @@ Features:
 - Health monitoring and statistics
 - Error handling and logging
 - Memory management and cleanup
+- Variable-aware DSPy modules with automatic synchronization
 
 Protocol:
 - 4-byte big-endian length header
@@ -63,6 +64,27 @@ except ImportError:
     GEMINI_AVAILABLE = False
     print("Warning: Google GenerativeAI not available. Gemini functionality will be limited.", file=sys.stderr)
 
+# Try to import variable-aware components
+try:
+    # Add snakepit bridge to path if needed
+    snakepit_path = os.path.join(os.path.dirname(__file__), '../../snakepit/priv/python')
+    if snakepit_path not in sys.path:
+        sys.path.insert(0, snakepit_path)
+    
+    from snakepit_bridge.dspy_integration import (
+        VariableAwarePredict,
+        VariableAwareChainOfThought,
+        VariableAwareReAct,
+        VariableAwareProgramOfThought,
+        ModuleVariableResolver,
+        create_variable_aware_program
+    )
+    from snakepit_bridge.session_context import SessionContext, get_or_create_session
+    VARIABLE_AWARE_AVAILABLE = True
+except ImportError as e:
+    VARIABLE_AWARE_AVAILABLE = False
+    print(f"Warning: Variable-aware modules not available: {e}", file=sys.stderr)
+
 
 class DSPyBridge:
     """
@@ -97,8 +119,15 @@ class DSPyBridge:
         
         # NEW: Feature flags for dynamic signatures
         self.feature_flags = {
-            "dynamic_signatures": os.environ.get("DSPEX_DYNAMIC_SIGNATURES", "true").lower() == "true"
+            "dynamic_signatures": os.environ.get("DSPEX_DYNAMIC_SIGNATURES", "true").lower() == "true",
+            "variable_aware": os.environ.get("DSPEX_VARIABLE_AWARE", "true").lower() == "true"
         }
+        
+        # Track session contexts for variable-aware modules
+        self._session_contexts = {}
+        
+        # Enable variable-aware features
+        self.variable_aware_enabled = VARIABLE_AWARE_AVAILABLE and self.feature_flags['variable_aware']
         
         # Initialize DSPy if available
         if DSPY_AVAILABLE:
@@ -107,6 +136,9 @@ class DSPyBridge:
         # Initialize Gemini if available
         if GEMINI_AVAILABLE:
             self._initialize_gemini()
+            
+        if self.variable_aware_enabled:
+            print("Variable-aware DSPy modules enabled", file=sys.stderr)
     
     def _initialize_dspy(self):
         """Initialize DSPy with default settings."""
@@ -164,7 +196,10 @@ class DSPyBridge:
                 'shutdown': self.shutdown,
                 # Session store communication handlers
                 'get_session_data': self.get_session_data,
-                'update_session_data': self.update_session_data
+                'update_session_data': self.update_session_data,
+                # Variable-aware commands
+                'update_variable_bindings': self.update_variable_bindings,
+                'get_variable_bindings': self.get_variable_bindings
             }
             
             if command not in handlers:
@@ -196,6 +231,8 @@ class DSPyBridge:
             "timestamp": time.time(),
             "dspy_available": DSPY_AVAILABLE,
             "gemini_available": GEMINI_AVAILABLE,
+            "variable_aware_available": VARIABLE_AWARE_AVAILABLE,
+            "variable_aware_enabled": self.variable_aware_enabled,
             "uptime": time.time() - self.start_time,
             "mode": self.mode
         }
@@ -319,6 +356,9 @@ class DSPyBridge:
                 - id: Unique program identifier
                 - signature: Signature definition with inputs/outputs
                 - program_type: Type of program to create (default: 'predict')
+                - variable_aware: Whether to create a variable-aware module
+                - session_id: Session ID for variable-aware modules
+                - variable_bindings: Optional dict of attribute -> variable_name bindings
                 
         Returns:
             Dictionary with program creation status
@@ -329,9 +369,16 @@ class DSPyBridge:
         program_id = args.get('id')
         signature_def = args.get('signature', {})
         program_type = args.get('program_type', 'predict')
+        variable_aware = args.get('variable_aware', False)
+        variable_bindings = args.get('variable_bindings', {})
         
         if not program_id:
             raise ValueError("Program ID is required")
+        
+        # Check if variable-aware is requested
+        if variable_aware and VARIABLE_AWARE_AVAILABLE:
+            # Delegate to variable-aware program creation
+            return self._create_variable_aware_program(args)
         
         # In pool-worker mode, programs are managed through centralized SessionStore
         # The Elixir side should have already checked for existence, so we don't need to check here
@@ -382,7 +429,8 @@ class DSPyBridge:
                 'fallback_used': fallback_used,
                 'created_at': time.time(),
                 'execution_count': 0,
-                'last_executed': None
+                'last_executed': None,
+                'variable_aware': False
             }
             
             if self.mode == "pool-worker":
@@ -409,7 +457,8 @@ class DSPyBridge:
                 "signature_class": signature_class.__name__ if signature_class else None,
                 "field_mapping": field_mapping,
                 "fallback_used": fallback_used,
-                "signature_def": signature_def
+                "signature_def": signature_def,
+                "variable_aware": False
             }
             
         except Exception as e:
@@ -649,6 +698,13 @@ class DSPyBridge:
                 self.configure_lm(self.session_lms[session_id])
         
         try:
+            # Check if variable-aware program
+            if program_info.get('variable_aware') and hasattr(program, 'sync_variables_sync'):
+                # Sync variables before execution
+                updates = program.sync_variables_sync()
+                if updates:
+                    pass  # Variables synced: {updates}
+            
             # Determine execution mode based on signature and fallback status
             is_dynamic = program_info.get('signature_class') is not None and not program_info.get('fallback_used', False)
             
@@ -1236,6 +1292,129 @@ class DSPyBridge:
             outputs[field_name] = field_value
         
         return outputs
+    
+    def _get_or_create_session_context(self, session_id):
+        """Get or create a session context for variable management."""
+        if not self.variable_aware_enabled:
+            return None
+        
+        if session_id not in self._session_contexts:
+            try:
+                # Create session context
+                # In pool-worker mode, we should have gRPC connection info
+                if self.mode == "pool-worker":
+                    # Get actual gRPC connection details from worker context
+                    ctx = get_or_create_session(session_id)
+                else:
+                    # Standalone mode - create local context
+                    ctx = SessionContext(session_id=session_id)
+                
+                self._session_contexts[session_id] = ctx
+            except Exception as e:
+                print(f"Failed to create session context: {e}", file=sys.stderr)
+                return None
+        
+        return self._session_contexts[session_id]
+    
+    def _create_variable_aware_program(self, args):
+        """Create a variable-aware DSPy program."""
+        program_id = args.get('id')
+        session_id = args.get('session_id')
+        signature_def = args.get('signature', {})
+        program_type = args.get('program_type', 'predict')
+        variable_bindings = args.get('variable_bindings', {})
+        
+        if not session_id:
+            raise ValueError("Session ID required for variable-aware programs")
+        
+        # Get session context
+        ctx = self._get_or_create_session_context(session_id)
+        if not ctx:
+            raise RuntimeError("Failed to create session context")
+        
+        # Map program types to variable-aware module types
+        type_mapping = {
+            'predict': 'Predict',
+            'chain_of_thought': 'ChainOfThought',
+            'react': 'ReAct',
+            'program_of_thought': 'ProgramOfThought'
+        }
+        
+        module_type = type_mapping.get(program_type, 'Predict')
+        
+        # Create signature string from definition
+        if signature_def.get('inputs') and signature_def.get('outputs'):
+            # Build signature string
+            inputs = ", ".join(f.get('name', '') for f in signature_def.get('inputs', []))
+            outputs = ", ".join(f.get('name', '') for f in signature_def.get('outputs', []))
+            signature_str = f"{inputs} -> {outputs}"
+        else:
+            signature_str = "question -> answer"
+        
+        try:
+            # Create variable-aware module
+            module = create_variable_aware_program(
+                module_type=module_type,
+                signature=signature_str,
+                session_context=ctx,
+                variable_bindings=variable_bindings,
+                auto_bind_common=args.get('auto_bind_common', True)
+            )
+            
+            # Try to get field mapping from signature
+            field_mapping = {}
+            if signature_def.get('inputs') and signature_def.get('outputs'):
+                try:
+                    # For variable-aware modules, use signature definition directly
+                    for field in signature_def.get('inputs', []):
+                        field_mapping[field['name']] = field['name']
+                    for field in signature_def.get('outputs', []):
+                        field_mapping[field['name']] = field['name']
+                except:
+                    pass
+            
+            # Store program info
+            program_info = {
+                'program': module,
+                'signature_def': signature_def,
+                'signature_str': signature_str,
+                'type': program_type,
+                'created_at': time.time(),
+                'execution_count': 0,
+                'last_executed': None,
+                'variable_aware': True,
+                'session_id': session_id,
+                'variable_bindings': module.get_bindings(),
+                'field_mapping': field_mapping,
+                'signature_class': None,
+                'fallback_used': False
+            }
+            
+            # Store based on mode
+            if self.mode == "pool-worker":
+                # In pool mode, check if anonymous session
+                if session_id == "anonymous":
+                    if not hasattr(self, 'programs'):
+                        self.programs = {}
+                    self.programs[program_id] = program_info
+                # For named sessions, Elixir handles storage
+            else:
+                if not hasattr(self, 'programs'):
+                    self.programs = {}
+                self.programs[program_id] = program_info
+            
+            return {
+                "program_id": program_id,
+                "status": "created",
+                "type": program_type,
+                "variable_aware": True,
+                "bindings": module.get_bindings(),
+                "signature": signature_def,
+                "signature_def": signature_def
+            }
+            
+        except Exception as e:
+            return {"error": f"Failed to create variable-aware program: {str(e)}"}
 
     def get_session_from_store(self, session_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -1388,6 +1567,106 @@ class DSPyBridge:
                 "session_id": session_id,
                 "status": "acknowledged",
                 "message": "Update acknowledged - session data managed centrally"
+            }
+            
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def update_variable_bindings(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update variable bindings for a program.
+        
+        Args:
+            args: Dictionary containing:
+                - program_id: ID of the program
+                - bindings: Dict of attribute -> variable_name mappings
+                - unbind: List of attributes to unbind
+        
+        Returns:
+            Dictionary with update status
+        """
+        if not self.variable_aware_enabled:
+            return {"error": "Variable-aware features not available"}
+        
+        program_id = args.get('program_id')
+        bindings = args.get('bindings', {})
+        unbind = args.get('unbind', [])
+        
+        if not program_id:
+            raise ValueError("Program ID is required")
+        
+        # Get program
+        if not hasattr(self, 'programs') or program_id not in self.programs:
+            raise ValueError(f"Program not found: {program_id}")
+        
+        program_info = self.programs[program_id]
+        
+        if not program_info.get('variable_aware'):
+            return {"error": "Program is not variable-aware"}
+        
+        program = program_info['program']
+        
+        try:
+            # Unbind specified attributes
+            for attr in unbind:
+                program.unbind_variable(attr)
+            
+            # Add new bindings
+            for attr, var_name in bindings.items():
+                program.bind_variable(attr, var_name)
+            
+            # Update stored bindings
+            program_info['variable_bindings'] = program.get_bindings()
+            
+            return {
+                "status": "updated",
+                "bindings": program.get_bindings()
+            }
+            
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def get_variable_bindings(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Get current variable bindings for a program.
+        
+        Args:
+            args: Dictionary containing program_id
+        
+        Returns:
+            Dictionary with current bindings
+        """
+        if not self.variable_aware_enabled:
+            return {"error": "Variable-aware features not available"}
+        
+        program_id = args.get('program_id')
+        
+        if not program_id:
+            raise ValueError("Program ID is required")
+        
+        # Get program
+        if not hasattr(self, 'programs') or program_id not in self.programs:
+            raise ValueError(f"Program not found: {program_id}")
+        
+        program_info = self.programs[program_id]
+        
+        if not program_info.get('variable_aware'):
+            return {"error": "Program is not variable-aware"}
+        
+        program = program_info['program']
+        
+        try:
+            # Get current bindings and values
+            bindings = program.get_bindings()
+            current_values = {}
+            
+            for attr, var_name in bindings.items():
+                if hasattr(program, attr):
+                    current_values[attr] = getattr(program, attr)
+            
+            return {
+                "bindings": bindings,
+                "current_values": current_values
             }
             
         except Exception as e:

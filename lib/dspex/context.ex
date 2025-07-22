@@ -136,6 +136,29 @@ defmodule DSPex.Context do
   end
 
   @doc """
+  Calls a registered program with the given inputs.
+  
+  ## Example
+  
+      Context.register_program(ctx, "qa_bot", %{
+        type: :dspy,
+        module_type: "chain_of_thought",
+        signature: %{
+          inputs: [%{name: "question", type: "string"}],
+          outputs: [%{name: "answer", type: "string"}]
+        }
+      })
+      
+      {:ok, result} = Context.call(ctx, "qa_bot", %{
+        question: "What is DSPy?"
+      })
+  """
+  @spec call(t(), String.t(), map()) :: {:ok, map()} | {:error, term()}
+  def call(context, program_id, inputs) do
+    GenServer.call(context, {:call_program, program_id, inputs})
+  end
+
+  @doc """
   Stops the context and cleans up resources.
   """
   @spec stop(t()) :: :ok
@@ -318,6 +341,17 @@ defmodule DSPex.Context do
     {:reply, :ok, state}
   end
 
+  def handle_call({:call_program, program_id, inputs}, _from, state) do
+    case Map.get(state.programs, program_id) do
+      nil ->
+        {:reply, {:error, :program_not_found}, state}
+      
+      program_spec ->
+        result = execute_program(program_spec, inputs, state)
+        {:reply, result, state}
+    end
+  end
+
   # Variable operations - delegate to backend
 
   @impl true
@@ -439,6 +473,45 @@ defmodule DSPex.Context do
     # DSPy modules always require Python
     module_spec[:type] in [:dspy, :python] or
       module_spec[:class] =~ "DSPy"
+  end
+
+  defp execute_program(program_spec, inputs, state) do
+    case program_spec do
+      %{type: :dspy} ->
+        # DSPy programs need to be executed through the Python bridge
+        execute_dspy_program(program_spec, inputs, state)
+        
+      %{type: :native} ->
+        # Native Elixir programs (future enhancement)
+        {:error, :native_programs_not_implemented}
+        
+      _ ->
+        {:error, :unknown_program_type}
+    end
+  end
+  
+  defp execute_dspy_program(program_spec, inputs, state) do
+    # Ensure we have a bridged backend
+    if not state.backend_module.requires_bridge?() do
+      {:error, :dspy_requires_bridged_backend}
+    else
+      # Get the session ID from the backend state
+      session_id = state.backend_state.session_id
+      
+      # Execute through the Python bridge
+      case Snakepit.PythonWorker.execute_program(
+        program_id: Map.get(program_spec, :id, "unknown"),
+        program_type: Map.get(program_spec, :module_type, "predict"),
+        signature: Map.get(program_spec, :signature, %{}),
+        inputs: inputs,
+        session_id: session_id,
+        variable_aware: Map.get(program_spec, :variable_aware, false),
+        variable_bindings: Map.get(program_spec, :variable_bindings, %{})
+      ) do
+        {:ok, result} -> {:ok, result}
+        {:error, reason} -> {:error, reason}
+      end
+    end
   end
 
   defp perform_backend_switch(state, new_backend_module) do
