@@ -18,7 +18,7 @@ Stage 5 extends the production hardening from Stage 4 with advanced features tha
 ## Architectural Extensions
 
 ```mermaid
-graph TD
+graph LR
     subgraph "Stage 5: Advanced Features"
         A[Coherent Cache Layer]
         B[Multi-Region Coordinator]
@@ -36,7 +36,7 @@ graph TD
     end
     
     subgraph "External Systems"
-        K[CDN/Edge Cache]
+        K["CDN/Edge Cache"]
         L[Global Load Balancer]
         M[Time-Series DB]
         N[Model Registry]
@@ -53,12 +53,12 @@ graph TD
     B --> L
     C --> M
     
-    style A fill:#ffd700
-    style B fill:#87ceeb
-    style C fill:#98fb98
-    style D fill:#ffb6c1
-    style E fill:#dda0dd
-    style F fill:#ffa500
+    style A fill:#ffd700,color:#000
+    style B fill:#87ceeb,color:#000
+    style C fill:#98fb98,color:#000
+    style D fill:#ffb6c1,color:#000
+    style E fill:#dda0dd,color:#000
+    style F fill:#ffa500,color:#000
 ```
 
 ## Detailed Feature Specifications

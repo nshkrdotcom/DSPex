@@ -30,8 +30,8 @@ graph TD
     
     subgraph "State Backends (New)"
         D[StateProvider Behaviour]
-        E[LocalState<br/>(Pure Elixir)]
-        F[BridgedState<br/>(Uses Stage 1)]
+        E["LocalState<br/>(Pure Elixir)"]
+        F["BridgedState<br/>(Uses Stage 1)"]
     end
     
     subgraph "Stage 1 Infrastructure"
@@ -49,10 +49,10 @@ graph TD
     G --> H
     H --> I
     
-    style C fill:#ffd700
-    style D fill:#87ceeb
-    style E fill:#90ee90
-    style F fill:#ffb6c1
+    style C fill:#ffd700,color:#000
+    style D fill:#87ceeb,color:#000
+    style E fill:#90ee90,color:#000
+    style F fill:#ffb6c1,color:#000
 ```
 
 ## Deliverables

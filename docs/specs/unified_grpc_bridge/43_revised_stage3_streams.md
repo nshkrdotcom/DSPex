@@ -24,14 +24,14 @@ Stage 3 transforms the bridge from a request-response system into a fully reacti
 ```mermaid
 graph TD
     subgraph "Reactive Layer (New)"
-        A[DSPex.Variables.watch/2]
-        B[ObserverManager<br/><i>Decouples SessionStore<br/>from stream management</i>]
+        A["DSPex.Variables.watch/2"]
+        B["ObserverManager<br/><i>Decouples SessionStore<br/>from stream management</i>"]
         C[Stream Processors]
     end
     
     subgraph "Backend Implementations"
-        D[LocalState.watch<br/>(Process Messages)<br/><i>Lightweight & Fast</i>]
-        E[BridgedState.watch<br/>(gRPC Streams)<br/><i>Cross-language Reactive</i>]
+        D["LocalState.watch<br/>(Process Messages)<br/><i>Lightweight & Fast</i>"]
+        E["BridgedState.watch<br/>(gRPC Streams)<br/><i>Cross-language Reactive</i>"]
     end
     
     subgraph "Python Side"
@@ -48,10 +48,10 @@ graph TD
     F --> G
     G --> H
     
-    style A fill:#ffd700
-    style B fill:#87ceeb
-    style F fill:#98fb98
-    style H fill:#dda0dd
+    style A fill:#ffd700,color:#000
+    style B fill:#87ceeb,color:#000
+    style F fill:#98fb98,color:#000
+    style H fill:#dda0dd,color:#000
 ```
 
 **Architectural Strengths:**
