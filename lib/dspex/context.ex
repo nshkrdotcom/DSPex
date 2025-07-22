@@ -137,9 +137,9 @@ defmodule DSPex.Context do
 
   @doc """
   Calls a registered program with the given inputs.
-  
+
   ## Example
-  
+
       Context.register_program(ctx, "qa_bot", %{
         type: :dspy,
         module_type: "chain_of_thought",
@@ -317,8 +317,9 @@ defmodule DSPex.Context do
     # Check if program requires Python
     requires_python = program_requires_python?(program_spec)
 
-    # Store program
-    programs = Map.put(state.programs, program_id, program_spec)
+    # Store program with its ID
+    program_spec_with_id = Map.put(program_spec, :id, program_id)
+    programs = Map.put(state.programs, program_id, program_spec_with_id)
     state = %{state | programs: programs}
 
     # Switch backend if needed
@@ -345,7 +346,7 @@ defmodule DSPex.Context do
     case Map.get(state.programs, program_id) do
       nil ->
         {:reply, {:error, :program_not_found}, state}
-      
+
       program_spec ->
         result = execute_program(program_spec, inputs, state)
         {:reply, result, state}
@@ -480,16 +481,16 @@ defmodule DSPex.Context do
       %{type: :dspy} ->
         # DSPy programs need to be executed through the Python bridge
         execute_dspy_program(program_spec, inputs, state)
-        
+
       %{type: :native} ->
         # Native Elixir programs (future enhancement)
         {:error, :native_programs_not_implemented}
-        
+
       _ ->
         {:error, :unknown_program_type}
     end
   end
-  
+
   defp execute_dspy_program(program_spec, inputs, state) do
     # Ensure we have a bridged backend
     if not state.backend_module.requires_bridge?() do
@@ -497,20 +498,20 @@ defmodule DSPex.Context do
     else
       # Get the session ID from the backend state
       session_id = state.backend_state.session_id
-      
-      # Execute through the Python bridge
-      case Snakepit.PythonWorker.execute_program(
-        program_id: Map.get(program_spec, :id, "unknown"),
-        program_type: Map.get(program_spec, :module_type, "predict"),
-        signature: Map.get(program_spec, :signature, %{}),
-        inputs: inputs,
-        session_id: session_id,
-        variable_aware: Map.get(program_spec, :variable_aware, false),
-        variable_bindings: Map.get(program_spec, :variable_bindings, %{})
-      ) do
-        {:ok, result} -> {:ok, result}
-        {:error, reason} -> {:error, reason}
-      end
+
+      # Execute through Snakepit
+      Snakepit.SessionHelpers.execute_program_command(
+        session_id,
+        "execute_program",
+        %{
+          program_id: Map.get(program_spec, :id, "unknown"),
+          program_type: Map.get(program_spec, :module_type, "predict"),
+          signature: Map.get(program_spec, :signature, %{}),
+          inputs: inputs,
+          variable_aware: Map.get(program_spec, :variable_aware, false),
+          variable_bindings: Map.get(program_spec, :variable_bindings, %{})
+        }
+      )
     end
   end
 

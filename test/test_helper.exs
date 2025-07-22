@@ -1,3 +1,6 @@
+# Load support files before ExUnit starts
+Code.require_file("support/state_provider_test.exs", __DIR__)
+
 ExUnit.start(exclude: [:live])
 
 # Configure test mode based on environment variable
