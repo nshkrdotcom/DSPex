@@ -1463,7 +1463,7 @@ defmodule DSPex.ContextStage2Test do
       # Get context ID to use from Python
       %{id: context_id} = :sys.get_state(ctx)
       
-      # Run Python script that accesses the variables
+      # Note: run_python_script is a complex test helper - see implementation below
       python_result = run_python_script("""
         import asyncio
         import grpc
@@ -1646,6 +1646,75 @@ def test_sync_compatibility(mock_session):
 4. **State Migration**: All variables preserved during backend switch ✓
 5. **Python Integration**: Variable-aware DSPy modules work correctly ✓
 6. **Same Code, Both Modes**: Programs work unchanged in either backend ✓
+
+## Test Infrastructure Requirements
+
+### The `run_python_script` Helper
+
+The test examples above rely on a `run_python_script` helper that executes Python code in a subprocess and captures its output. This is a non-trivial piece of test infrastructure that requires careful implementation:
+
+```elixir
+defmodule DSPex.TestHelpers.Python do
+  @moduledoc """
+  Helper functions for running Python scripts in tests.
+  """
+  
+  @doc """
+  Executes a Python script and returns its output.
+  
+  This helper needs to:
+  1. Spawn a Python process with proper environment
+  2. Capture stdout/stderr separately
+  3. Handle timeouts (default 5 seconds)
+  4. Parse specific output patterns (e.g., "RESULT:...")
+  5. Clean up processes on failure
+  6. Handle Python import errors gracefully
+  """
+  def run_python_script(script, opts \\ []) do
+    timeout = Keyword.get(opts, :timeout, 5000)
+    python_path = Keyword.get(opts, :python_path, "python3")
+    
+    # Implementation considerations:
+    # - Use Port or System.cmd with proper options
+    # - Set PYTHONPATH to include snakepit_bridge
+    # - Handle both sync and async Python code
+    # - Parse structured output (JSON preferred over string parsing)
+    # - Provide clear error messages for common failures
+    
+    # Simplified example (actual implementation will be more robust):
+    case System.cmd(python_path, ["-c", script], 
+                    env: [{"PYTHONPATH", "priv/python"}],
+                    stderr_to_stdout: true,
+                    timeout: timeout) do
+      {output, 0} -> 
+        parse_python_output(output)
+      {output, _exit_code} -> 
+        {:error, "Python script failed: #{output}"}
+    end
+  end
+  
+  defp parse_python_output(output) do
+    # Extract structured results from output
+    # Handle both "RESULT:" prefixed output and JSON
+  end
+end
+```
+
+### Alternative Testing Approaches
+
+Given the complexity of subprocess management, consider these alternatives:
+
+1. **ExUnit + Python pytest Integration**: Run Python tests separately and aggregate results
+2. **Docker-based Testing**: Use containers to ensure consistent Python environment
+3. **Mock-based Testing**: For unit tests, mock the Python interaction entirely
+4. **Integration Test Suite**: Separate integration tests that assume gRPC server is running
+
+### Recommended Implementation Order
+
+1. Start with mock-based unit tests for the Context and StateProvider logic
+2. Implement basic `run_python_script` for essential integration tests
+3. Gradually enhance the helper as more complex scenarios arise
+4. Consider extracting to a separate test support library if it grows complex
 
 ## Performance Impact
 

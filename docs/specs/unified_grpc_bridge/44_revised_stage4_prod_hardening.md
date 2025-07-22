@@ -4,9 +4,17 @@
 
 ## Overview
 
-Stage 4 transforms the DSPex bridge from a functional prototype into a production-ready system. This stage focuses on robustness, security, performance optimization, and enterprise features. All advanced features are implemented specifically in the `BridgedState` backend, keeping the pure Elixir path lightweight.
+Stage 4 transforms the DSPex bridge from a functional prototype into a production-ready system. This stage focuses on robustness, security, performance optimization, and enterprise features. 
 
-**Key Principle:** Advanced features like dependency graphs and optimization coordination are only relevant for complex, multi-process workflows that require the bridge. Pure Elixir workflows remain simple and fast.
+**Critical Insight:** All advanced features are implemented specifically in the `BridgedState` backend. This is a key architectural decision that keeps the fast path fast and adds complexity only where it's needed. Pure Elixir workflows remain simple and performant, while hybrid workflows get enterprise-grade features.
+
+**Note on Scope:** This stage is intentionally massive and could be broken down further. We've chosen to present it as a cohesive "production hardening" phase, but implementation should be iterative:
+1. First iteration: Dependency Management
+2. Second iteration: Optimization Coordination  
+3. Third iteration: Security & Access Control
+4. Fourth iteration: HA & Recovery Patterns
+
+See Stage 5 for additional production features that extend beyond core hardening.
 
 ## Goals
 
@@ -21,9 +29,9 @@ Stage 4 transforms the DSPex bridge from a functional prototype into a productio
 
 ```mermaid
 graph TD
-    subgraph "Production Features Layer"
-        A[Dependency Manager]
-        B[Optimizer Coordinator]
+    subgraph "Production Features Layer (BridgedState Only)"
+        A[Dependency Manager<br/><i>Graph data structure</i>]
+        B[Optimizer Coordinator<br/><i>Distributed locking</i>]
         C[Access Control]
         D[Analytics Engine]
         E[HA Manager]
@@ -33,6 +41,7 @@ graph TD
         F[SessionStore]
         G[gRPC Handlers]
         H[ObserverManager]
+        CB[Circuit Breaker<br/><i>Resilience pattern</i>]
     end
     
     subgraph "Monitoring & Observability"
@@ -41,21 +50,42 @@ graph TD
         K[Distributed Tracing]
     end
     
+    subgraph "Future Distributed Backends"
+        L[Redis/Valkey<br/><i>For distributed state</i>]
+        M[Raft/etcd<br/><i>For consensus</i>]
+    end
+    
     A --> F
     B --> F
     C --> F
     D --> I
     E --> F
+    F --> CB
+    CB --> G
     
     F --> I
     G --> J
     H --> K
     
+    F -.->|Future| L
+    B -.->|Future| M
+    
     style A fill:#ffd700
     style B fill:#87ceeb
     style C fill:#ffb6c1
     style I fill:#98fb98
+    style CB fill:#ff6b6b
+    style L fill:#e0e0e0
+    style M fill:#e0e0e0
 ```
+
+**Architectural Decisions:**
+
+1. **Distributed Primitives:** The DependencyManager and OptimizerCoordinator use GenServers initially but are designed to swap in distributed backends (Redis, Raft) in future multi-node deployments without changing core logic.
+
+2. **Circuit Breaker Pattern:** Explicitly implemented in BridgedState to prevent struggling Python workers from causing cascading failures in the Elixir system.
+
+3. **Operational Maturity:** Analytics and HAManager demonstrate deep understanding of production requirements - these are not afterthoughts but first-class concerns.
 
 ## Deliverables
 
@@ -1141,9 +1171,18 @@ defmodule DSPex.Bridge.HAManager do
 end
 ```
 
-### 6. Error Recovery Patterns
+### 6. Circuit Breaker & Error Recovery
 
-#### Update `lib/dspex/bridge/state/bridged.ex` with recovery:
+#### Update `lib/dspex/bridge/state/bridged.ex` with circuit breaker:
+
+**Note:** The circuit breaker pattern is essential for preventing cascading failures. When the Python worker becomes unresponsive or slow, the circuit breaker will:
+1. Track failures and successes
+2. Open the circuit after threshold failures
+3. Provide fallback responses (from cache or defaults)
+4. Periodically attempt recovery (half-open state)
+5. Fully close the circuit after sustained success
+
+This protects the Elixir system from being dragged down by Python-side issues.
 
 ```elixir
 defmodule DSPex.Bridge.State.Bridged do
@@ -1564,7 +1603,12 @@ OptimizerCoordinator.get_all_active_optimizations()
 
 ## Conclusion
 
-Stage 4 completes the transformation of DSPex from a research prototype to a production-ready system. The key insight is that all this complexity only applies to the `BridgedState` backend - pure Elixir workflows remain simple and blazingly fast.
+Stage 4 demonstrates a mature vision for a production system. The key architectural insight - implementing these features only in the `BridgedState` backend - ensures that:
+
+1. **Fast Path Stays Fast:** Pure Elixir workflows bypass all this complexity
+2. **Complexity Where Needed:** Hybrid workflows get enterprise features
+3. **Future-Proof Design:** Distributed primitives can be swapped without logic changes
+4. **Operational Excellence:** Not an afterthought but built-in from the start
 
 The architecture now supports:
 - Enterprise-scale deployments with thousands of concurrent sessions
@@ -1572,5 +1616,15 @@ The architecture now supports:
 - Fine-grained security and access control
 - Complete observability and debugging capabilities
 - High availability with zero-downtime upgrades
+- Resilience through circuit breakers and recovery patterns
 
 Most importantly, it does all this while maintaining the original vision: developers write simple, elegant code that automatically scales from in-process to distributed execution as needed.
+
+## Next Stage Preview
+
+Stage 5 will extend beyond core hardening to include:
+- Advanced caching strategies and cache coherence
+- Multi-region deployment patterns
+- Event sourcing and audit trails
+- Advanced optimization algorithms
+- ML model versioning and A/B testing infrastructure

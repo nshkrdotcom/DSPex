@@ -57,9 +57,81 @@ graph TD
 
 ## Detailed Implementation Plan
 
-### 1. Extend SessionStore for Variables
+### 1. Create Variable Module and Extend SessionStore
 
-First, we'll add variable support to the existing `Session` structure.
+First, we'll create a proper Variable module, then add variable support to the existing `Session` structure.
+
+#### Create `snakepit/lib/snakepit/bridge/variables/variable.ex`:
+
+```elixir
+defmodule Snakepit.Bridge.Variables.Variable do
+  @moduledoc """
+  Variable struct and related functions.
+  
+  Variables are typed, versioned values that can be synchronized
+  between Elixir and Python processes.
+  """
+  
+  @type t :: %__MODULE__{
+    id: String.t(),
+    name: String.t() | atom(),
+    type: atom(),
+    value: any(),
+    constraints: map(),
+    metadata: map(),
+    version: integer(),
+    created_at: integer(),
+    last_updated_at: integer(),
+    optimization_status: map()
+  }
+  
+  @enforce_keys [:id, :name, :type, :value, :created_at]
+  defstruct [
+    :id,
+    :name,
+    :type,
+    :value,
+    constraints: %{},
+    metadata: %{},
+    version: 0,
+    created_at: nil,
+    last_updated_at: nil,
+    optimization_status: %{
+      optimizing: false,
+      optimizer_id: nil,
+      optimizer_pid: nil,
+      started_at: nil
+    }
+  ]
+  
+  @doc """
+  Creates a new variable with validation.
+  """
+  def new(attrs) do
+    struct!(__MODULE__, attrs)
+  end
+  
+  @doc """
+  Updates a variable's value and increments version.
+  """
+  def update_value(variable, new_value, metadata \\ %{}) do
+    %{variable |
+      value: new_value,
+      version: variable.version + 1,
+      last_updated_at: System.monotonic_time(:second),
+      metadata: Map.merge(variable.metadata, metadata)
+    }
+  end
+  
+  @doc """
+  Converts variable to protobuf format.
+  """
+  def to_proto(variable) do
+    # This will be implemented in the gRPC handlers
+    variable
+  end
+end
+```
 
 #### Update `snakepit/lib/snakepit/bridge/session.ex`:
 
@@ -70,23 +142,13 @@ defmodule Snakepit.Bridge.Session do
   
   Extended in Stage 1 to support variables alongside programs.
   """
-
-  @type variable :: %{
-    id: String.t(),
-    name: String.t() | atom(),
-    type: atom(),
-    value: any(),
-    constraints: map(),
-    metadata: map(),
-    version: integer(),
-    created_at: integer(),
-    last_updated_at: integer()
-  }
+  
+  alias Snakepit.Bridge.Variables.Variable
 
   @type t :: %__MODULE__{
           id: String.t(),
           programs: map(),
-          variables: %{String.t() => variable()},
+          variables: %{String.t() => Variable.t()},
           variable_index: %{String.t() => String.t()}, # name -> id mapping
           metadata: map(),
           created_at: integer(),
@@ -111,8 +173,8 @@ defmodule Snakepit.Bridge.Session do
   @doc """
   Adds or updates a variable in the session.
   """
-  @spec put_variable(t(), String.t(), variable()) :: t()
-  def put_variable(%__MODULE__{} = session, var_id, variable) when is_binary(var_id) do
+  @spec put_variable(t(), String.t(), Variable.t()) :: t()
+  def put_variable(%__MODULE__{} = session, var_id, %Variable{} = variable) when is_binary(var_id) do
     # Update both the variables map and the name index
     variables = Map.put(session.variables, var_id, variable)
     variable_index = Map.put(session.variable_index, to_string(variable.name), var_id)
@@ -123,7 +185,7 @@ defmodule Snakepit.Bridge.Session do
   @doc """
   Gets a variable by ID or name.
   """
-  @spec get_variable(t(), String.t() | atom()) :: {:ok, variable()} | {:error, :not_found}
+  @spec get_variable(t(), String.t() | atom()) :: {:ok, Variable.t()} | {:error, :not_found}
   def get_variable(%__MODULE__{} = session, identifier) when is_atom(identifier) do
     get_variable(session, to_string(identifier))
   end
@@ -145,7 +207,7 @@ defmodule Snakepit.Bridge.Session do
   @doc """
   Lists all variables in the session.
   """
-  @spec list_variables(t()) :: [variable()]
+  @spec list_variables(t()) :: [Variable.t()]
   def list_variables(%__MODULE__{} = session) do
     Map.values(session.variables)
   end
@@ -160,6 +222,7 @@ Add variable-specific operations to the SessionStore:
 defmodule Snakepit.Bridge.SessionStore do
   # ... existing code ...
 
+  alias Snakepit.Bridge.Session
   alias Snakepit.Bridge.Variables.{Variable, Types}
   
   ## Variable API
@@ -177,7 +240,7 @@ defmodule Snakepit.Bridge.SessionStore do
   Gets a variable by ID or name.
   """
   @spec get_variable(String.t(), String.t() | atom()) :: 
-    {:ok, Session.variable()} | {:error, term()}
+    {:ok, Variable.t()} | {:error, term()}
   def get_variable(session_id, identifier) do
     GenServer.call(__MODULE__, {:get_variable, session_id, identifier})
   end
@@ -194,7 +257,7 @@ defmodule Snakepit.Bridge.SessionStore do
   @doc """
   Lists all variables in a session.
   """
-  @spec list_variables(String.t()) :: {:ok, [Session.variable()]} | {:error, term()}
+  @spec list_variables(String.t()) :: {:ok, [Variable.t()]} | {:error, term()}
   def list_variables(session_id) do
     GenServer.call(__MODULE__, {:list_variables, session_id})
   end
@@ -212,7 +275,7 @@ defmodule Snakepit.Bridge.SessionStore do
       var_id = generate_variable_id(name)
       now = System.monotonic_time(:second)
       
-      variable = %{
+      variable = Variable.new(%{
         id: var_id,
         name: name,
         type: type,
@@ -220,7 +283,6 @@ defmodule Snakepit.Bridge.SessionStore do
         constraints: constraints,
         metadata: Map.merge(
           %{
-            created_at: now,
             source: :elixir,
             description: Keyword.get(opts, :description)
           },
@@ -229,7 +291,7 @@ defmodule Snakepit.Bridge.SessionStore do
         version: 0,
         created_at: now,
         last_updated_at: now
-      }
+      })
       
       updated_session = Session.put_variable(session, var_id, variable)
       new_state = store_session(state, session_id, updated_session)
@@ -265,12 +327,7 @@ defmodule Snakepit.Bridge.SessionStore do
          {:ok, validated_value} <- type_module.validate(new_value),
          :ok <- type_module.validate_constraints(validated_value, variable.constraints) do
       
-      updated_variable = %{variable |
-        value: validated_value,
-        version: variable.version + 1,
-        last_updated_at: System.monotonic_time(:second),
-        metadata: Map.merge(variable.metadata, metadata)
-      }
+      updated_variable = Variable.update_value(variable, validated_value, metadata)
       
       updated_session = Session.put_variable(session, variable.id, updated_variable)
       new_state = store_session(state, session_id, updated_session)

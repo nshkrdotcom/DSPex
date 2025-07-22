@@ -434,11 +434,16 @@ defmodule Snakepit.GRPCWorker do
         Process.flag(:trap_exit, true)
         ProcessRegistry.register(os_pid)
         
-        # Wait for server readiness
-        case wait_for_server(config[:grpc_port]) do
-          :ok ->
+        # Start a task to handle port output and detect readiness
+        {:ok, ready_ref} = start_server_monitor(port, config[:grpc_port])
+        
+        # Wait for server readiness signal
+        receive do
+          {:server_ready, ^ready_ref, grpc_port} ->
+            Logger.info("Python server ready on port #{grpc_port}")
+            
             # Connect gRPC client
-            case Client.connect(config[:grpc_port]) do
+            case Client.connect(grpc_port) do
               {:ok, channel} ->
                 # Initialize session with config
                 session_config = %{
@@ -464,7 +469,13 @@ defmodule Snakepit.GRPCWorker do
                 cleanup(port, os_pid)
                 {:stop, {:connection_failed, reason}}
             end
-          {:error, :timeout} ->
+            
+          {:server_failed, ^ready_ref, reason} ->
+            cleanup(port, os_pid)
+            {:stop, {:server_startup_failed, reason}}
+            
+        after
+          config[:startup_timeout] || 30_000 ->
             cleanup(port, os_pid)
             {:stop, :server_startup_timeout}
         end
@@ -558,16 +569,60 @@ defmodule Snakepit.GRPCWorker do
     end
   end
   
-  defp wait_for_server(port, attempts \\ 50)
-  defp wait_for_server(_port, 0), do: {:error, :timeout}
-  defp wait_for_server(port, attempts) do
-    case :gen_tcp.connect('localhost', port, [:binary, active: false], 100) do
-      {:ok, socket} ->
-        :gen_tcp.close(socket)
-        :ok
-      {:error, _} ->
-        Process.sleep(100)
-        wait_for_server(port, attempts - 1)
+  defp start_server_monitor(port, expected_grpc_port) do
+    ref = make_ref()
+    parent = self()
+    
+    task = Task.async(fn ->
+      monitor_port_output(port, parent, ref, expected_grpc_port)
+    end)
+    
+    {:ok, ref}
+  end
+  
+  defp monitor_port_output(port, parent, ref, expected_grpc_port) do
+    receive do
+      {^port, {:data, {:line, line}}} ->
+        # Log all Python output for debugging
+        Logger.debug("Python output: #{line}")
+        
+        # Check for the ready signal
+        case String.trim(line) do
+          "GRPC_READY:" <> port_str ->
+            case Integer.parse(port_str) do
+              {port_num, ""} when port_num == expected_grpc_port ->
+                send(parent, {:server_ready, ref, port_num})
+              _ ->
+                Logger.warn("Unexpected port in ready signal: #{port_str}")
+                monitor_port_output(port, parent, ref, expected_grpc_port)
+            end
+          _ ->
+            # Check for common error patterns
+            cond do
+              String.contains?(line, "Error") || String.contains?(line, "ERROR") ->
+                Logger.error("Python error: #{line}")
+              String.contains?(line, "Warning") || String.contains?(line, "WARNING") ->
+                Logger.warn("Python warning: #{line}")
+              true ->
+                :ok
+            end
+            monitor_port_output(port, parent, ref, expected_grpc_port)
+        end
+        
+      {^port, {:data, {:noeol, partial}}} ->
+        # Handle partial lines
+        Logger.debug("Python partial output: #{partial}")
+        monitor_port_output(port, parent, ref, expected_grpc_port)
+        
+      {^port, {:exit_status, status}} ->
+        send(parent, {:server_failed, ref, {:exit_status, status}})
+        
+      {:EXIT, ^port, reason} ->
+        send(parent, {:server_failed, ref, {:port_exit, reason}})
+        
+    after
+      60_000 ->
+        send(parent, {:server_failed, ref, :monitor_timeout})
     end
   end
   
@@ -1455,9 +1510,10 @@ end
 - **Solution**: Check import paths and proto syntax
 
 ### Issue: gRPC Connection Refused
-- **Solution**: Increase wait_for_server timeout
-- **Solution**: Verify Python prints "GRPC_READY"
+- **Solution**: Check Python server logs via `Logger.debug` output
+- **Solution**: Verify Python prints "GRPC_READY:port" to stdout
 - **Solution**: Check firewall/port availability
+- **Solution**: Ensure Python server has `flush=True` on ready print
 
 ### Issue: Session Cleanup Not Working
 - **Solution**: Ensure terminate callback is implemented

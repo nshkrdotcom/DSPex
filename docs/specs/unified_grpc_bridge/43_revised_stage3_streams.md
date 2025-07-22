@@ -25,13 +25,13 @@ Stage 3 transforms the bridge from a request-response system into a fully reacti
 graph TD
     subgraph "Reactive Layer (New)"
         A[DSPex.Variables.watch/2]
-        B[ObserverManager]
+        B[ObserverManager<br/><i>Decouples SessionStore<br/>from stream management</i>]
         C[Stream Processors]
     end
     
     subgraph "Backend Implementations"
-        D[LocalState.watch<br/>(Process Messages)]
-        E[BridgedState.watch<br/>(gRPC Streams)]
+        D[LocalState.watch<br/>(Process Messages)<br/><i>Lightweight & Fast</i>]
+        E[BridgedState.watch<br/>(gRPC Streams)<br/><i>Cross-language Reactive</i>]
     end
     
     subgraph "Python Side"
@@ -53,6 +53,16 @@ graph TD
     style F fill:#98fb98
     style H fill:#dda0dd
 ```
+
+**Architectural Strengths:**
+
+1. **ObserverManager Pattern**: The dedicated ObserverManager prevents the SessionStore from becoming bloated with stream management complexity. It can handle thousands of subscribers efficiently.
+
+2. **Backend-Specific Implementation**: Each backend implements watching optimally for its context:
+   - LocalState uses efficient Erlang process messaging (essentially free)
+   - BridgedState uses gRPC streaming for cross-language updates
+
+3. **StreamConsumer GenServer**: Each gRPC stream gets its own supervised process, following OTP best practices for fault isolation and state management.
 
 ## Deliverables
 
@@ -473,16 +483,18 @@ defmodule Snakepit.GRPC.Handlers.VariableHandlers do
     identifiers = request.variable_identifiers
     include_initial = request.include_initial_values
     
-    # Register the stream with ObserverManager
+    # CRITICAL: Register stream with ObserverManager BEFORE sending initial values
+    # This ensures no updates are missed between registration and initial value sending
     observer_pid = self()
     callback = fn var_id, old_value, new_value, metadata ->
       send(observer_pid, {:variable_update, var_id, old_value, new_value, metadata})
     end
     
-    # Register observers for all requested variables
+    # Register observers for all requested variables atomically
     refs = Enum.map(identifiers, fn identifier ->
       case SessionStore.get_variable(session_id, identifier) do
         {:ok, variable} ->
+          # Register observer BEFORE sending initial value
           ref = ObserverManager.add_observer(variable.id, observer_pid, callback)
           {variable.id, ref, variable}
         _ ->
@@ -491,7 +503,10 @@ defmodule Snakepit.GRPC.Handlers.VariableHandlers do
     end)
     |> Enum.reject(&is_nil/1)
     
-    # Send initial values if requested
+    # Send initial values if requested - AFTER observers are registered
+    # This prevents the "stale read" problem by ensuring:
+    # 1. Observer is active before initial values are sent
+    # 2. Any concurrent updates will be queued after initial values
     if include_initial do
       Enum.each(refs, fn {var_id, _ref, variable} ->
         update = SnakepitBridge.VariableUpdate.new(
@@ -509,7 +524,7 @@ defmodule Snakepit.GRPC.Handlers.VariableHandlers do
       end)
     end
     
-    # Stream updates
+    # Stream updates - observer is already active
     stream_updates(stream, refs)
   end
   
@@ -838,9 +853,15 @@ async def watch_variables(self, names: List[str],
     """
     Watch variables for changes via gRPC streaming.
     
+    This implementation is robust against "stale reads" - when include_initial=True,
+    the server guarantees that:
+    1. Initial values are sent first, before any updates
+    2. No updates between the RPC call and stream activation are missed
+    3. The stream is fully active before any concurrent updates are processed
+    
     Args:
         names: List of variable names to watch
-        include_initial: Emit current values immediately
+        include_initial: Emit current values immediately (prevents stale reads)
         filter_fn: Optional filter function (name, old_value, new_value) -> bool
         debounce_ms: Minimum milliseconds between updates per variable
         
@@ -865,7 +886,7 @@ async def watch_variables(self, names: List[str],
     request = pb2.WatchVariablesRequest(
         session_id=self.session_id,
         variable_identifiers=names,
-        include_initial_values=include_initial
+        include_initial_values=include_initial  # Handles stale read prevention
     )
     
     # Debouncing state
@@ -1172,6 +1193,8 @@ end
 2. **Smart Cleanup**: Process monitoring ensures no orphan watchers
 3. **Flexible Filtering**: Both client and server-side filtering options
 4. **Type Evolution**: Choice and module types enable configuration as code
+5. **Stale Read Prevention**: The `include_initial_values` flag combined with atomic observer registration ensures no updates are missed
+6. **Scalable Observer Pattern**: ObserverManager can handle thousands of concurrent watchers without impacting SessionStore performance
 
 ## Next Stage Preview
 
