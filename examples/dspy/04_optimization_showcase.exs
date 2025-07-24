@@ -438,14 +438,15 @@ defmodule OptimizationShowcase do
   end
 end
 
-# Run the showcase
-OptimizationShowcase.run()
-
-IO.puts("\n\n=== Optimization Showcase Complete ===")
-IO.puts("\nAll DSPex wrappers have been demonstrated!")
-IO.puts("See the examples above for usage patterns of:")
-IO.puts("- Core modules (Predict, ChainOfThought, ReAct, etc.)")
-IO.puts("- All optimizers (BootstrapFewShot, MIPRO, COPRO, etc.)")
-IO.puts("- Retrievers (ColBERTv2, 20+ vector databases)")
-IO.puts("- Supporting features (LM providers, sessions, evaluation)")
-IO.puts("\nFor more details, see README_DSPY_INTEGRATION.md")
+# Run the showcase with proper cleanup
+Snakepit.run_as_script(fn ->
+  OptimizationShowcase.run()
+  IO.puts("\n\n=== Optimization Showcase Complete ===")
+  IO.puts("\nAll DSPex wrappers have been demonstrated!")
+  IO.puts("See the examples above for usage patterns of:")
+  IO.puts("- Core modules (Predict, ChainOfThought, ReAct, etc.)")
+  IO.puts("- All optimizers (BootstrapFewShot, MIPRO, COPRO, etc.)")
+  IO.puts("- Retrievers (ColBERTv2, 20+ vector databases)")
+  IO.puts("- Supporting features (LM providers, sessions, evaluation)")
+  IO.puts("\nFor more details, see README_DSPY_INTEGRATION.md")
+end)

@@ -252,7 +252,8 @@ defmodule QAPipeline do
   end
 end
 
-# Run the pipeline
-QAPipeline.run()
-
-IO.puts("\n\n=== Pipeline Complete ===")
+# Run the pipeline with proper cleanup
+Snakepit.run_as_script(fn ->
+  QAPipeline.run()
+  IO.puts("\n\n=== Pipeline Complete ===")
+end)

@@ -412,11 +412,12 @@ defmodule DocumentAnalysisRAG do
   end
 end
 
-# Run the system
-DocumentAnalysisRAG.run()
-
-IO.puts("\n\n=== Document Analysis RAG Complete ===")
-IO.puts("To use with real document analysis:")
-IO.puts("1. Set your Gemini API key: export GOOGLE_API_KEY=your-key")
-IO.puts("2. Set up a vector database (ChromaDB, Qdrant, etc.)")
-IO.puts("3. Run again for actual RAG results")
+# Run the system with proper cleanup
+Snakepit.run_as_script(fn ->
+  DocumentAnalysisRAG.run()
+  IO.puts("\n\n=== Document Analysis RAG Complete ===")
+  IO.puts("To use with real document analysis:")
+  IO.puts("1. Set your Gemini API key: export GOOGLE_API_KEY=your-key")
+  IO.puts("2. Set up a vector database (ChromaDB, Qdrant, etc.)")
+  IO.puts("3. Run again for actual RAG results")
+end)

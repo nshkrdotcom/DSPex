@@ -434,18 +434,19 @@ defmodule BidirectionalToolBridgeDemo do
   end
 end
 
-# Run the comprehensive demo
-BidirectionalToolBridgeDemo.run()
-
-IO.puts("\n\n=== Bidirectional Tool Bridge Demo Complete ===")
-IO.puts("\n🎯 Key Achievements Demonstrated:")
-IO.puts("1. ✅ Python DSPy calling back to Elixir validation functions")
-IO.puts("2. ✅ Elixir business logic integration during ML reasoning")
-IO.puts("3. ✅ Enhanced DSPy modules with automatic tool registration")
-IO.puts("4. ✅ Custom domain-specific validators in Elixir")
-IO.puts("5. ✅ Advanced metaprogramming with bidirectional defdsyp")
-IO.puts("6. ✅ Real-time tool discovery and session introspection")
-IO.puts("\n💡 This demonstrates true bidirectional integration where:")
-IO.puts("   - Elixir handles business logic, validation, and concurrent processing")
-IO.puts("   - Python handles ML reasoning, DSPy operations, and AI workflows")
-IO.puts("   - Both ecosystems work together seamlessly through the tool bridge")
+# Run the comprehensive demo with proper cleanup
+Snakepit.run_as_script(fn ->
+  BidirectionalToolBridgeDemo.run()
+  IO.puts("\n\n=== Bidirectional Tool Bridge Demo Complete ===")
+  IO.puts("\n🎯 Key Achievements Demonstrated:")
+  IO.puts("1. ✅ Python DSPy calling back to Elixir validation functions")
+  IO.puts("2. ✅ Elixir business logic integration during ML reasoning")
+  IO.puts("3. ✅ Enhanced DSPy modules with automatic tool registration")
+  IO.puts("4. ✅ Custom domain-specific validators in Elixir")
+  IO.puts("5. ✅ Advanced metaprogramming with bidirectional defdsyp")
+  IO.puts("6. ✅ Real-time tool discovery and session introspection")
+  IO.puts("\n💡 This demonstrates true bidirectional integration where:")
+  IO.puts("   - Elixir handles business logic, validation, and concurrent processing")
+  IO.puts("   - Python handles ML reasoning, DSPy operations, and AI workflows")
+  IO.puts("   - Both ecosystems work together seamlessly through the tool bridge")
+end)

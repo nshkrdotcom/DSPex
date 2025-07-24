@@ -353,10 +353,11 @@ defmodule CodeGenerationSystem do
   
 end
 
-# Run the system
-CodeGenerationSystem.run()
-
-IO.puts("\n\n=== Code Generation System Complete ===")
-IO.puts("To use with real code generation:")
-IO.puts("1. Set your Gemini API key: export GOOGLE_API_KEY=your-key")
-IO.puts("2. Run again for actual code generation results")
+# Run the system with proper cleanup
+Snakepit.run_as_script(fn ->
+  CodeGenerationSystem.run()
+  IO.puts("\n\n=== Code Generation System Complete ===")
+  IO.puts("To use with real code generation:")
+  IO.puts("1. Set your Gemini API key: export GOOGLE_API_KEY=your-key")
+  IO.puts("2. Run again for actual code generation results")
+end)

@@ -398,25 +398,26 @@ end
 
 IO.puts("")
 
-# Run the streaming pipeline demo
-StreamingInferencePipeline.run()
+# Run the streaming pipeline demo with proper cleanup
+Snakepit.run_as_script(fn ->
+  StreamingInferencePipeline.run()
+  IO.puts("\n\n=== Streaming DSPy Pipeline Demo Complete ===")
+  IO.puts("\n🚀 Key Benefits of Streaming:")
+  IO.puts("• ⚡ Progressive results - see output as it's generated")
+  IO.puts("• 💾 Memory efficient - constant memory usage regardless of dataset size")
+  IO.puts("• 🔄 Real-time feedback - know immediately when something goes wrong")
+  IO.puts("• 🎯 Better user experience - progress indicators and early results")
+  IO.puts("• 🛑 Cancellable operations - stop long-running tasks mid-stream")
 
-IO.puts("\n\n=== Streaming DSPy Pipeline Demo Complete ===")
-IO.puts("\n🚀 Key Benefits of Streaming:")
-IO.puts("• ⚡ Progressive results - see output as it's generated")
-IO.puts("• 💾 Memory efficient - constant memory usage regardless of dataset size")
-IO.puts("• 🔄 Real-time feedback - know immediately when something goes wrong")
-IO.puts("• 🎯 Better user experience - progress indicators and early results")
-IO.puts("• 🛑 Cancellable operations - stop long-running tasks mid-stream")
+  IO.puts("\n🔮 Future Enhancements:")
+  IO.puts("• Real gRPC streaming implementation in enhanced bridge")
+  IO.puts("• Session affinity for streaming operations")
+  IO.puts("• Backpressure handling for slow consumers")
+  IO.puts("• Stream cancellation and cleanup")
+  IO.puts("• Bidirectional streaming for interactive AI applications")
 
-IO.puts("\n🔮 Future Enhancements:")
-IO.puts("• Real gRPC streaming implementation in enhanced bridge")
-IO.puts("• Session affinity for streaming operations")
-IO.puts("• Backpressure handling for slow consumers")
-IO.puts("• Stream cancellation and cleanup")
-IO.puts("• Bidirectional streaming for interactive AI applications")
-
-IO.puts("\n📚 For more information:")
-IO.puts("• Snakepit gRPC docs: ./snakepit/README_GRPC.md")
-IO.puts("• Streaming examples: ./snakepit/docs/specs/grpc_streaming_examples.md")
-IO.puts("• DSPy integration: ./README_DSPY_INTEGRATION.md")
+  IO.puts("\n📚 For more information:")
+  IO.puts("• Snakepit gRPC docs: ./snakepit/README_GRPC.md")
+  IO.puts("• Streaming examples: ./snakepit/docs/specs/grpc_streaming_examples.md")
+  IO.puts("• DSPy integration: ./README_DSPY_INTEGRATION.md")
+end)
