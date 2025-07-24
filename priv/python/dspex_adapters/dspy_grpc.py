@@ -403,6 +403,156 @@ class DSPyGRPCHandler(BaseAdapter):
         _MODULE_STORAGE.clear()
         return {"status": "reset"}
     
+    @tool(description="Register Elixir tool for bidirectional calling")
+    def register_elixir_tool(self, name: str, function: Any, description: str = "", parameters: List = None, exposed_to_python: bool = True) -> Dict[str, Any]:
+        """Register an Elixir function as a tool callable from Python DSPy code"""
+        try:
+            # Store tool metadata for Python access
+            tool_info = {
+                "name": name,
+                "function": function,
+                "description": description,
+                "parameters": parameters or [],
+                "exposed_to_python": exposed_to_python
+            }
+            
+            # Register in session storage with special prefix
+            _MODULE_STORAGE[f"elixir_tool_{name}"] = tool_info
+            
+            return {
+                "success": True,
+                "tool_name": name,
+                "registered": True
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to register Elixir tool {name}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    @tool(description="Enhanced DSPy Chain of Thought with Elixir validation")
+    def enhanced_chain_of_thought(self, signature: str, **inputs) -> Dict[str, Any]:
+        """
+        Enhanced DSPy Chain of Thought that calls back to Elixir for validation and processing.
+        
+        This is an example of bidirectional tool calling where Python DSPy code
+        leverages Elixir's strengths during reasoning.
+        """
+        if not DSPY_AVAILABLE:
+            return {"success": False, "error": "DSPy not available"}
+            
+        try:
+            # Step 1: Perform DSPy Chain of Thought reasoning
+            cot = dspy.ChainOfThought(signature)
+            result = cot(**inputs)
+            
+            # Step 2: Call back to Elixir for business validation
+            if self.session_context and hasattr(self.session_context, 'call_elixir_tool'):
+                try:
+                    validation = self.session_context.call_elixir_tool(
+                        'validate_reasoning',
+                        reasoning=result.reasoning if hasattr(result, 'reasoning') else str(result),
+                        domain=inputs.get('domain', 'general')
+                    )
+                    
+                    # Step 3: Call Elixir template engine for formatting
+                    formatted = self.session_context.call_elixir_tool(
+                        'process_template',
+                        template="<%= reasoning %>\n\nValidation: <%= validation.score %>/1.0\nAnswer: <%= answer %>",
+                        variables={
+                            'reasoning': result.reasoning if hasattr(result, 'reasoning') else str(result),
+                            'validation': validation,
+                            'answer': result.answer if hasattr(result, 'answer') else str(result)
+                        }
+                    )
+                    
+                    return {
+                        "success": True,
+                        "result": self._serialize_result(result),
+                        "elixir_validation": validation,
+                        "formatted_output": formatted.get('processed_template', ''),
+                        "type": "enhanced_chain_of_thought"
+                    }
+                    
+                except Exception as e:
+                    logger.warning(f"Elixir tool call failed, returning basic result: {e}")
+                    # Fall back to basic result if Elixir tools fail
+                    return {
+                        "success": True,
+                        "result": self._serialize_result(result),
+                        "type": "chain_of_thought",
+                        "elixir_validation": {"error": str(e)}
+                    }
+            
+            # No session context - return basic result
+            return {
+                "success": True,
+                "result": self._serialize_result(result),
+                "type": "chain_of_thought"
+            }
+            
+        except Exception as e:
+            logger.error(f"Enhanced Chain of Thought failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    @tool(description="Enhanced DSPy Predict with Elixir post-processing")
+    def enhanced_predict(self, signature: str, **inputs) -> Dict[str, Any]:
+        """
+        Enhanced DSPy Predict that uses Elixir for signature validation and result transformation.
+        """
+        if not DSPY_AVAILABLE:
+            return {"success": False, "error": "DSPy not available"}
+            
+        try:
+            # Step 1: Validate signature using Elixir
+            if self.session_context and hasattr(self.session_context, 'call_elixir_tool'):
+                try:
+                    sig_validation = self.session_context.call_elixir_tool(
+                        'validate_signature',
+                        signature=signature
+                    )
+                    
+                    if not sig_validation.get('valid', True):
+                        return {
+                            "success": False,
+                            "error": f"Invalid signature: {sig_validation.get('errors', 'Unknown validation error')}"
+                        }
+                        
+                except Exception as e:
+                    logger.warning(f"Signature validation failed: {e}")
+            
+            # Step 2: Perform DSPy prediction
+            predictor = dspy.Predict(signature)
+            result = predictor(**inputs)
+            
+            # Step 3: Transform result using Elixir
+            if self.session_context and hasattr(self.session_context, 'call_elixir_tool'):
+                try:
+                    transformed = self.session_context.call_elixir_tool(
+                        'transform_result',
+                        result=self._serialize_result(result),
+                        format='prediction_data'
+                    )
+                    
+                    return {
+                        "success": True,
+                        "result": transformed.get('transformed_result', self._serialize_result(result)),
+                        "type": "enhanced_predict"
+                    }
+                    
+                except Exception as e:
+                    logger.warning(f"Result transformation failed: {e}")
+            
+            # Fallback to basic result
+            return {
+                "success": True,
+                "result": self._serialize_result(result),
+                "type": "predict"
+            }
+            
+        except Exception as e:
+            logger.error(f"Enhanced Predict failed: {e}")
+            return {"success": False, "error": str(e)}
+
     @tool(description="Universal DSPy function caller with introspection")
     def call_dspy(self, module_path: str, function_name: str, args: List = None, kwargs: Dict = None) -> Dict[str, Any]:
         """

@@ -17,7 +17,7 @@ defmodule DSPex.Modules.Predict do
       {:ok, result} = DSPex.Modules.Predict.execute(predictor, %{question: "What is DSPy?"})
   """
   def create(signature, opts \\ []) do
-    session_id = opts[:session_id] || ID.generate("session")
+    _session_id = opts[:session_id] || ID.generate("session")
 
     case DSPex.Bridge.create_instance("dspy.Predict", %{"signature" => signature}, opts) do
       {:ok, ref} ->
@@ -35,7 +35,7 @@ defmodule DSPex.Modules.Predict do
   """
   def execute(predictor_ref, inputs, opts \\ [])
 
-  def execute({session_id, predictor_id} = ref, inputs, opts) do
+  def execute({_session_id, _predictor_id} = ref, inputs, opts) do
     case DSPex.Bridge.call_method(ref, "__call__", inputs, opts) do
       {:ok, %{"result" => raw_result}} ->
         {:ok, transform_prediction_result(raw_result)}
@@ -68,7 +68,7 @@ defmodule DSPex.Modules.Predict do
   # Transform Python result to Elixir-friendly format
   defp transform_prediction_result(raw_result) do
     case raw_result do
-      %{"success" => true, "result" => %{"prediction_data" => prediction_data}} ->
+      %{"success" => true, "result" => %{"prediction_data" => _prediction_data}} ->
         # Already transformed by bridge
         raw_result
 

@@ -6,12 +6,14 @@
 
 **DSPex** is a comprehensive Elixir implementation of [DSPy](https://github.com/stanfordnlp/dspy) (Declarative Self-improving Language Programs) that provides a unified interface for working with Large Language Models. It combines high-performance native Elixir implementations with seamless Python DSPy integration through [Snakepit](https://github.com/nshkrdotcom/snakepit) for complex ML workflows.
 
-## 🚀 What We've Built: Complete DSPy Integration
+## 🚀 What We've Built: Revolutionary Bidirectional Integration
 
-DSPex now features a **revolutionary schema-driven bridge system** that provides:
+DSPex now features a **revolutionary bidirectional tool bridge system** that provides:
 
 - ✅ **Universal DSPy Access**: Automatic discovery and exposure of all DSPy classes without manual wrappers
+- ✅ **Bidirectional Tool Calling**: Python DSPy code can call back to Elixir functions during reasoning
 - ✅ **Real-time Schema Introspection**: Automatically discovers DSPy modules, methods, and signatures
+- ✅ **Enhanced Metaprogramming**: Advanced `defdsyp` macro with automatic tool registration
 - ✅ **Seamless Elixir Integration**: Native Elixir modules that transparently call Python DSPy
 - ✅ **Production-Ready gRPC Bridge**: High-performance communication with proper session management
 - ✅ **Zero-Config Discovery**: No manual configuration needed - DSPy modules are auto-discovered
@@ -242,8 +244,7 @@ end
 # mix.exs
 def deps do
   [
-    {:dspex, "~> 0.2.0"},
-    {:snakepit, "~> 0.4.1"}  # Required for DSPy integration
+    {:dspex, "~> 0.2.0"}
   ]
 end
 ```

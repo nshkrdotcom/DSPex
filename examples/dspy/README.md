@@ -58,6 +58,22 @@ Complete showcase of all optimizers and features:
 - Session management
 - Performance benchmarking
 
+### 05_streaming_inference_pipeline.exs
+Streaming inference demonstrations:
+- Progressive result display
+- Real-time processing
+- Performance optimizations
+- Session affinity
+
+### 06_bidirectional_tool_bridge.exs ⭐ NEW
+Revolutionary bidirectional tool calling system:
+- Python DSPy calling back to Elixir functions mid-reasoning
+- Domain-specific validation (medical, financial, technical)
+- Enhanced Chain of Thought with Elixir business logic
+- Custom tool registration and business rule integration
+- Advanced metaprogramming with enhanced defdsyp macro
+- Real-time tool discovery and session introspection
+
 ## Running Without API Keys
 
 The examples will work in "mock mode" when no Gemini API key is configured. They will:
@@ -84,9 +100,11 @@ DSPex.LM.configure("google/gemini-2.0-flash-exp", api_key: System.get_env("GOOGL
 
 ## Architecture
 
-These examples demonstrate DSPex's dual implementation architecture:
-- Python DSPy modules are called through Snakepit
-- Native Elixir implementations will be used automatically when available
-- The same API works for both implementations
+These examples demonstrate DSPex's revolutionary dual implementation architecture:
+- **Unidirectional**: Python DSPy modules called through Snakepit gRPC bridge
+- **Bidirectional**: Python DSPy code can call back to Elixir functions during reasoning
+- **Native Elixir**: High-performance Elixir implementations used automatically when available
+- **Enhanced DSPy**: DSPy modules enhanced with Elixir validation and business logic
+- **Tool Bridge**: Real-time tool registration between Python and Elixir ecosystems
 
 See [DSPy Integration Guide](../../README_DSPY_INTEGRATION.md) for complete documentation.

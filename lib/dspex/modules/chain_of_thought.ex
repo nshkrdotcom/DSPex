@@ -19,7 +19,7 @@ defmodule DSPex.Modules.ChainOfThought do
       # Result includes: %{reasoning: "...", answer: "..."}
   """
   def create(signature, opts \\ []) do
-    session_id = opts[:session_id] || ID.generate("session")
+    _session_id = opts[:session_id] || ID.generate("session")
 
     case DSPex.Bridge.create_instance("dspy.ChainOfThought", %{"signature" => signature}, opts) do
       {:ok, ref} ->
@@ -37,7 +37,7 @@ defmodule DSPex.Modules.ChainOfThought do
   """
   def execute(cot_ref, inputs, opts \\ [])
 
-  def execute({session_id, cot_id} = ref, inputs, opts) do
+  def execute({_session_id, _cot_id} = ref, inputs, opts) do
     case DSPex.Bridge.call_method(ref, "__call__", inputs, opts) do
       {:ok, %{"result" => raw_result}} ->
         {:ok, transform_cot_result(raw_result)}
@@ -70,7 +70,7 @@ defmodule DSPex.Modules.ChainOfThought do
   # Transform Python result to Elixir-friendly format
   defp transform_cot_result(raw_result) do
     case raw_result do
-      %{"success" => true, "result" => %{"prediction_data" => prediction_data}} ->
+      %{"success" => true, "result" => %{"prediction_data" => _prediction_data}} ->
         # Already transformed by bridge
         raw_result
 

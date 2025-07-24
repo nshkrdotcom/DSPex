@@ -78,6 +78,42 @@ defmodule DSPex.Native.Signature do
   def parse(_), do: {:error, "Invalid signature specification"}
 
   @doc """
+  Validate a signature specification without parsing the full structure.
+  """
+  @spec validate(String.t()) :: {:ok, map()} | {:error, term()}
+  def validate(spec) when is_binary(spec) do
+    case parse(spec) do
+      {:ok, signature} ->
+        errors = []
+
+        # Basic validation checks
+        errors =
+          if length(signature.inputs) == 0,
+            do: ["No input fields specified" | errors],
+            else: errors
+
+        errors =
+          if length(signature.outputs) == 0,
+            do: ["No output fields specified" | errors],
+            else: errors
+
+        case errors do
+          [] ->
+            {:ok,
+             %{valid: true, inputs: length(signature.inputs), outputs: length(signature.outputs)}}
+
+          _ ->
+            {:error, errors}
+        end
+
+      {:error, error} ->
+        {:error, [error]}
+    end
+  end
+
+  def validate(_), do: {:error, ["Invalid signature specification"]}
+
+  @doc """
   Compile a signature for repeated use with validation and serialization.
   """
   @spec compile(String.t()) :: {:ok, map()} | {:error, term()}
