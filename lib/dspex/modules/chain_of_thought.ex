@@ -109,7 +109,11 @@ defmodule DSPex.Modules.ChainOfThought do
     error_str = to_string(error)
 
     cond do
-      String.contains?(error_str, "signature") ->
+      String.contains?(error_str, "missing 1 required positional argument: 'signature'") ->
+        "Missing signature parameter in constructor"
+
+      String.contains?(error_str, "invalid signature") or
+          String.contains?(error_str, "signature format") ->
         "Invalid signature format"
 
       String.contains?(error_str, "LM not configured") ->
