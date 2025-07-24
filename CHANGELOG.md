@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-07-23
+
+### Added
+- **Universal DSPy Bridge System**: Complete schema-driven bridge with automatic discovery of 70+ DSPy classes
+- **DSPex.Bridge**: Metaprogramming system with `defdsyp` macro for generating custom DSPy wrappers
+- **Comprehensive Variable Management**: Type-safe variable system with constraints, validation, and batch operations
+- **Dual-Backend Architecture**: Automatic switching between LocalState (microsecond latency) and BridgedState (gRPC)
+- **DSPex.Context**: Central execution context with seamless backend migration and program registration
+- **Variable-Aware DSPy Integration**: Automatic parameter binding and synchronization between Elixir variables and Python modules
+- **Production-Ready gRPC Integration**: Enhanced Snakepit v0.4.1 integration with 17 registered Python tools
+- **Advanced State Management**: Pluggable backend abstraction with state migration and capability detection
+- **3-Layer Testing Architecture**: Fast unit tests (~70ms), protocol tests, and full integration tests
+- **Comprehensive Documentation**: 45+ implementation documents, specs, and testing strategies
+- **Benchmarking Suite**: Performance comparison between local and bridged state backends
+- **Enhanced Examples**: All 5 examples updated to use real Gemini API calls with working results
+
+### Changed
+- **Updated Snakepit dependency** to v0.4.1 with enhanced gRPC capabilities  
+- **Reorganized project structure** - moved legacy code to `docs/home/` directory
+- **Enhanced Python adapters** with `dspy_grpc.py` tool registration system
+- **Improved error handling** with comprehensive Python traceback propagation
+- **Updated all examples** to demonstrate real LLM API integration
+
+### Fixed
+- **Constructor parameter binding** - resolved Snakepit JSON serialization issues with DSPy-specific signature handling
+- **Session affinity and instance storage** - proper gRPC session management with worker affinity
+- **Result transformation pipeline** - seamless handling of DSPy completions, prediction_data, and reasoning/answer pairs
+- **Automatic backend switching** - zero-downtime migration between LocalState and BridgedState
+- **Type-safe variable operations** - comprehensive constraint validation with meaningful error messages
+
+### Technical Innovations
+- **Zero-Configuration DSPy Access**: Any DSPy class usable immediately without writing Elixir wrappers
+- **Performance-Optimized Execution**: Automatic backend selection based on program requirements
+- **Dynamic Program Configuration**: Runtime parameter adjustment through variable bindings without restart
+- **Seamless State Migration**: Backend switching without data loss or service interruption
+- **Schema-Driven Auto-Discovery**: Universal access to DSPy functionality through Python introspection
+
 ## [0.1.2] - 2025-07-20
 
 ### Added

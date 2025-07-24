@@ -242,7 +242,7 @@ end
 # mix.exs
 def deps do
   [
-    {:dspex, "~> 0.1.2"},
+    {:dspex, "~> 0.2.0"},
     {:snakepit, "~> 0.4.1"}  # Required for DSPy integration
   ]
 end
