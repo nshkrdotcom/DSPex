@@ -75,31 +75,21 @@ defmodule DSPex.VariablesIntegrationTest do
       assert Variables.get(ctx, :batch_size) == 64
     end
 
-    test "backend switching preserves variables" do
+    test "session-based variable persistence" do
       {:ok, ctx} = Context.start_link()
 
-      # Start with LocalState backend
-      backend_info = Context.get_backend(ctx)
-      assert backend_info.type == :local
-
-      # Create variables
+      # Create variables using SessionStore
       Variables.defvariable!(ctx, :prompt_template, :string, "Answer: {answer}")
       Variables.defvariable!(ctx, :cache_size, :integer, 100)
 
-      values_before = Variables.get_many(ctx, [:prompt_template, :cache_size])
+      values = Variables.get_many(ctx, [:prompt_template, :cache_size])
+      
+      assert values == %{
+        prompt_template: "Answer: {answer}",
+        cache_size: 100
+      }
 
-      # Force switch to BridgedState
-      assert :ok = Context.ensure_bridged(ctx)
-
-      # Verify backend switched
-      backend_info = Context.get_backend(ctx)
-      assert backend_info.type == :bridged
-
-      # Verify variables preserved
-      values_after = Variables.get_many(ctx, [:prompt_template, :cache_size])
-      assert values_after == values_before
-
-      # Can still update variables
+      # Can update variables
       assert :ok = Variables.set(ctx, :cache_size, 200)
       assert Variables.get(ctx, :cache_size) == 200
     end

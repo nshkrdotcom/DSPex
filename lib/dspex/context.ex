@@ -253,12 +253,15 @@ defmodule DSPex.Context do
       program_count: map_size(state.programs),
       metadata: state.metadata
     }
+
     {:reply, info, state}
   end
 
   @impl true
   def handle_call({:register_program, program_id, program_spec}, _from, state) do
-    new_programs = Map.put(state.programs, program_id, program_spec)
+    # Add the program ID to the spec for introspection
+    enriched_spec = Map.put(program_spec, :id, program_id)
+    new_programs = Map.put(state.programs, program_id, enriched_spec)
     new_state = %{state | programs: new_programs}
 
     Logger.debug("Registered program #{program_id} in session #{state.session_id}")
@@ -287,6 +290,7 @@ defmodule DSPex.Context do
     case SessionStore.register_variable(state.session_id, name, type, initial_value, opts) do
       {:ok, var_id} ->
         {:reply, {:ok, var_id}, state}
+
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
@@ -297,6 +301,7 @@ defmodule DSPex.Context do
     case SessionStore.get_variable(state.session_id, identifier) do
       {:ok, variable} ->
         {:reply, {:ok, variable.value}, state}
+
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
@@ -307,6 +312,7 @@ defmodule DSPex.Context do
     case SessionStore.update_variable(state.session_id, identifier, value, metadata) do
       :ok ->
         {:reply, :ok, state}
+
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
@@ -317,6 +323,7 @@ defmodule DSPex.Context do
     case SessionStore.list_variables(state.session_id) do
       {:ok, variables} ->
         {:reply, {:ok, variables}, state}
+
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
@@ -327,6 +334,7 @@ defmodule DSPex.Context do
     case SessionStore.get_variables(state.session_id, identifiers) do
       {:ok, result} ->
         {:reply, {:ok, result}, state}
+
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
@@ -337,6 +345,7 @@ defmodule DSPex.Context do
     case SessionStore.update_variables(state.session_id, updates, metadata: metadata) do
       {:ok, _results} ->
         {:reply, :ok, state}
+
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
@@ -347,6 +356,7 @@ defmodule DSPex.Context do
     case SessionStore.delete_variable(state.session_id, identifier) do
       :ok ->
         {:reply, :ok, state}
+
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
@@ -372,9 +382,11 @@ defmodule DSPex.Context do
         case SessionStore.start_link() do
           {:ok, _} ->
             :ok
+
           {:error, reason} ->
             raise "Failed to start SessionStore: #{inspect(reason)}"
         end
+
       _pid ->
         :ok
     end

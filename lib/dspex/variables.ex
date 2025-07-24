@@ -341,15 +341,15 @@ defmodule DSPex.Variables do
   @spec get_many(context, [var_identifier]) :: map()
   def get_many(context, identifiers) do
     case Context.get_variables(context, identifiers) do
-      {:ok, values} ->
-        # Convert string keys back to atoms if needed
-        Map.new(values, fn {k, v} ->
+      {:ok, %{found: found, missing: _missing}} ->
+        # Extract values from SessionStore Variable structs and convert keys
+        Map.new(found, fn {k, var} ->
           key =
             if is_binary(k) and identifier_in_list?(k, identifiers),
               do: safe_to_atom(k, identifiers),
               else: k
 
-          {key, v}
+          {key, var.value}
         end)
 
       {:error, reason} ->
