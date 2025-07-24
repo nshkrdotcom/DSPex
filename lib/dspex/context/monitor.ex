@@ -19,13 +19,11 @@ defmodule DSPex.Context.Monitor do
       DSPex.Context.Monitor.attach_handlers()
 
   Events monitored:
-  - Backend switches
   - Variable operations
   - Errors
   """
   def attach_handlers do
     events = [
-      [:dspex, :context, :backend_switch],
       [:dspex, :context, :variable_operation],
       [:dspex, :context, :error]
     ]
@@ -47,20 +45,6 @@ defmodule DSPex.Context.Monitor do
 
   # Telemetry event handlers
 
-  defp handle_event([:dspex, :context, :backend_switch], measurements, metadata, _) do
-    Logger.info("""
-    Context backend switch:
-      Context: #{metadata.context_id}
-      From: #{inspect(metadata.from)}
-      To: #{inspect(metadata.to)}
-      Duration: #{measurements.duration_ms}ms
-    """)
-
-    if measurements.duration_ms > 50 do
-      Logger.warning("Backend switch took longer than expected: #{measurements.duration_ms}ms")
-    end
-  end
-
   defp handle_event([:dspex, :context, :variable_operation], measurements, metadata, _) do
     if measurements.duration_ms > 100 do
       Logger.warning("""
@@ -68,7 +52,7 @@ defmodule DSPex.Context.Monitor do
         Context: #{metadata.context_id}
         Operation: #{metadata.operation}
         Duration: #{measurements.duration_ms}ms
-        Backend: #{inspect(metadata.backend)}
+        Session: #{metadata.session_id}
       """)
     end
   end
@@ -206,14 +190,14 @@ defmodule DSPex.Context.Monitor do
   end
 
   @doc """
-  Watches for backend switches and logs them.
+  Watches the session and logs activity.
 
   Returns a process that monitors the context.
   """
-  def watch_switches(context) do
+  def watch_session(context) do
     spawn_link(fn ->
       initial = DSPex.Context.get_info(context)
-      watch_loop(context, initial.switches)
+      watch_loop(context, initial.program_count)
     end)
   end
 
@@ -228,20 +212,20 @@ defmodule DSPex.Context.Monitor do
     "#{Float.round(microseconds / 1000, 2)} ms"
   end
 
-  defp watch_loop(context, last_switches) do
+  defp watch_loop(context, last_count) do
     Process.sleep(1000)
 
     case DSPex.Context.get_info(context) do
-      %{switches: ^last_switches} ->
+      %{program_count: ^last_count} ->
         # No change
-        watch_loop(context, last_switches)
+        watch_loop(context, last_count)
 
-      %{switches: new_switches} = info ->
+      %{program_count: new_count, session_id: session_id} ->
         Logger.info(
-          "Context #{DSPex.Context.get_session_id(context)} switched backends! Now using #{inspect(info.metadata.backend)}"
+          "Context #{session_id} program count changed: #{last_count} -> #{new_count}"
         )
 
-        watch_loop(context, new_switches)
+        watch_loop(context, new_count)
 
       _ ->
         # Context might be dead

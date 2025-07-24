@@ -35,7 +35,6 @@ defmodule DSPex.Examples.VariableAwareDSPy do
     )
     
     # Register a variable-aware DSPy program
-    # This will trigger backend switch to BridgedState
     program_id = "qa_assistant"
     
     Context.register_program(ctx, program_id, %{
@@ -173,13 +172,13 @@ defmodule DSPex.Examples.VariableAwareDSPy do
   end
   
   @doc """
-  Demonstrates backend switching with variable preservation.
+  Demonstrates session-based variable persistence with DSPy programs.
   """
-  def backend_switching_example do
+  def session_persistence_example do
     {:ok, ctx} = Context.start_link()
     
-    # Start with pure Elixir operations
-    IO.puts("Starting with LocalState backend...")
+    # Create session variables using SessionStore
+    IO.puts("Creating session variables...")
     
     Variables.defvariable!(ctx, :system_prompt, :string, 
       "You are a helpful AI assistant.",
@@ -190,13 +189,11 @@ defmodule DSPex.Examples.VariableAwareDSPy do
       constraints: %{enum: ["concise", "detailed", "technical", "casual"]}
     )
     
-    # Show we're using LocalState
-    backend_info = Context.get_backend(ctx)
-    IO.puts("Current backend: #{backend_info.type}")
     IO.puts("Variables defined: #{length(Variables.list(ctx))}")
+    IO.puts("Session ID: #{Context.get_session_id(ctx)}")
     
-    # Now register a DSPy program - this triggers switch to BridgedState
-    IO.puts("\nRegistering DSPy program (triggers backend switch)...")
+    # Register a DSPy program that can access session variables
+    IO.puts("\nRegistering DSPy program...")
     
     Context.register_program(ctx, "style_aware_assistant", %{
       type: :dspy,
@@ -212,27 +209,24 @@ defmodule DSPex.Examples.VariableAwareDSPy do
       }
     })
     
-    # Check backend again
-    backend_info = Context.get_backend(ctx)
-    IO.puts("Backend after DSPy registration: #{backend_info.type}")
-    IO.puts("Switches: #{backend_info.switches}")
+    # Show session variables are preserved
+    IO.puts("Variables still available: #{length(Variables.list(ctx))}")
     
-    # Verify variables survived the switch
-    IO.puts("\nVariables after switch:")
+    # List current variables
+    IO.puts("\nCurrent session variables:")
     for var <- Variables.list(ctx) do
       IO.puts("  #{var.name} = #{inspect(var.value)}")
     end
     
-    # Use the program with different styles
+    # Demonstrate variable updates affect program behavior
     for style <- ["concise", "detailed", "technical"] do
       Variables.set(ctx, :response_style, style)
       
-      {:ok, result} = Context.call(ctx, "style_aware_assistant", %{
-        query: "Explain quantum computing"
-      })
-      
-      IO.puts("\nResponse in #{style} style:")
-      IO.puts(result["response"])
+      # Note: This would work with Snakepit running
+      IO.puts("\nWould call program with #{style} style...")
+      # {:ok, result} = Context.call(ctx, "style_aware_assistant", %{
+      #   query: "Explain quantum computing"
+      # })
     end
     
     ctx
@@ -248,8 +242,8 @@ defmodule DSPex.Examples.VariableAwareDSPy do
     IO.puts("\n=== Adaptive Reasoning Example ===\n")
     adaptive_reasoning_example()
     
-    IO.puts("\n=== Backend Switching Example ===\n")
-    backend_switching_example()
+    IO.puts("\n=== Session Persistence Example ===\n")
+    session_persistence_example()
     
     :ok
   end
