@@ -28,7 +28,6 @@ defmodule DSPex do
       {:ok, result} = DSPex.run_pipeline(pipeline, %{query: "machine learning"})
   """
 
-  alias DSPex.Router
   alias DSPex.Pipeline
 
   # Type aliases for cleaner specs
@@ -80,7 +79,9 @@ defmodule DSPex do
     * `:stream` - Enable streaming responses
   """
   @spec predict(signature(), map(), keyword()) :: {:ok, map()} | {:error, term()}
-  defdelegate predict(signature, inputs, opts \\ []), to: Router
+  def predict(signature, inputs, opts \\ []) do
+    DSPex.Modules.Predict.predict(signature, inputs, opts)
+  end
 
   @doc """
   Chain of Thought reasoning.
@@ -88,7 +89,9 @@ defmodule DSPex do
   Generates step-by-step reasoning before the final answer.
   """
   @spec chain_of_thought(signature(), map(), keyword()) :: {:ok, map()} | {:error, term()}
-  defdelegate chain_of_thought(signature, inputs, opts \\ []), to: Router
+  def chain_of_thought(signature, inputs, opts \\ []) do
+    DSPex.Modules.ChainOfThought.think(signature, inputs, opts)
+  end
 
   @doc """
   ReAct pattern - Reasoning + Acting with tools.
@@ -104,7 +107,9 @@ defmodule DSPex do
   """
   @spec react(signature(), map(), list(map()), keyword()) ::
           {:ok, map()} | {:error, term()}
-  defdelegate react(signature, inputs, tools, opts \\ []), to: Router
+  def react(signature, inputs, tools, opts \\ []) do
+    DSPex.Modules.ReAct.reason_and_act(signature, inputs, tools, opts)
+  end
 
   # Pipeline operations
 
@@ -190,9 +195,19 @@ defmodule DSPex do
     %{
       status: :ok,
       version: "0.1.0",
-      pools: DSPex.Python.PoolManager.status(),
-      native_modules: DSPex.Native.Registry.list(),
-      python_modules: DSPex.Python.Registry.list()
+      snakepit_status: snakepit_status(),
+      native_modules: DSPex.Native.Registry.list()
     }
+  end
+
+  defp snakepit_status do
+    case Snakepit.get_stats() do
+      stats when is_map(stats) ->
+        Map.put(stats, :status, :running)
+      _ ->
+        %{status: :not_available}
+    end
+  catch
+    _, _ -> %{status: :error}
   end
 end

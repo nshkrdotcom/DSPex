@@ -203,7 +203,6 @@ defmodule DSPex.Context.Monitor do
 
   # Private helpers
 
-
   defp format_time(microseconds) when microseconds < 1000 do
     "#{Float.round(microseconds, 2)} μs"
   end
@@ -221,9 +220,7 @@ defmodule DSPex.Context.Monitor do
         watch_loop(context, last_count)
 
       %{program_count: new_count, session_id: session_id} ->
-        Logger.info(
-          "Context #{session_id} program count changed: #{last_count} -> #{new_count}"
-        )
+        Logger.info("Context #{session_id} program count changed: #{last_count} -> #{new_count}")
 
         watch_loop(context, new_count)
 

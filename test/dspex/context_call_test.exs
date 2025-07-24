@@ -13,7 +13,6 @@ defmodule DSPex.ContextCallTest do
       assert {:error, {:program_not_found, "nonexistent"}} = Context.call(ctx, "nonexistent", %{})
     end
 
-
     test "stores program ID in spec when registering", %{ctx: ctx} do
       Context.register_program(ctx, "my_program", %{
         type: :dspy,

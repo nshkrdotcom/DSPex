@@ -83,11 +83,11 @@ defmodule DSPex.VariablesIntegrationTest do
       Variables.defvariable!(ctx, :cache_size, :integer, 100)
 
       values = Variables.get_many(ctx, [:prompt_template, :cache_size])
-      
+
       assert values == %{
-        prompt_template: "Answer: {answer}",
-        cache_size: 100
-      }
+               prompt_template: "Answer: {answer}",
+               cache_size: 100
+             }
 
       # Can update variables
       assert :ok = Variables.set(ctx, :cache_size, 200)

@@ -67,7 +67,7 @@ defmodule DSPexTest do
 
       assert status.status == :ok
       assert status.version == "0.1.0"
-      assert is_map(status.pools)
+      assert is_map(status.snakepit_status)
       assert is_list(status.native_modules)
     end
   end

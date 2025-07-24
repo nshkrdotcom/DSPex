@@ -9,17 +9,8 @@ defmodule DSPex.Application do
       # Registry for tracking Python processes
       {Registry, keys: :unique, name: DSPex.ProcessRegistry},
 
-      # Python pool manager (Snakepit pools)
-      DSPex.Python.PoolManager,
-
       # Native module registry
-      DSPex.Native.Registry,
-
-      # Python module registry
-      DSPex.Python.Registry,
-
-      # Router with its registries
-      DSPex.Router
+      DSPex.Native.Registry
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
@@ -36,8 +27,7 @@ defmodule DSPex.Application do
 
   @impl true
   def stop(_state) do
-    # Cleanup Python processes gracefully
-    DSPex.Python.PoolManager.shutdown()
+    # Snakepit manages its own lifecycle
     :ok
   end
 end
