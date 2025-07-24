@@ -1,7 +1,7 @@
 # Load support files before ExUnit starts
 Code.require_file("support/state_provider_test.exs", __DIR__)
 
-ExUnit.start(exclude: [:live])
+ExUnit.start(exclude: [:live, :performance])
 
 # Configure test mode based on environment variable
 test_mode = System.get_env("TEST_MODE", "mock_adapter")

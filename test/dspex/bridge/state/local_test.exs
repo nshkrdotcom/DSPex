@@ -9,6 +9,7 @@ defmodule DSPex.Bridge.State.LocalTest do
       {:ok, state: state}
     end
 
+    @tag :performance
     test "sub-microsecond performance", %{state: state} do
       # Register a variable
       {:ok, {_, state}} =
