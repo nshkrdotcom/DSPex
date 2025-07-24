@@ -3,9 +3,11 @@
 
 # Configure Snakepit for pooling
 Application.put_env(:snakepit, :pooling_enabled, true)
-Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.EnhancedPython)
-Application.put_env(:snakepit, :wire_protocol, :auto)
-Application.put_env(:snakepit, :pool_config, %{pool_size: 2})
+Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.GRPCPython)
+Application.put_env(:snakepit, :pool_config, %{
+  pool_size: 2,
+  adapter_args: ["--adapter", "dspex_adapters.dspy_grpc.DSPyGRPCHandler"]
+})
 
 # Load config
 config_path = Path.join(__DIR__, "../config.exs")

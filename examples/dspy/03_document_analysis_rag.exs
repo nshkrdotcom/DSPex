@@ -1,11 +1,13 @@
 # Document Analysis with RAG - Demonstrates retrievers and advanced optimizers
 # Run with: mix run examples/dspy/03_document_analysis_rag.exs
 
-# Configure Snakepit for pooling
+# Configure Snakepit for pooling BEFORE starting
 Application.put_env(:snakepit, :pooling_enabled, true)
-Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.EnhancedPython)
-Application.put_env(:snakepit, :wire_protocol, :auto)
-Application.put_env(:snakepit, :pool_config, %{pool_size: 4})
+Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.GRPCPython)
+Application.put_env(:snakepit, :pool_config, %{
+  pool_size: 4,
+  adapter_args: ["--adapter", "dspex_adapters.dspy_grpc.DSPyGRPCHandler"]
+})
 
 # Stop and restart applications if already started
 Application.stop(:dspex)
@@ -15,8 +17,14 @@ Application.stop(:snakepit)
 {:ok, _} = Application.ensure_all_started(:snakepit)
 {:ok, _} = Application.ensure_all_started(:dspex)
 
-# Initialize DSPex
-{:ok, _} = DSPex.Config.init()
+# Check DSPy availability using new integration
+case Snakepit.execute_in_session("rag_session", "check_dspy", %{}) do
+  {:ok, %{"available" => true}} -> 
+    IO.puts("✓ DSPy available")
+  {:error, error} -> 
+    IO.puts("✗ DSPy check failed: #{inspect(error)}")
+    System.halt(1)
+end
 
 # Load config and configure Gemini as default language model
 config_path = Path.join(__DIR__, "../config.exs")
@@ -24,13 +32,27 @@ config_data = Code.eval_file(config_path) |> elem(0)
 api_key = config_data.api_key
 
 if api_key do
-  IO.puts("Configuring Gemini for document analysis...")
-  DSPex.LM.configure(config_data.model, api_key: api_key)
+  IO.puts("\n✓ Configuring Gemini...")
+  IO.puts("  API Key: #{String.slice(api_key, 0..5)}...#{String.slice(api_key, -4..-1)}")
+  
+  # Configure Gemini using the gRPC bridge  
+  case Snakepit.execute_in_session("rag_session", "configure_lm", %{
+    "model_type" => "gemini", 
+    "api_key" => api_key,
+    "model" => config_data.model
+  }) do
+    {:ok, %{"success" => true}} -> IO.puts("  Successfully configured!")
+    {:ok, %{"success" => false, "error" => error}} -> IO.puts("  Configuration error: #{error}")
+    {:error, error} -> IO.puts("  Configuration error: #{inspect(error)}")
+  end
 else
-  IO.puts("WARNING: No Gemini API key found!")
-  IO.puts("Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")
-  IO.puts("Running in mock mode...")
-  DSPex.LM.configure("mock/gemini")
+  IO.puts("\n⚠️  WARNING: No Gemini API key found!")
+  IO.puts("  Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")
+  IO.puts("  Get your free API key at: https://makersuite.google.com/app/apikey")
+  IO.puts("  ")
+  IO.puts("  Example: export GOOGLE_API_KEY=your-gemini-api-key")
+  IO.puts("  ")
+  IO.puts("  Running without LLM - examples will show expected errors...")
 end
 
 defmodule DocumentAnalysisRAG do
@@ -169,28 +191,60 @@ defmodule DocumentAnalysisRAG do
       IO.puts("\nQ: #{question}")
       
       # Process query
-      {:ok, processed} = DSPex.Modules.Predict.execute(query_processor, %{
+      {search_query, intent} = case DSPex.Modules.Predict.execute(query_processor, %{
         question: question
-      })
-      
-      search_query = get_in(processed, ["result", "prediction_data", "search_query"]) || question
-      intent = get_in(processed, ["result", "prediction_data", "intent"]) || "general"
-      
-      IO.puts("Search Query: #{search_query}")
-      IO.puts("Intent: #{intent}")
+      }) do
+        {:ok, result} ->
+          sq = case result do
+            %{"success" => true, "result" => prediction_data} ->
+              prediction_data["search_query"] || question
+            %{"search_query" => sq} ->
+              sq
+            _ ->
+              question
+          end
+          
+          i = case result do
+            %{"success" => true, "result" => prediction_data} ->
+              prediction_data["intent"] || "general"
+            %{"intent" => i} ->
+              i
+            _ ->
+              "general"
+          end
+          
+          IO.puts("Search Query: #{sq}")
+          IO.puts("Intent: #{i}")
+          {sq, i}
+        {:error, error} ->
+          IO.puts("Error processing query: #{inspect(error)}")
+          {question, "general"}
+      end
       
       # Retrieve relevant context using mock retriever
       relevant_docs = mock_retrieve.(search_query, documents, 2)
       context = Enum.join(relevant_docs, " ")
       
       # Generate answer with context
-      {:ok, answer} = DSPex.Modules.ChainOfThought.execute(answer_generator, %{
+      case DSPex.Modules.ChainOfThought.execute(answer_generator, %{
         question: question,
         context: context
-      })
-      
-      answer_text = get_in(answer, ["result", "prediction_data", "answer"]) || "No answer generated"
-      IO.puts("Answer: #{answer_text}")
+      }) do
+        {:ok, result} ->
+          answer_text = case result do
+            %{"success" => true, "result" => prediction_data} ->
+              prediction_data["answer"] || "No answer field in result"
+            %{"success" => false, "error" => error} ->
+              "Error: #{error}"
+            %{"answer" => answer_text} ->
+              answer_text
+            _ ->
+              "Generated response: #{inspect(result)}"
+          end
+          IO.puts("Answer: #{answer_text}")
+        {:error, error} ->
+          IO.puts("Error generating answer: #{inspect(error)}")
+      end
       IO.puts(String.duplicate("-", 50))
     end
   end

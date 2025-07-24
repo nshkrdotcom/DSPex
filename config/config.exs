@@ -4,14 +4,14 @@ import Config
 config :dspex, :llm,
   default_adapter: :instructor_lite,
   default_provider: :gemini,
-  default_model: "gemini/gemini-2.0-flash-exp",
+  default_model: "gemini/gemini-2.5-flash-lite",
   adapters: [
     instructor_lite: [
       default_provider: :gemini,
       providers: [
         gemini: [
           api_key: {:system, "GEMINI_API_KEY"},
-          model: "gemini/gemini-2.0-flash-exp"
+          model: "gemini/gemini-2.5-flash-lite"
         ],
         openai: [
           api_key: {:system, "OPENAI_API_KEY"}
@@ -24,7 +24,7 @@ config :dspex, :llm,
     gemini: [
       auth_strategy: :gemini,
       api_key: {:system, "GEMINI_API_KEY"},
-      model: "gemini/gemini-2.0-flash-exp"
+      model: "gemini/gemini-2.5-flash-lite"
     ],
     http: [
       timeout: 60_000,
@@ -36,12 +36,14 @@ config :dspex, :llm,
     ]
   ]
 
-# Configure Snakepit
+# Configure Snakepit with gRPC adapter
 config :snakepit,
   pools: [
     default: [
-      size: 4,
-      max_overflow: 2
+      size: 1,
+      max_overflow: 0,
+      adapter: Snakepit.Adapters.GRPCPython,
+      adapter_args: ["--adapter", "dspex_adapters.dspy_grpc.DSPyGRPCHandler"]
     ]
   ]
 

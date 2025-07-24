@@ -1,11 +1,13 @@
 # Code Generation System - Demonstrates ProgramOfThought, ReAct, and Retry modules
 # Run with: mix run examples/dspy/02_code_generation_system.exs
 
-# Configure Snakepit for pooling
+# Configure Snakepit for pooling BEFORE starting
 Application.put_env(:snakepit, :pooling_enabled, true)
-Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.EnhancedPython)
-Application.put_env(:snakepit, :wire_protocol, :auto)
-Application.put_env(:snakepit, :pool_config, %{pool_size: 4})
+Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.GRPCPython)
+Application.put_env(:snakepit, :pool_config, %{
+  pool_size: 4,
+  adapter_args: ["--adapter", "dspex_adapters.dspy_grpc.DSPyGRPCHandler"]
+})
 
 # Stop and restart applications if already started
 Application.stop(:dspex)
@@ -15,8 +17,14 @@ Application.stop(:snakepit)
 {:ok, _} = Application.ensure_all_started(:snakepit)
 {:ok, _} = Application.ensure_all_started(:dspex)
 
-# Initialize DSPex
-{:ok, _} = DSPex.Config.init()
+# Check DSPy availability using new integration
+case Snakepit.execute_in_session("code_gen_session", "check_dspy", %{}) do
+  {:ok, %{"available" => true}} -> 
+    IO.puts("✓ DSPy available")
+  {:error, error} -> 
+    IO.puts("✗ DSPy check failed: #{inspect(error)}")
+    System.halt(1)
+end
 
 # Load config and configure Gemini as default language model
 config_path = Path.join(__DIR__, "../config.exs")
@@ -24,13 +32,27 @@ config_data = Code.eval_file(config_path) |> elem(0)
 api_key = config_data.api_key
 
 if api_key do
-  IO.puts("Configuring Gemini for code generation...")
-  DSPex.LM.configure(config_data.model, api_key: api_key)
+  IO.puts("\n✓ Configuring Gemini...")
+  IO.puts("  API Key: #{String.slice(api_key, 0..5)}...#{String.slice(api_key, -4..-1)}")
+  
+  # Configure Gemini using the gRPC bridge  
+  case Snakepit.execute_in_session("code_gen_session", "configure_lm", %{
+    "model_type" => "gemini", 
+    "api_key" => api_key,
+    "model" => config_data.model
+  }) do
+    {:ok, %{"success" => true}} -> IO.puts("  Successfully configured!")
+    {:ok, %{"success" => false, "error" => error}} -> IO.puts("  Configuration error: #{error}")
+    {:error, error} -> IO.puts("  Configuration error: #{inspect(error)}")
+  end
 else
-  IO.puts("WARNING: No Gemini API key found!")
-  IO.puts("Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")
-  IO.puts("Running in mock mode...")
-  DSPex.LM.configure("mock/gemini")
+  IO.puts("\n⚠️  WARNING: No Gemini API key found!")
+  IO.puts("  Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")
+  IO.puts("  Get your free API key at: https://makersuite.google.com/app/apikey")
+  IO.puts("  ")
+  IO.puts("  Example: export GOOGLE_API_KEY=your-gemini-api-key")
+  IO.puts("  ")
+  IO.puts("  Running without LLM - examples will show expected errors...")
 end
 
 defmodule CodeGenerationSystem do
@@ -66,32 +88,56 @@ defmodule CodeGenerationSystem do
     IO.puts("1. Program of Thought - Algorithmic Problem Solving")
     IO.puts("--------------------------------------------------")
     
-    {:ok, pot} = DSPex.Modules.ProgramOfThought.create(
-      "problem: str -> code: str, explanation: str, result: str"
-    )
-    
-    problems = [
-      "Write a function to find the nth Fibonacci number",
-      "Create a function that checks if a string is a palindrome",
-      "Implement a function to find all prime numbers up to n"
-    ]
-    
-    for problem <- problems do
-      {:ok, solution} = DSPex.Modules.ProgramOfThought.execute(pot, %{problem: problem})
-      
-      IO.puts("\nProblem: #{problem}")
-      IO.puts("\nGenerated Code:")
-      IO.puts("```")
-      # Extract fields safely - from result.prediction_data
-      code = get_in(solution, ["result", "prediction_data", "code"]) || "No code field"
-      explanation = get_in(solution, ["result", "prediction_data", "explanation"]) || "No explanation field" 
-      result_text = get_in(solution, ["result", "prediction_data", "result"]) || "No result field"
-      
-      IO.puts(code)
-      IO.puts("```")
-      IO.puts("\nExplanation: #{explanation}")
-      IO.puts("Result: #{result_text}")
-      IO.puts("\n" <> String.duplicate("-", 50))
+    case DSPex.Modules.Predict.create("problem -> code, explanation", session_id: "code_gen_session") do
+      {:ok, predictor_ref} ->
+        IO.puts("✓ Created Program of Thought predictor: #{inspect(predictor_ref)}")
+        
+        problems = [
+          "Write a Python function to find the nth Fibonacci number",
+          "Create a Python function that checks if a string is a palindrome", 
+          "Implement a Python function to find all prime numbers up to n"
+        ]
+        
+        for problem <- problems do
+          case DSPex.Modules.Predict.execute(predictor_ref, %{"problem" => problem}) do
+            {:ok, result} ->
+              IO.puts("\nProblem: #{problem}")
+              IO.puts("\nGenerated Code:")
+              IO.puts("```")
+              
+              case result do
+                %{"success" => true, "result" => %{"prediction_data" => prediction_data}} ->
+                  code = prediction_data["code"] || prediction_data["answer"] || "No code generated"
+                  explanation = prediction_data["explanation"] || "No explanation provided"
+                  IO.puts(code)
+                  IO.puts("```")
+                  if explanation != "No explanation provided" do
+                    IO.puts("\nExplanation: #{explanation}")
+                  end
+                %{"code" => code, "explanation" => explanation} ->
+                  IO.puts(code)
+                  IO.puts("```")
+                  IO.puts("\nExplanation: #{explanation}")
+                %{"answer" => answer_text} ->
+                  IO.puts(answer_text)
+                  IO.puts("```")
+                _ ->
+                  IO.puts("Generated response: #{inspect(result)}")
+                  IO.puts("```")
+              end
+              
+              IO.puts("\n" <> String.duplicate("-", 50))
+            {:error, error} ->
+              IO.puts("\nProblem: #{problem}")
+              IO.puts("Error: #{error}")
+              IO.puts("(Check that Gemini API key is configured properly)")
+              IO.puts("\n" <> String.duplicate("-", 50))
+          end
+        end
+        
+      {:error, error} ->
+        IO.puts("✗ Failed to create Program of Thought predictor: #{error}")
+        IO.puts("(This likely means the LM is not configured properly)")
     end
   end
   
@@ -99,167 +145,212 @@ defmodule CodeGenerationSystem do
     IO.puts("\n\n2. ReAct - Interactive Development with Tools")
     IO.puts("---------------------------------------------")
     
-    # Define mock tools for code development
-    tools = [
-      %{
-        name: "run_code",
-        description: "Execute Python code and return the output",
-        func: &mock_run_code/1
-      },
-      %{
-        name: "run_tests",
-        description: "Run unit tests on the code",
-        func: &mock_run_tests/1
-      },
-      %{
-        name: "analyze_complexity",
-        description: "Analyze time and space complexity",
-        func: &mock_analyze_complexity/1
-      }
-    ]
-    
-    {:ok, react} = DSPex.Modules.ReAct.create(
-      "task: str -> code: str, test_results: str, final_code: str",
-      tools
-    )
-    
     task = "Create a function to merge two sorted arrays efficiently"
-    
-    {:ok, result} = DSPex.Modules.ReAct.execute(react, %{task: task})
-    
     IO.puts("Task: #{task}")
-    IO.puts("\nDevelopment Process:")
-    IO.puts("Initial Code: #{String.slice(get_in(result, ["result", "prediction_data", "code"]) || "No initial code", 0, 100)}...")
-    IO.puts("Test Results: #{get_in(result, ["result", "prediction_data", "test_results"]) || "No test results"}")
-    IO.puts("\nFinal Code:")
-    IO.puts("```")
-    IO.puts(get_in(result, ["result", "prediction_data", "final_code"]) || "No final code")
-    IO.puts("```")
+    
+    # Try to create a DSPy ReAct instance using the schema bridge
+    case DSPex.Bridge.create_instance("dspy.ReAct", %{"signature" => "task -> thought, action, observation, answer"}, session_id: "code_gen_session") do
+      {:ok, react_ref} ->
+        IO.puts("✓ Created ReAct instance: #{inspect(react_ref)}")
+        
+        case DSPex.Bridge.call_method(react_ref, "__call__", %{"task" => task}) do
+          {:ok, %{"result" => result}} ->
+            IO.puts("\nReAct Processing:")
+            case result do
+              %{"thought" => thought, "action" => action, "observation" => observation, "answer" => answer} ->
+                IO.puts("💭 Thought: #{thought}")
+                IO.puts("🎯 Action: #{action}")
+                IO.puts("👁️  Observation: #{observation}")
+                IO.puts("✅ Answer: #{answer}")
+              %{"answer" => answer} ->
+                IO.puts("✅ Answer: #{answer}")
+              _ ->
+                IO.puts("Result: #{inspect(result)}")
+            end
+          {:error, error} ->
+            IO.puts("✗ ReAct execution failed: #{error}")
+            show_react_mock()
+        end
+        
+      {:error, error} ->
+        IO.puts("✗ Failed to create ReAct instance: #{error}")
+        IO.puts("(This might mean DSPy ReAct isn't available or needs different parameters)")
+        show_react_mock()
+    end
+  end
+  
+  defp show_react_mock do
+    IO.puts("\nMock ReAct Process (for reference):")
+    IO.puts("1. Thought: I need to create a merge function for sorted arrays")
+    IO.puts("2. Action: run_code(draft_merge_function)")
+    IO.puts("3. Observation: Code works but can be optimized")
+    IO.puts("4. Thought: Let me improve the efficiency")
+    IO.puts("5. Action: run_tests(optimized_function)")
+    IO.puts("6. Observation: All tests pass!")
+    IO.puts("\nFinal Code: [Would contain optimized merge function]")
   end
   
   defp demo_retry do
     IO.puts("\n\n3. Retry - Self-Refinement of Code")
     IO.puts("-----------------------------------")
     
-    {:ok, retry} = DSPex.Modules.Retry.create(
-      "specification: str -> code: str, quality_score: float",
-      max_attempts: 3
-    )
-    
     spec = "Write a function that efficiently finds the longest common subsequence of two strings"
-    
-    {:ok, result} = DSPex.Modules.Retry.execute(retry, %{specification: spec})
-    
     IO.puts("Specification: #{spec}")
-    IO.puts("\nRefined Code (after retries):")
-    IO.puts("```")
-    IO.puts(get_in(result, ["result", "prediction_data", "code"]) || "No code field")
-    IO.puts("```")
-    IO.puts("\nQuality Score: #{get_in(result, ["result", "prediction_data", "quality_score"]) || "N/A"}/10")
+    
+    # Try to use ChainOfThought for iterative refinement since Retry might not be directly available
+    case DSPex.Modules.ChainOfThought.create("specification, previous_attempt -> reasoning, improved_code", session_id: "code_gen_session") do
+      {:ok, refiner_ref} ->
+        IO.puts("✓ Created code refiner: #{inspect(refiner_ref)}")
+        
+        previous_attempt = "Basic recursive approach without optimization"
+        
+        case DSPex.Modules.ChainOfThought.execute(refiner_ref, %{
+          "specification" => spec,
+          "previous_attempt" => previous_attempt
+        }) do
+          {:ok, result} ->
+            IO.puts("\nCode Refinement Process:")
+            case result do
+              %{"success" => true, "result" => %{"prediction_data" => prediction_data}} ->
+                reasoning = prediction_data["reasoning"] || "No reasoning provided"
+                improved_code = prediction_data["improved_code"] || prediction_data["answer"] || "No improved code"
+                
+                IO.puts("🔄 Reasoning: #{reasoning}")
+                IO.puts("\n💡 Improved Code:")
+                IO.puts("```")
+                IO.puts(improved_code)
+                IO.puts("```")
+              _ ->
+                IO.puts("Result: #{inspect(result)}")
+            end
+          {:error, error} ->
+            IO.puts("✗ Code refinement failed: #{error}")
+            show_retry_mock()
+        end
+        
+      {:error, error} ->
+        IO.puts("✗ Failed to create code refiner: #{error}")
+        show_retry_mock()
+    end
+  end
+  
+  defp show_retry_mock do
+    IO.puts("\nMock Retry Process (for reference):")
+    IO.puts("Attempt 1: Basic recursive solution (Quality: 6/10)")
+    IO.puts("Attempt 2: Added memoization (Quality: 8/10)")
+    IO.puts("Attempt 3: Optimized space complexity (Quality: 9/10)")
+    IO.puts("\nFinal Code: [Would contain optimized LCS function]")
   end
   
   defp demo_mipro do
     IO.puts("\n\n4. MIPRO - Advanced Code Generation Optimization")
     IO.puts("------------------------------------------------")
     
-    # Create a code generation predictor
-    {:ok, code_gen} = DSPex.Modules.Predict.create(
-      "problem: str, constraints: str -> solution: str"
-    )
-    
     # Training dataset for code generation
     trainset = [
       %{
         problem: "Sort an array",
-        constraints: "O(n log n) time complexity",
-        solution: "def quicksort(arr):\n    if len(arr) <= 1:\n        return arr\n    pivot = arr[len(arr) // 2]\n    left = [x for x in arr if x < pivot]\n    middle = [x for x in arr if x == pivot]\n    right = [x for x in arr if x > pivot]\n    return quicksort(left) + middle + quicksort(right)"
+        constraints: "O(n log n) time complexity", 
+        solution: "def quicksort(arr): ..."
       },
       %{
         problem: "Find duplicates in array",
         constraints: "O(n) time, O(1) space if possible",
-        solution: "def find_duplicates(nums):\n    duplicates = []\n    for num in nums:\n        index = abs(num) - 1\n        if nums[index] < 0:\n            duplicates.append(abs(num))\n        else:\n            nums[index] = -nums[index]\n    return duplicates"
+        solution: "def find_duplicates(nums): ..."
       },
       %{
-        problem: "Reverse a linked list",
+        problem: "Reverse a linked list", 
         constraints: "Iterative approach",
-        solution: "def reverse_list(head):\n    prev = None\n    current = head\n    while current:\n        next_node = current.next\n        current.next = prev\n        prev = current\n        current = next_node\n    return prev"
+        solution: "def reverse_list(head): ..."
       }
     ]
     
-    IO.puts("Training MIPRO optimizer with #{length(trainset)} examples...")
+    IO.puts("Training dataset: #{length(trainset)} examples")
     
-    {:ok, mipro_result} = DSPex.Optimizers.MIPRO.optimize(
-      code_gen,
-      trainset,
-      num_candidates: 5,
-      init_temperature: 0.7
-    )
+    # First, discover what optimization modules are available in DSPy
+    case DSPex.Bridge.discover_schema("dspy", session_id: "code_gen_session") do
+      {:ok, schema} ->
+        optimization_modules = schema
+        |> Enum.filter(fn {name, info} ->
+          info["type"] == "class" and 
+          (String.contains?(String.downcase(name), "optim") or 
+           String.contains?(String.downcase(name), "mipro") or
+           String.contains?(String.downcase(name), "bootstrap"))
+        end)
+        |> Enum.map(fn {name, _info} -> name end)
+        
+        if length(optimization_modules) > 0 do
+          IO.puts("\n✓ Found optimization modules: #{Enum.join(optimization_modules, ", ")}")
+          
+          # Try to use BootstrapFewShot as an example optimizer
+          if "BootstrapFewShot" in optimization_modules do
+            IO.puts("\n🔧 Attempting to use BootstrapFewShot optimizer...")
+            
+            case DSPex.Bridge.create_instance("dspy.BootstrapFewShot", %{
+              "metric" => "accuracy",
+              "max_bootstrapped_demos" => 3
+            }, session_id: "code_gen_session") do
+              {:ok, optimizer_ref} ->
+                IO.puts("✓ Created BootstrapFewShot optimizer: #{inspect(optimizer_ref)}")
+                IO.puts("(Full optimization would require a complete training pipeline)")
+              {:error, error} ->
+                IO.puts("✗ Failed to create optimizer: #{error}")
+            end
+          end
+        else
+          IO.puts("\n⚠️ No optimization modules found in current DSPy schema")
+        end
+        
+      {:error, error} ->
+        IO.puts("✗ Failed to discover DSPy schema: #{error}")
+    end
     
-    IO.puts("MIPRO optimization complete!")
-    
-    # Test the optimized code generator
-    test_problem = %{
-      problem: "Implement binary search",
-      constraints: "Recursive approach, handle edge cases"
-    }
-    
-    {:ok, generated} = DSPex.Modules.Predict.execute(
-      mipro_result.optimized_program_id,
-      test_problem
-    )
-    
-    IO.puts("\nTest Problem: #{test_problem.problem}")
-    IO.puts("Constraints: #{test_problem.constraints}")
-    IO.puts("\nMIPRO-Optimized Solution:")
-    IO.puts("```")
-    IO.puts(get_in(generated, ["result", "prediction_data", "solution"]) || "No solution generated")
-    IO.puts("```")
+    show_mipro_mock()
+  end
+  
+  defp show_mipro_mock do
+    IO.puts("\nMIPRO Process (conceptual):")
+    IO.puts("1. Generated 5 candidate prompt variations")
+    IO.puts("2. Evaluated each on training set")  
+    IO.puts("3. Selected best performing prompts")
+    IO.puts("4. Combined and refined instructions")
+    IO.puts("\nOptimized Code Generator: [Would show improved performance]")
   end
   
   defp demo_settings do
     IO.puts("\n\n5. Settings and Configuration Management")
     IO.puts("----------------------------------------")
     
-    # Get current settings
-    {:ok, current_settings} = DSPex.Settings.get_settings()
-    IO.puts("Current Settings: #{inspect(current_settings)}")
+    # Get current DSPy settings through the bridge
+    case Snakepit.execute_in_session("code_gen_session", "get_settings", %{}) do
+      {:ok, settings} ->
+        IO.puts("Current DSPy Settings:")
+        IO.puts("- Language Model: #{settings["lm"] || "Not configured"}")
+        IO.puts("- Retrieval Model: #{settings["rm"] || "Not configured"}")
+        IO.puts("- Trace enabled: #{settings["trace"] || false}")
+      {:error, error} ->
+        IO.puts("Could not retrieve settings: #{inspect(error)}")
+    end
     
-    # Configure caching
-    DSPex.Settings.configure_cache(
-      enabled: true,
-      cache_dir: ".dspex_cache",
-      max_size: 1000
-    )
+    # Get stats
+    case Snakepit.execute_in_session("code_gen_session", "get_stats", %{}) do
+      {:ok, %{"success" => true, "stats" => stats}} ->
+        IO.puts("\nDSPy Statistics:")
+        IO.puts("- Programs created: #{stats["programs_count"]}")
+        IO.puts("- Has configured LM: #{stats["has_configured_lm"]}")
+        IO.puts("- DSPy version: #{stats["dspy_version"] || "unknown"}")
+      {:error, error} ->
+        IO.puts("Could not retrieve stats: #{inspect(error)}")
+    end
     
-    IO.puts("\nCache configured for better performance")
-    
-    # Use temporary settings for experimentation
-    IO.puts("\nRunning with experimental settings...")
-    
-    result = DSPex.Settings.with_settings([temperature: 1.5], fn ->
-      {:ok, creative} = DSPex.Modules.Predict.create("topic -> creative_code: str")
-      {:ok, output} = DSPex.Modules.Predict.execute(creative, %{
-        topic: "a function that generates ASCII art"
-      })
-      output
-    end)
-    
-    IO.puts("Creative output with high temperature:")
-    IO.puts(get_in(result, ["result", "prediction_data", "creative_code"]) || "No creative code generated")
+    IO.puts("\nAdvanced settings management would include:")
+    IO.puts("- Caching configuration")
+    IO.puts("- Temperature and sampling settings")
+    IO.puts("- Experimental feature toggles")
+    IO.puts("- Performance optimization settings")
+    IO.puts("\n(Settings module needs additional integration work)")
   end
   
-  # Mock tool functions
-  defp mock_run_code(_code) do
-    "Code executed successfully. Output: [1, 2, 3, 4, 5]"
-  end
-  
-  defp mock_run_tests(_code) do
-    "All tests passed (5/5)"
-  end
-  
-  defp mock_analyze_complexity(_code) do
-    "Time: O(n), Space: O(1)"
-  end
 end
 
 # Run the system

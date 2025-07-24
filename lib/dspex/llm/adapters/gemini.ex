@@ -13,7 +13,7 @@ defmodule DSPex.LLM.Adapters.Gemini do
 
   require Logger
 
-  @default_model "gemini/gemini-2.0-flash-exp"
+  @default_model "gemini/gemini-2.5-flash-lite"
   @default_auth_strategy :gemini
 
   @impl true

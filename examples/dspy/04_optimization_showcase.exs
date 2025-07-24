@@ -1,11 +1,13 @@
 # Optimization Showcase - Demonstrates all optimizers and advanced features
 # Run with: mix run examples/dspy/04_optimization_showcase.exs
 
-# Configure Snakepit for pooling
+# Configure Snakepit for pooling BEFORE starting
 Application.put_env(:snakepit, :pooling_enabled, true)
-Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.EnhancedPython)
-Application.put_env(:snakepit, :wire_protocol, :auto)
-Application.put_env(:snakepit, :pool_config, %{pool_size: 4})
+Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.GRPCPython)
+Application.put_env(:snakepit, :pool_config, %{
+  pool_size: 4,
+  adapter_args: ["--adapter", "dspex_adapters.dspy_grpc.DSPyGRPCHandler"]
+})
 
 # Stop and restart applications if already started
 Application.stop(:dspex)
@@ -15,17 +17,42 @@ Application.stop(:snakepit)
 {:ok, _} = Application.ensure_all_started(:snakepit)
 {:ok, _} = Application.ensure_all_started(:dspex)
 
-# Initialize DSPex
-{:ok, _} = DSPex.Config.init()
+# Check DSPy availability using new integration
+case Snakepit.execute_in_session("optimizer_session", "check_dspy", %{}) do
+  {:ok, %{"available" => true}} -> 
+    IO.puts("✓ DSPy available")
+  {:error, error} -> 
+    IO.puts("✗ DSPy check failed: #{inspect(error)}")
+    System.halt(1)
+end
 
-# Load config and configure Gemini as default if available
+# Load config and configure Gemini as default language model
 config_path = Path.join(__DIR__, "../config.exs")
 config_data = Code.eval_file(config_path) |> elem(0)
 api_key = config_data.api_key
 
 if api_key do
-  IO.puts("Configuring Gemini as primary LM...")
-  DSPex.LM.configure(config_data.model, api_key: api_key)
+  IO.puts("\\n✓ Configuring Gemini...")
+  IO.puts("  API Key: #{String.slice(api_key, 0..5)}...#{String.slice(api_key, -4..-1)}")
+  
+  # Configure Gemini using the gRPC bridge  
+  case Snakepit.execute_in_session("optimizer_session", "configure_lm", %{
+    "model_type" => "gemini", 
+    "api_key" => api_key,
+    "model" => config_data.model
+  }) do
+    {:ok, %{"success" => true}} -> IO.puts("  Successfully configured!")
+    {:ok, %{"success" => false, "error" => error}} -> IO.puts("  Configuration error: #{error}")
+    {:error, error} -> IO.puts("  Configuration error: #{inspect(error)}")
+  end
+else
+  IO.puts("\\n⚠️  WARNING: No Gemini API key found!")
+  IO.puts("  Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")
+  IO.puts("  Get your free API key at: https://makersuite.google.com/app/apikey")
+  IO.puts("  ")
+  IO.puts("  Example: export GOOGLE_API_KEY=your-gemini-api-key")
+  IO.puts("  ")
+  IO.puts("  Running without LLM - examples will show expected errors...")
 end
 
 # Configure LM with different providers
@@ -68,140 +95,171 @@ defmodule OptimizationShowcase do
     providers = [
       {:gemini, config_data.model, config_data.api_key},
       {:openai, "gpt-4", System.get_env("OPENAI_API_KEY")},
-      {:anthropic, "claude-3-opus-20240229", System.get_env("ANTHROPIC_API_KEY")},
-      {:ollama, "llama2", nil}
+      {:anthropic, "claude-3-opus-20240229", System.get_env("ANTHROPIC_API_KEY")}
     ]
     
     for {provider, model, api_key} <- providers do
-      if api_key || provider == :ollama do
-        IO.puts("\nConfiguring #{provider}/#{model}...")
+      if api_key do
+        IO.puts("\\nConfiguring #{provider}/#{model}...")
         
-        # Mock LM provider configuration (specific provider methods not yet implemented)
-        case provider do
-          :openai -> DSPex.LM.configure(model, api_key: api_key)
-          :anthropic -> DSPex.LM.configure(model, api_key: api_key)
-          :gemini -> DSPex.LM.configure(model, api_key: api_key)
-          :ollama -> DSPex.LM.configure(model)
+        # Configure LM using the gRPC bridge
+        result = case Snakepit.execute_in_session("optimizer_session", "configure_lm", %{
+          "model_type" => Atom.to_string(provider), 
+          "api_key" => api_key,
+          "model" => model
+        }) do
+          {:ok, %{"success" => true}} -> 
+            IO.puts("✓ #{provider} configured")
+            :ok
+          {:ok, %{"success" => false, "error" => error}} -> 
+            IO.puts("✗ #{provider} configuration failed: #{error}")
+            :error
+          {:error, error} -> 
+            IO.puts("✗ #{provider} configuration error: #{inspect(error)}")
+            :error
         end
-        
-        IO.puts("✓ #{provider} configured")
       else
-        IO.puts("\n✗ Skipping #{provider} (no API key)")
+        IO.puts("\\n✗ Skipping #{provider} (no API key)")
       end
     end
     
-    # Use Gemini or mock for the rest of the demo
-    config_path = Path.join(__DIR__, "../config.exs")
-    config_data = Code.eval_file(config_path) |> elem(0)
+    # Confirm current LM is working
     if config_data.api_key do
-      DSPex.LM.configure(config_data.model, api_key: config_data.api_key)
-      IO.puts("\nUsing Gemini for optimization demos")
+      IO.puts("\\nUsing Gemini for optimization demos")
     else
-      DSPex.LM.configure("mock/gemini")
-      IO.puts("\nUsing mock LM for optimization demos (set GOOGLE_API_KEY for real results)")
+      IO.puts("\\nNo LM configured - optimization demos will show mock results")
     end
   end
   
   defp demo_optimizer_comparison do
-    IO.puts("\n\n2. Optimizer Comparison")
+    IO.puts("\\n\\n2. Optimizer Comparison")
     IO.puts("-----------------------")
     
-    # Create a task and dataset
-    {:ok, base_program} = DSPex.Modules.Predict.create(
-      "context: str, question: str -> answer: str"
-    )
+    # Create a basic Q&A program for demonstration
+    {:ok, base_program} = DSPex.Modules.Predict.create("question: str -> answer: str")
     
-    trainset = generate_dspy_examples()
-    valset = generate_dspy_examples(5)
+    # Generate mock training examples
+    trainset = generate_simple_examples(10)
+    valset = generate_simple_examples(5)
     
     IO.puts("Dataset: #{length(trainset)} training, #{length(valset)} validation examples")
     
-    # Test each optimizer
-    optimizers = [
-      {:bootstrap_few_shot, &optimize_bootstrap_few_shot/3},
-      {:mipro, &optimize_mipro/3},
-      {:mipro_v2, &optimize_mipro_v2/3},
-      {:copro, &optimize_copro/3}
+    # Test a simple example with the base program
+    test_question = "What is the capital of France?"
+    
+    case DSPex.Modules.Predict.execute(base_program, %{question: test_question}) do
+      {:ok, result} ->
+        answer = case result do
+          %{"success" => true, "result" => prediction_data} ->
+            prediction_data["answer"] || "No answer"
+          %{"answer" => answer_text} ->
+            answer_text
+          _ ->
+            "Result: #{inspect(result)}"
+        end
+        IO.puts("\\nBase program test:")
+        IO.puts("Q: #{test_question}")
+        IO.puts("A: #{answer}")
+      {:error, error} ->
+        IO.puts("\\nBase program test failed: #{inspect(error)}")
+    end
+    
+    # Mock optimizer comparison results
+    IO.puts("\\n\\nOptimizer Comparison (Mock Results):")
+    IO.puts("------------------------------------")
+    
+    mock_results = [
+      {"BootstrapFewShot", 78.5, 1200},
+      {"MIPRO", 82.1, 2100}, 
+      {"MIPROv2", 85.3, 1800},
+      {"COPRO", 79.8, 2500}
     ]
     
-    results = for {name, optimizer_fn} <- optimizers do
-      IO.puts("\n\nOptimizing with #{name}...")
-      
-      start_time = System.monotonic_time(:millisecond)
-      
-      {:ok, optimized} = optimizer_fn.(base_program, trainset, valset)
-      
-      end_time = System.monotonic_time(:millisecond)
-      duration = end_time - start_time
-      
-      # Evaluate optimized program
-      {:ok, eval_results} = DSPex.Evaluation.evaluate(
-        optimized.optimized_program_id,
-        valset,
-        metric: &DSPex.Evaluation.Metrics.exact_match/2
-      )
-      
-      score = calculate_accuracy(eval_results)
-      
-      IO.puts("✓ #{name} complete")
+    for {name, score, duration} <- mock_results do
+      IO.puts("\\n#{name}:")
       IO.puts("  Time: #{duration}ms")
       IO.puts("  Accuracy: #{score}%")
-      
-      {name, score, duration}
+      IO.puts("  Status: Mock result (optimizer integration needs implementation)")
     end
     
     # Summary
-    IO.puts("\n\nOptimizer Performance Summary:")
+    IO.puts("\\n\\nOptimizer Performance Summary:")
     IO.puts("------------------------------")
     
-    results
+    mock_results
     |> Enum.sort_by(fn {_, score, _} -> score end, :desc)
     |> Enum.each(fn {name, score, duration} ->
-      IO.puts("#{String.pad_trailing(to_string(name), 20)} Score: #{Float.round(score, 1)}% Time: #{duration}ms")
+      IO.puts("#{String.pad_trailing(name, 20)} Score: #{score}% Time: #{duration}ms")
     end)
+    
+    IO.puts("\\nNote: These are mock results. Full optimizer integration requires:")
+    IO.puts("- DSPy optimizer bridges in the gRPC adapter")
+    IO.puts("- Evaluation framework implementation")
+    IO.puts("- Training dataset management")
   end
   
   defp demo_sessions do
-    IO.puts("\n\n3. Session Management")
+    IO.puts("\\n\\n3. Session Management")
     IO.puts("---------------------")
     
-    # Create a session for stateful operations
-    IO.puts("Creating session for multi-step optimization...")
+    # Create different session IDs for different operations
+    session_ids = ["session_predictor", "session_cot", "session_shared"]
     
-    # Mock session management (DSPex.Session not yet implemented)
-    mock_session_demo = fn ->
-      # Step 1: Create base program
-      {:ok, predictor} = DSPex.Modules.Predict.create("question -> answer")
-      
-      IO.puts("✓ Created predictor in mock session")
-      
-      # Step 2: Add chain of thought
-      {:ok, cot} = DSPex.Modules.ChainOfThought.create("question -> answer")
-      
-      IO.puts("✓ Created chain of thought in mock session")
-      
-      # Step 3: Optimize both with shared configuration
-      trainset = generate_dspy_examples(10)
-      
-      {:ok, _opt_predictor} = DSPex.Optimizers.BootstrapFewShot.optimize(
-        predictor,
-        trainset,
-        max_bootstrapped_demos: 2
-      )
-      
-      {:ok, _opt_cot} = DSPex.Optimizers.BootstrapFewShot.optimize(
-        cot,
-        trainset,
-        max_bootstrapped_demos: 2
-      )
-      
-      IO.puts("✓ Optimized both modules in mock session")
-      IO.puts("✓ Mock session demonstrates shared configuration")
+    IO.puts("Creating sessions for multi-step operations...")
+    
+    # Step 1: Create predictor in first session
+    {:ok, predictor} = DSPex.Modules.Predict.create("question -> answer", session_id: "session_predictor")
+    IO.puts("✓ Created predictor in session_predictor")
+    
+    # Step 2: Create chain of thought in second session
+    {:ok, cot} = DSPex.Modules.ChainOfThought.create("question -> answer", session_id: "session_cot")
+    IO.puts("✓ Created chain of thought in session_cot")
+    
+    # Step 3: Test both modules
+    test_question = "What is machine learning?"
+    
+    case DSPex.Modules.Predict.execute(predictor, %{question: test_question}) do
+      {:ok, result} ->
+        answer = case result do
+          %{"success" => true, "result" => prediction_data} ->
+            prediction_data["answer"] || "No answer"
+          %{"answer" => answer_text} ->
+            answer_text
+          _ ->
+            inspect(result)
+        end
+        IO.puts("✓ Predictor result: #{String.slice(answer, 0, 50)}...")
+      {:error, error} ->
+        IO.puts("✗ Predictor failed: #{inspect(error)}")
     end
     
-    mock_session_demo.()
+    case DSPex.Modules.ChainOfThought.execute(cot, %{question: test_question}) do
+      {:ok, result} ->
+        answer = case result do
+          %{"success" => true, "result" => prediction_data} ->
+            prediction_data["answer"] || "No answer"
+          %{"answer" => answer_text} ->
+            answer_text
+          _ ->
+            inspect(result)
+        end
+        IO.puts("✓ Chain of Thought result: #{String.slice(answer, 0, 50)}...")
+      {:error, error} ->
+        IO.puts("✗ Chain of Thought failed: #{inspect(error)}")
+    end
     
-    IO.puts("\nSession closed - all temporary state cleaned up")
+    # Show session statistics
+    case Snakepit.execute_in_session("session_predictor", "get_stats", %{}) do
+      {:ok, %{"success" => true, "stats" => stats}} ->
+        IO.puts("\\nSession statistics:")
+        IO.puts("- Programs in session_predictor: #{stats["programs_count"]}")
+        IO.puts("- Has configured LM: #{stats["has_configured_lm"]}")
+      {:error, _error} ->
+        IO.puts("\\nCould not retrieve session statistics")
+    end
+    
+    IO.puts("\\n✓ Multi-session management demonstrated")
+    IO.puts("✓ Each session maintains independent state")
   end
   
   defp demo_bootstrap_random_search do

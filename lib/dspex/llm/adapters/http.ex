@@ -105,7 +105,7 @@ defmodule DSPex.LLM.Adapters.HTTP do
   # Private functions
 
   defp build_gemini_endpoint(:gemini, config) do
-    model = config[:model] || "gemini/gemini-2.0-flash-exp"
+    model = config[:model] || "gemini/gemini-2.5-flash-lite"
     api_key = config[:api_key]
 
     if api_key do

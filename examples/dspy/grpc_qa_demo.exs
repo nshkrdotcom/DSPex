@@ -20,7 +20,7 @@ Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.GRPCPython)
 Application.put_env(:snakepit, :pool_config, %{
   pool_size: 1,
   # Use the DSPy-enabled gRPC adapter
-  adapter_args: ["--adapter", "snakepit_bridge.adapters.dspy_grpc.DSPyGRPCHandler"]
+  adapter_args: ["--adapter", "dspex_adapters.dspy_grpc.DSPyGRPCHandler"]
 })
 
 # Configure gRPC settings

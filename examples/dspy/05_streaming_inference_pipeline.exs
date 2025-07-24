@@ -1,33 +1,13 @@
-# Streaming DSPy Inference Pipeline - Demonstrates gRPC streaming capabilities
+# Streaming DSPy Inference Pipeline - Updated for gRPC v0.4.1 with Schema Bridge
 # Run with: mix run examples/dspy/05_streaming_inference_pipeline.exs
 
-# Configure Snakepit for gRPC streaming capabilities
+# Configure Snakepit for pooling BEFORE starting
 Application.put_env(:snakepit, :pooling_enabled, true)
-Application.put_env(:snakepit, :wire_protocol, :auto)
-Application.put_env(:snakepit, :pool_config, %{pool_size: 4})
-Application.put_env(:snakepit, :grpc_config, %{
-  base_port: 50051,
-  port_range: 100
-})
-
-# Require gRPC adapter - fail if not available
-unless Snakepit.Adapters.GRPCPython.grpc_available?() do
-  IO.puts("❌ gRPC dependencies not available!")
-  IO.puts("This streaming example requires gRPC functionality.")
-  IO.puts("")
-  IO.puts("To enable gRPC streaming:")
-  IO.puts("1. Install gRPC dependencies in snakepit:")
-  IO.puts("   cd snakepit && mix deps.get")
-  IO.puts("")
-  IO.puts("2. Recompile snakepit: cd snakepit && mix compile")
-  IO.puts("3. Return to project root and recompile: cd .. && mix compile")
-  IO.puts("")
-  IO.puts("Alternatively, use a different example that doesn't require streaming.")
-  System.halt(1)
-end
-
-IO.puts("✓ gRPC dependencies available - using gRPC adapter for streaming")
 Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.GRPCPython)
+Application.put_env(:snakepit, :pool_config, %{
+  pool_size: 4,
+  adapter_args: ["--adapter", "dspex_adapters.dspy_grpc.DSPyGRPCHandler"]
+})
 
 # Stop and restart applications if already started
 Application.stop(:dspex)
@@ -37,21 +17,27 @@ Application.stop(:snakepit)
 {:ok, _} = Application.ensure_all_started(:snakepit)
 {:ok, _} = Application.ensure_all_started(:dspex)
 
-# Initialize DSPex
-{:ok, _} = DSPex.Config.init()
+IO.puts("=== DSPy Streaming Inference Pipeline ===")
+IO.puts("Updated for Snakepit v0.4.1 with schema bridge\n")
 
-# Load config and configure Gemini as default if available
-config_path = Path.join(__DIR__, "../config.exs")
+# Load config
+config_path = Path.join(__DIR__, "config.exs")
 config_data = Code.eval_file(config_path) |> elem(0)
 api_key = config_data.api_key
 
 if api_key do
-  IO.puts("✓ Configuring Gemini for streaming inference...")
-  DSPex.LM.configure(config_data.model, api_key: api_key)
-  IO.puts("  Successfully configured!")
+  IO.puts("✓ Configuring Gemini...")
+  case Snakepit.execute_in_session("main_session", "configure_lm", %{
+    "model_type" => "gemini", 
+    "api_key" => api_key,
+    "model" => config_data.model
+  }) do
+    {:ok, %{"success" => true}} -> IO.puts("  ✓ LM configured!")
+    {:ok, %{"success" => false, "error" => error}} -> IO.puts("  ✗ LM config failed: #{error}")
+    {:error, error} -> IO.puts("  ✗ LM config error: #{inspect(error)}")
+  end
 else
-  IO.puts("⚠️  No API key found - using mock LM for demonstration")
-  DSPex.LM.configure("mock/gemini")
+  IO.puts("⚠️  No API key found - streaming demo will use mock responses")
 end
 
 defmodule StreamingInferencePipeline do

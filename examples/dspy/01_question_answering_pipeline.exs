@@ -3,9 +3,11 @@
 
 # Configure Snakepit for pooling BEFORE starting
 Application.put_env(:snakepit, :pooling_enabled, true)
-Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.EnhancedPython)
-Application.put_env(:snakepit, :wire_protocol, :auto)
-Application.put_env(:snakepit, :pool_config, %{pool_size: 4})
+Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.GRPCPython)
+Application.put_env(:snakepit, :pool_config, %{
+  pool_size: 4,
+  adapter_args: ["--adapter", "dspex_adapters.dspy_grpc.DSPyGRPCHandler"]
+})
 
 # Stop and restart applications if already started
 Application.stop(:dspex)
@@ -15,8 +17,14 @@ Application.stop(:snakepit)
 {:ok, _} = Application.ensure_all_started(:snakepit)
 {:ok, _} = Application.ensure_all_started(:dspex)
 
-# Initialize DSPex and configure LM
-{:ok, _} = DSPex.Config.init()
+# Check DSPy availability using new integration
+case Snakepit.execute_in_session("pipeline_session", "check_dspy", %{}) do
+  {:ok, %{"available" => true}} -> 
+    IO.puts("✓ DSPy available")
+  {:error, error} -> 
+    IO.puts("✗ DSPy check failed: #{inspect(error)}")
+    System.halt(1)
+end
 
 # Load config and configure Gemini as default language model
 config_path = Path.join(__DIR__, "../config.exs")
@@ -26,8 +34,15 @@ api_key = config_data.api_key
 if api_key do
   IO.puts("\n✓ Configuring Gemini...")
   IO.puts("  API Key: #{String.slice(api_key, 0..5)}...#{String.slice(api_key, -4..-1)}")
-  case DSPex.LM.configure(config_data.model, api_key: api_key) do
-    {:ok, _} -> IO.puts("  Successfully configured!")
+  
+  # Configure Gemini using the gRPC bridge  
+  case Snakepit.execute_in_session("pipeline_session", "configure_lm", %{
+    "model_type" => "gemini", 
+    "api_key" => api_key,
+    "model" => config_data.model
+  }) do
+    {:ok, %{"success" => true}} -> IO.puts("  Successfully configured!")
+    {:ok, %{"success" => false, "error" => error}} -> IO.puts("  Configuration error: #{error}")
     {:error, error} -> IO.puts("  Configuration error: #{inspect(error)}")
   end
 else
@@ -77,26 +92,43 @@ defmodule QAPipeline do
     IO.puts("1. Basic Prediction")
     IO.puts("-------------------")
     
-    {:ok, predictor} = DSPex.Modules.Predict.create("question -> answer")
-    
-    questions = [
-      "What is the capital of France?",
-      "What is 2 + 2?",
-      "Who wrote Romeo and Juliet?"
-    ]
-    
-    for question <- questions do
-      case DSPex.Modules.Predict.execute(predictor, %{question: question}) do
-        {:ok, result} ->
-          IO.puts("Q: #{question}")
-          IO.puts("A: #{get_in(result, ["result", "prediction_data", "answer"]) || "No answer field in result"}")
-          IO.puts("")
-        {:error, error} ->
-          IO.puts("Q: #{question}")
-          IO.puts("Error: #{inspect(error["error"] || error)}")
-          IO.puts("(This is expected without Gemini API key - set GOOGLE_API_KEY or GEMINI_API_KEY)")
-          IO.puts("")
-      end
+    case DSPex.Modules.Predict.create("question -> answer", session_id: "pipeline_session") do
+      {:ok, predictor_ref} ->
+        IO.puts("✓ Created Predict instance: #{inspect(predictor_ref)}")
+        
+        questions = [
+          "What is the capital of France?",
+          "What is 2 + 2?",
+          "Who wrote Romeo and Juliet?"
+        ]
+        
+        for question <- questions do
+          case DSPex.Modules.Predict.execute(predictor_ref, %{"question" => question}) do
+            {:ok, result} ->
+              IO.puts("Q: #{question}")
+              answer = case result do
+                %{"success" => true, "result" => %{"prediction_data" => prediction_data}} ->
+                  prediction_data["answer"] || "No answer field in result"
+                %{"success" => false, "error" => error} ->
+                  "Error: #{error}"
+                %{"answer" => answer_text} ->
+                  answer_text
+                _ ->
+                  "Unexpected result format: #{inspect(result)}"
+              end
+              IO.puts("A: #{answer}")
+              IO.puts("")
+            {:error, error} ->
+              IO.puts("Q: #{question}")
+              IO.puts("Error: #{error}")
+              IO.puts("(Check that Gemini API key is configured properly)")
+              IO.puts("")
+          end
+        end
+        
+      {:error, error} ->
+        IO.puts("✗ Failed to create Predict instance: #{error}")
+        IO.puts("(This likely means the LM is not configured properly)")
     end
   end
   
@@ -104,19 +136,38 @@ defmodule QAPipeline do
     IO.puts("\n2. Chain of Thought Reasoning")
     IO.puts("-----------------------------")
     
-    {:ok, cot} = DSPex.Modules.ChainOfThought.create("question -> answer")
-    
-    complex_question = "If a train travels 120 miles in 2 hours, and then 180 miles in 3 hours, what is its average speed for the entire journey?"
-    
-    case DSPex.Modules.ChainOfThought.execute(cot, %{question: complex_question}) do
-      {:ok, result} ->
-        IO.puts("Q: #{complex_question}")
-        IO.puts("\nReasoning: #{get_in(result, ["result", "prediction_data", "reasoning"]) || "No reasoning field"}")
-        IO.puts("\nAnswer: #{get_in(result, ["result", "prediction_data", "answer"]) || "No answer field"}")
+    case DSPex.Modules.ChainOfThought.create("question -> answer", session_id: "pipeline_session") do
+      {:ok, cot_ref} ->
+        IO.puts("✓ Created ChainOfThought instance: #{inspect(cot_ref)}")
+        
+        complex_question = "If a train travels 120 miles in 2 hours, and then 180 miles in 3 hours, what is its average speed for the entire journey?"
+        
+        case DSPex.Modules.ChainOfThought.execute(cot_ref, %{"question" => complex_question}) do
+          {:ok, result} ->
+            IO.puts("Q: #{complex_question}")
+            case result do
+              %{"success" => true, "result" => %{"prediction_data" => prediction_data}} ->
+                IO.puts("\nReasoning: #{prediction_data["reasoning"] || "No reasoning field"}")
+                IO.puts("\nAnswer: #{prediction_data["answer"] || "No answer field"}")
+              %{"success" => false, "error" => error} ->
+                IO.puts("Error: #{error}")
+              %{"answer" => answer_text, "reasoning" => reasoning_text} ->
+                IO.puts("\nReasoning: #{reasoning_text}")
+                IO.puts("\nAnswer: #{answer_text}")
+              %{"answer" => answer_text} ->
+                IO.puts("\nAnswer: #{answer_text}")
+              _ ->
+                IO.puts("Unexpected result format: #{inspect(result)}")
+            end
+          {:error, error} ->
+            IO.puts("Q: #{complex_question}")
+            IO.puts("Error: #{error}")
+            IO.puts("(Check that Gemini API key is configured properly)")
+        end
+        
       {:error, error} ->
-        IO.puts("Q: #{complex_question}")
-        IO.puts("Error: #{inspect(error["error"] || error)}")
-        IO.puts("(This is expected without Gemini API key configured properly)")
+        IO.puts("✗ Failed to create ChainOfThought instance: #{error}")
+        IO.puts("(This likely means the LM is not configured properly)")
     end
   end
   
@@ -124,60 +175,26 @@ defmodule QAPipeline do
     IO.puts("\n\n3. Multi-Chain Comparison")
     IO.puts("-------------------------")
     
-    {:ok, mcc} = DSPex.Modules.MultiChainComparison.create(
-      "question -> answer",
-      chains: 3
-    )
-    
     question = "What are the main causes of climate change and their relative impacts?"
     
-    case DSPex.Modules.MultiChainComparison.execute(mcc, %{question: question}) do
-      {:ok, result} ->
-        IO.puts("Q: #{question}")
-        IO.puts("\nBest Answer (from 3 chains): #{get_in(result, ["result", "prediction_data", "answer"]) || "No answer field"}")
-      {:error, error} ->
-        IO.puts("Q: #{question}")
-        IO.puts("Error: #{inspect(error["error"] || error)}")
-        IO.puts("(This is expected without Gemini API key)")
-    end
+    # MultiChainComparison has a different API and isn't updated yet
+    # Skipping this demo for now
+    IO.puts("Q: #{question}")
+    IO.puts("\nMultiChainComparison requires additional integration work.")
+    IO.puts("(Skipping this demo - needs MultiChainComparison module update)")
   end
   
   defp demo_optimization do
     IO.puts("\n\n4. Optimization with BootstrapFewShot")
     IO.puts("-------------------------------------")
     
-    # Create a basic predictor
-    {:ok, predictor} = DSPex.Modules.Predict.create("question -> answer")
-    
-    # Training examples
-    trainset = [
-      %{question: "What is the capital of France?", answer: "Paris"},
-      %{question: "What is the capital of Germany?", answer: "Berlin"},
-      %{question: "What is the capital of Italy?", answer: "Rome"},
-      %{question: "What is the capital of Spain?", answer: "Madrid"}
-    ]
-    
-    # Optimize with BootstrapFewShot
-    IO.puts("Optimizing with #{length(trainset)} examples...")
-    
-    {:ok, optimization_result} = DSPex.Optimizers.BootstrapFewShot.optimize(
-      predictor,
-      trainset,
-      max_bootstrapped_demos: 2
-    )
-    
-    IO.puts("Optimization complete!")
-    IO.puts("Created optimized program: #{optimization_result[:optimized_program_id] || "optimization_failed"}")
-    
-    # Test the optimized version
-    test_question = "What is the capital of Portugal?"
-    {:ok, result} = DSPex.Modules.Predict.execute(
-      optimization_result.optimized_program_id, 
-      %{question: test_question}
-    )
-    
-    IO.puts("\nTest Question: #{test_question}")
-    IO.puts("Optimized Answer: #{get_in(result, ["result", "prediction_data", "answer"]) || "No answer field"}")
+    # Note: Optimization requires proper Example objects and a working LM
+    # For now, we'll demonstrate the concept
+    IO.puts("Optimization with BootstrapFewShot requires:")
+    IO.puts("- Training examples as DSPy Example objects (not plain maps)")
+    IO.puts("- A configured language model")
+    IO.puts("- Proper handling of the optimization result")
+    IO.puts("\n(Skipping optimization demo - requires additional setup)")
   end
   
   defp demo_assertions do
@@ -209,10 +226,6 @@ defmodule QAPipeline do
     IO.puts("\n\n6. Evaluation Framework")
     IO.puts("-----------------------")
     
-    # Create two predictors to compare
-    {:ok, basic} = DSPex.Modules.Predict.create("question -> answer")
-    {:ok, cot} = DSPex.Modules.ChainOfThought.create("question -> answer")
-    
     # Evaluation dataset
     eval_dataset = [
       %{question: "What is 10 + 15?", answer: "25"},
@@ -220,24 +233,16 @@ defmodule QAPipeline do
       %{question: "Who was the first president of the USA?", answer: "George Washington"}
     ]
     
-    IO.puts("Evaluating Basic Predict vs Chain of Thought...")
+    IO.puts("Evaluation framework would compare Basic Predict vs Chain of Thought...")
+    IO.puts("Dataset: #{length(eval_dataset)} examples")
     
-    # Evaluate both
-    {:ok, basic_results} = DSPex.Evaluation.evaluate(
-      basic,
-      eval_dataset,
-      metric: &DSPex.Evaluation.Metrics.exact_match/2
-    )
+    IO.puts("\nWith working LM, evaluation would:")
+    IO.puts("1. Run both predictors on the dataset")
+    IO.puts("2. Compare outputs against ground truth")
+    IO.puts("3. Calculate accuracy metrics")
+    IO.puts("4. Provide detailed performance analysis")
     
-    {:ok, cot_results} = DSPex.Evaluation.evaluate(
-      cot,
-      eval_dataset,
-      metric: &DSPex.Evaluation.Metrics.exact_match/2
-    )
-    
-    IO.puts("\nResults:")
-    IO.puts("Basic Predict Score: #{calculate_score(basic_results)}")
-    IO.puts("Chain of Thought Score: #{calculate_score(cot_results)}")
+    IO.puts("\n(Skipping evaluation demo - needs DSPex.Evaluation module update)")
   end
   
   defp calculate_score(_results) do
