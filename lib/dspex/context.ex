@@ -2,37 +2,34 @@ defmodule DSPex.Context do
   @moduledoc """
   The central execution context for DSPex programs.
 
-  A Context is a process that manages:
-  - Variable state (local or bridged)
-  - Program execution
-  - Automatic backend switching
+  Simplified to use Snakepit's SessionStore directly instead of 
+  maintaining a custom state management layer.
 
-  ## Automatic Backend Switching
+  ## Architecture
 
-  The Context starts with a LocalState backend for maximum performance.
-  When Python components are added (DSPy modules, Python tools), it
-  automatically migrates to BridgedState for cross-language support.
+  Context is now a lightweight wrapper around Snakepit.Bridge.SessionStore:
+
+      DSPex.Context
+           ↓
+      Snakepit.Bridge.SessionStore ←→ gRPC ←→ Python
 
   ## Example
 
+      # Create a session-based context
       {:ok, ctx} = DSPex.Context.start_link()
       
-      # Starts with local backend - microsecond operations
+      # All operations use SessionStore directly
       DSPex.Variables.set(ctx, :temperature, 0.7)
       
-      # Adding a Python module triggers backend upgrade
+      # DSPy modules share the same session
       DSPex.Modules.ChainOfThought.new(ctx, "question -> answer")
-      # Context automatically switches to bridged backend
-      
-      # Same API continues to work
-      DSPex.Variables.get(ctx, :temperature)  # Still returns 0.7
 
   ## Supervision
 
   Contexts can be supervised:
 
       children = [
-        {DSPex.Context, name: MyApp.Context, backend: :local}
+        {DSPex.Context, name: MyApp.Context, session_id: "my_session"}
       ]
       
       Supervisor.start_link(children, strategy: :one_for_one)
@@ -41,19 +38,14 @@ defmodule DSPex.Context do
   use GenServer
   require Logger
 
-  alias DSPex.Bridge.State.{Local, Bridged}
-  alias DSPex.Bridge.StateProvider
+  alias Snakepit.Bridge.SessionStore
 
   @type t :: pid() | atom()
-  @type backend :: :local | :bridged | module()
 
   defstruct [
-    :id,
-    :backend_module,
-    :backend_state,
+    :session_id,
     :programs,
-    :metadata,
-    :monitors
+    :metadata
   ]
 
   ## Client API
@@ -64,7 +56,6 @@ defmodule DSPex.Context do
   ## Options
 
     * `:name` - Register the context with a name
-    * `:backend` - Initial backend (:local or :bridged, default: :local)
     * `:session_id` - Specific session ID (auto-generated if not provided)
     * `:ttl` - Session time-to-live in seconds
 
@@ -76,8 +67,8 @@ defmodule DSPex.Context do
       # Named context
       {:ok, ctx} = DSPex.Context.start_link(name: MyApp.Context)
       
-      # Start directly with bridged backend
-      {:ok, ctx} = DSPex.Context.start_link(backend: :bridged)
+      # Specific session ID
+      {:ok, ctx} = DSPex.Context.start_link(session_id: "my_session")
   """
   def start_link(opts \\ []) do
     {name_opts, init_opts} = Keyword.split(opts, [:name])
@@ -85,50 +76,23 @@ defmodule DSPex.Context do
   end
 
   @doc """
-  Ensures the context is using the bridged backend.
-
-  Called automatically when Python components are added.
-  Can also be called manually if you know Python will be needed.
-
-  ## Returns
-
-    * `:ok` - Successfully using bridged backend
-    * `{:error, reason}` - Switch failed
+  Gets the session ID for this context.
   """
-  @spec ensure_bridged(t()) :: :ok | {:error, term()}
-  def ensure_bridged(context) do
-    GenServer.call(context, :ensure_bridged)
+  @spec get_session_id(t()) :: String.t()
+  def get_session_id(context) do
+    GenServer.call(context, :get_session_id)
   end
 
   @doc """
-  Gets information about the current backend.
-
-  ## Returns
-
-  Map with:
-    * `:module` - The backend module
-    * `:type` - :local or :bridged
-    * `:requires_bridge` - Whether Python bridge is needed
-    * `:capabilities` - Backend capabilities
-    * `:switches` - Number of backend switches
+  Gets the context session information.
   """
-  @spec get_backend(t()) :: map()
-  def get_backend(context) do
-    GenServer.call(context, :get_backend)
-  end
-
-  @doc """
-  Gets the context ID.
-  """
-  @spec get_id(t()) :: String.t()
-  def get_id(context) do
-    GenServer.call(context, :get_id)
+  @spec get_info(t()) :: map()
+  def get_info(context) do
+    GenServer.call(context, :get_info)
   end
 
   @doc """
   Registers a program with the context.
-
-  Programs can trigger backend switches if they require Python.
   """
   @spec register_program(t(), String.t(), map()) :: :ok
   def register_program(context, program_id, program_spec) do
@@ -166,7 +130,7 @@ defmodule DSPex.Context do
     GenServer.stop(context, :normal)
   end
 
-  ## Variable Operations (delegated to backend)
+  ## Variable Operations (delegated to SessionStore)
 
   @doc """
   Registers a new variable.
@@ -198,25 +162,25 @@ defmodule DSPex.Context do
   @doc """
   Lists all variables.
 
-  See `DSPex.Variables.list/1` for the high-level API.
+  See `DSPex.Variables.list/2` for the high-level API.
   """
   def list_variables(context) do
     GenServer.call(context, :list_variables)
   end
 
   @doc """
-  Gets multiple variables.
+  Gets multiple variables at once.
 
-  See `DSPex.Variables.get_many/2` for the high-level API.
+  See `DSPex.Variables.get_many/3` for the high-level API.
   """
   def get_variables(context, identifiers) do
     GenServer.call(context, {:get_variables, identifiers})
   end
 
   @doc """
-  Updates multiple variables.
+  Updates multiple variables atomically.
 
-  See `DSPex.Variables.update_many/3` for the high-level API.
+  See `DSPex.Variables.set_many/4` for the high-level API.
   """
   def update_variables(context, updates, metadata \\ %{}) do
     GenServer.call(context, {:update_variables, updates, metadata})
@@ -224,342 +188,195 @@ defmodule DSPex.Context do
 
   @doc """
   Deletes a variable.
+
+  See `DSPex.Variables.delete/2` for the high-level API.
   """
   def delete_variable(context, identifier) do
     GenServer.call(context, {:delete_variable, identifier})
   end
 
-  ## GenServer Implementation
+  ## GenServer Callbacks
 
   @impl true
   def init(opts) do
-    # Determine initial backend
-    backend_module =
-      case Keyword.get(opts, :backend, :local) do
-        :local -> Local
-        :bridged -> Bridged
-        module when is_atom(module) -> module
-      end
+    session_id = Keyword.get(opts, :session_id, generate_session_id())
+    ttl = Keyword.get(opts, :ttl, 3600)
 
-    # Validate it's a StateProvider
-    StateProvider.validate_provider!(backend_module)
+    # Ensure SessionStore is available
+    ensure_session_store!()
 
-    # Generate or use provided context ID
-    context_id = Keyword.get(opts, :session_id, generate_context_id())
-
-    # Initialize backend
-    backend_opts =
-      [session_id: context_id] ++
-        Keyword.take(opts, [:ttl, :existing_state])
-
-    case backend_module.init(backend_opts) do
-      {:ok, backend_state} ->
+    # Create session in SessionStore
+    case SessionStore.create_session(session_id, ttl: ttl) do
+      {:ok, _session} ->
         state = %__MODULE__{
-          id: context_id,
-          backend_module: backend_module,
-          backend_state: backend_state,
+          session_id: session_id,
           programs: %{},
           metadata: %{
             created_at: DateTime.utc_now(),
-            backend_switches: 0,
-            backend_history: [{backend_module, DateTime.utc_now()}]
-          },
-          monitors: %{}
+            backend: :session_store
+          }
         }
 
-        Logger.info("DSPex context #{context_id} initialized with #{inspect(backend_module)}")
+        Logger.debug("DSPex.Context initialized with session #{session_id}")
+        {:ok, state}
 
+      {:error, :already_exists} ->
+        # Session already exists, that's fine
+        state = %__MODULE__{
+          session_id: session_id,
+          programs: %{},
+          metadata: %{
+            created_at: DateTime.utc_now(),
+            backend: :session_store,
+            reused_session: true
+          }
+        }
+
+        Logger.debug("DSPex.Context reusing existing session #{session_id}")
         {:ok, state}
 
       {:error, reason} ->
-        {:stop, {:backend_init_failed, reason}}
+        {:error, {:session_creation_failed, reason}}
     end
   end
 
   @impl true
-  def handle_call(:ensure_bridged, _from, state) do
-    if state.backend_module == Bridged or state.backend_module.requires_bridge?() do
-      # Already bridged
-      {:reply, :ok, state}
-    else
-      # Need to upgrade
-      case perform_backend_switch(state, Bridged) do
-        {:ok, new_state} ->
-          {:reply, :ok, new_state}
-
-        {:error, reason} ->
-          {:reply, {:error, reason}, state}
-      end
-    end
+  def handle_call(:get_session_id, _from, state) do
+    {:reply, state.session_id, state}
   end
 
   @impl true
-  def handle_call(:get_backend, _from, state) do
-    backend_info = %{
-      module: state.backend_module,
-      type: backend_type(state.backend_module),
-      requires_bridge: state.backend_module.requires_bridge?(),
-      capabilities: state.backend_module.capabilities(),
-      switches: state.metadata.backend_switches,
-      history: state.metadata.backend_history
+  def handle_call(:get_info, _from, state) do
+    info = %{
+      session_id: state.session_id,
+      programs: Map.keys(state.programs),
+      program_count: map_size(state.programs),
+      metadata: state.metadata
     }
-
-    {:reply, backend_info, state}
-  end
-
-  @impl true
-  def handle_call(:get_id, _from, state) do
-    {:reply, state.id, state}
+    {:reply, info, state}
   end
 
   @impl true
   def handle_call({:register_program, program_id, program_spec}, _from, state) do
-    # Check if program requires Python
-    requires_python = program_requires_python?(program_spec)
+    new_programs = Map.put(state.programs, program_id, program_spec)
+    new_state = %{state | programs: new_programs}
 
-    # Store program with its ID
-    program_spec_with_id = Map.put(program_spec, :id, program_id)
-    programs = Map.put(state.programs, program_id, program_spec_with_id)
-    state = %{state | programs: programs}
-
-    # Switch backend if needed
-    state =
-      if requires_python and not state.backend_module.requires_bridge?() do
-        Logger.info("Program #{program_id} requires Python, switching to bridged backend")
-
-        case perform_backend_switch(state, Bridged) do
-          {:ok, new_state} ->
-            new_state
-
-          {:error, reason} ->
-            Logger.error("Failed to switch backend for Python program: #{inspect(reason)}")
-            state
-        end
-      else
-        state
-      end
-
-    {:reply, :ok, state}
+    Logger.debug("Registered program #{program_id} in session #{state.session_id}")
+    {:reply, :ok, new_state}
   end
 
+  @impl true
   def handle_call({:call_program, program_id, inputs}, _from, state) do
     case Map.get(state.programs, program_id) do
       nil ->
-        {:reply, {:error, :program_not_found}, state}
+        {:reply, {:error, {:program_not_found, program_id}}, state}
 
-      program_spec ->
-        result = execute_program(program_spec, inputs, state)
+      _program_spec ->
+        # For now, delegate to Snakepit execution
+        # In a full implementation, this would use the program_spec
+        # to determine how to execute the program
+        result = Snakepit.execute_in_session(state.session_id, "call_dspy", inputs)
         {:reply, result, state}
     end
   end
 
-  # Variable operations - delegate to backend
+  ## Variable operations - delegate to SessionStore
 
   @impl true
   def handle_call({:register_variable, name, type, initial_value, opts}, _from, state) do
-    case state.backend_module.register_variable(
-           state.backend_state,
-           name,
-           type,
-           initial_value,
-           opts
-         ) do
-      {:ok, {var_id, new_backend_state}} ->
-        state = %{state | backend_state: new_backend_state}
+    case SessionStore.register_variable(state.session_id, name, type, initial_value, opts) do
+      {:ok, var_id} ->
         {:reply, {:ok, var_id}, state}
-
-      error ->
-        {:reply, error, state}
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
     end
   end
 
   @impl true
   def handle_call({:get_variable, identifier}, _from, state) do
-    result = state.backend_module.get_variable(state.backend_state, identifier)
-    {:reply, result, state}
+    case SessionStore.get_variable(state.session_id, identifier) do
+      {:ok, variable} ->
+        {:reply, {:ok, variable.value}, state}
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
   end
 
   @impl true
   def handle_call({:set_variable, identifier, value, metadata}, _from, state) do
-    case state.backend_module.set_variable(
-           state.backend_state,
-           identifier,
-           value,
-           metadata
-         ) do
-      {:ok, new_backend_state} ->
-        state = %{state | backend_state: new_backend_state}
+    case SessionStore.update_variable(state.session_id, identifier, value, metadata) do
+      :ok ->
         {:reply, :ok, state}
-
-      error ->
-        {:reply, error, state}
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
     end
   end
 
   @impl true
   def handle_call(:list_variables, _from, state) do
-    result = state.backend_module.list_variables(state.backend_state)
-    {:reply, result, state}
+    case SessionStore.list_variables(state.session_id) do
+      {:ok, variables} ->
+        {:reply, {:ok, variables}, state}
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
   end
 
   @impl true
   def handle_call({:get_variables, identifiers}, _from, state) do
-    result = state.backend_module.get_variables(state.backend_state, identifiers)
-    {:reply, result, state}
+    case SessionStore.get_variables(state.session_id, identifiers) do
+      {:ok, result} ->
+        {:reply, {:ok, result}, state}
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
   end
 
   @impl true
   def handle_call({:update_variables, updates, metadata}, _from, state) do
-    case state.backend_module.update_variables(
-           state.backend_state,
-           updates,
-           metadata
-         ) do
-      {:ok, new_backend_state} ->
-        state = %{state | backend_state: new_backend_state}
+    case SessionStore.update_variables(state.session_id, updates, metadata: metadata) do
+      {:ok, _results} ->
         {:reply, :ok, state}
-
-      error ->
-        {:reply, error, state}
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
     end
   end
 
   @impl true
   def handle_call({:delete_variable, identifier}, _from, state) do
-    case state.backend_module.delete_variable(state.backend_state, identifier) do
-      {:ok, new_backend_state} ->
-        state = %{state | backend_state: new_backend_state}
+    case SessionStore.delete_variable(state.session_id, identifier) do
+      :ok ->
         {:reply, :ok, state}
-
-      error ->
-        {:reply, error, state}
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
     end
   end
 
   @impl true
-  def terminate(reason, state) do
-    Logger.info("DSPex context #{state.id} terminating: #{inspect(reason)}")
-
-    # Clean up backend
-    state.backend_module.cleanup(state.backend_state)
-
-    # Clean up monitors
-    Enum.each(state.monitors, fn {_ref, pid} ->
-      Process.unlink(pid)
-    end)
-
+  def terminate(_reason, state) do
+    Logger.debug("DSPex.Context terminating for session #{state.session_id}")
+    # SessionStore handles cleanup via TTL, no explicit cleanup needed
     :ok
   end
 
   ## Private Helpers
 
-  defp generate_context_id do
-    "ctx_#{System.unique_integer([:positive, :monotonic])}"
+  defp generate_session_id do
+    "dspex_session_#{System.unique_integer([:positive, :monotonic])}"
   end
 
-  defp backend_type(Local), do: :local
-  defp backend_type(Bridged), do: :bridged
-  defp backend_type(_), do: :custom
-
-  defp program_requires_python?(program_spec) do
-    # Check if program uses Python components
-    # This is simplified - real implementation would inspect the program
-    Map.get(program_spec, :requires_python, false) or
-      Map.get(program_spec, :adapter, "") =~ "Python" or
-      Map.get(program_spec, :modules, []) |> Enum.any?(&module_requires_python?/1)
-  end
-
-  defp module_requires_python?(module_spec) do
-    # Check if a module requires Python
-    # DSPy modules always require Python
-    module_spec[:type] in [:dspy, :python] or
-      module_spec[:class] =~ "DSPy"
-  end
-
-  defp execute_program(program_spec, inputs, state) do
-    case program_spec do
-      %{type: :dspy} ->
-        # DSPy programs need to be executed through the Python bridge
-        execute_dspy_program(program_spec, inputs, state)
-
-      %{type: :native} ->
-        # Native Elixir programs (future enhancement)
-        {:error, :native_programs_not_implemented}
-
-      _ ->
-        {:error, :unknown_program_type}
-    end
-  end
-
-  defp execute_dspy_program(program_spec, inputs, state) do
-    # Ensure we have a bridged backend
-    if not state.backend_module.requires_bridge?() do
-      {:error, :dspy_requires_bridged_backend}
-    else
-      # Get the session ID from the backend state
-      session_id = state.backend_state.session_id
-
-      # Execute through Snakepit
-      Snakepit.SessionHelpers.execute_program_command(
-        session_id,
-        "execute_program",
-        %{
-          program_id: Map.get(program_spec, :id, "unknown"),
-          program_type: Map.get(program_spec, :module_type, "predict"),
-          signature: Map.get(program_spec, :signature, %{}),
-          inputs: inputs,
-          variable_aware: Map.get(program_spec, :variable_aware, false),
-          variable_bindings: Map.get(program_spec, :variable_bindings, %{})
-        }
-      )
-    end
-  end
-
-  defp perform_backend_switch(state, new_backend_module) do
-    Logger.info(
-      "Switching context #{state.id} from #{inspect(state.backend_module)} to #{inspect(new_backend_module)}"
-    )
-
-    start_time = System.monotonic_time(:millisecond)
-
-    with {:ok, exported} <- state.backend_module.export_state(state.backend_state),
-         :ok <- state.backend_module.cleanup(state.backend_state),
-         {:ok, new_backend_state} <-
-           new_backend_module.init(
-             session_id: state.id,
-             existing_state: exported
-           ) do
-      elapsed = System.monotonic_time(:millisecond) - start_time
-
-      new_state = %{
-        state
-        | backend_module: new_backend_module,
-          backend_state: new_backend_state,
-          metadata:
-            state.metadata
-            |> Map.update!(:backend_switches, &(&1 + 1))
-            |> Map.update!(:backend_history, &(&1 ++ [{new_backend_module, DateTime.utc_now()}]))
-            |> Map.put(:last_switch_ms, elapsed)
-      }
-
-      Logger.info("Context #{state.id} successfully switched backends in #{elapsed}ms")
-
-      # Emit telemetry event
-      :telemetry.execute(
-        [:dspex, :context, :backend_switch],
-        %{duration_ms: elapsed},
-        %{
-          context_id: state.id,
-          from: state.backend_module,
-          to: new_backend_module
-        }
-      )
-
-      {:ok, new_state}
-    else
-      {:error, reason} = error ->
-        Logger.error("Failed to switch backend: #{inspect(reason)}")
-        error
+  defp ensure_session_store! do
+    case Process.whereis(SessionStore) do
+      nil ->
+        # Try to start it
+        case SessionStore.start_link() do
+          {:ok, _} ->
+            :ok
+          {:error, reason} ->
+            raise "Failed to start SessionStore: #{inspect(reason)}"
+        end
+      _pid ->
+        :ok
     end
   end
 end
