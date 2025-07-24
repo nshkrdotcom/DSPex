@@ -189,24 +189,42 @@ defmodule DSPex.MixProject do
           DSPex.Python.PoolManager
         ]
       ],
-      before_closing_body_tag: &mermaid_js/1
+      before_closing_head_tag: &docs_before_closing_head_tag/1,
+      before_closing_body_tag: &docs_before_closing_body_tag/1
     ]
   end
 
-  defp mermaid_js(:html) do
+  defp docs_before_closing_head_tag(:html) do
     """
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    """
+  end
+
+  defp docs_before_closing_head_tag(_), do: ""
+
+  defp docs_before_closing_body_tag(:html) do
+    """
     <script>
-      document.addEventListener("DOMContentLoaded", function() {
+      document.addEventListener("DOMContentLoaded", function () {
         mermaid.initialize({
-          startOnLoad: false,
-          theme: document.body.className.includes("dark") ? "dark" : "default"
+          startOnLoad: true,
+          theme: document.body.className.includes("dark") ? "dark" : "default",
+          themeVariables: {
+            primaryColor: "#6366f1",
+            primaryTextColor: "#fff",
+            primaryBorderColor: "#4f46e5",
+            lineColor: "#6b7280",
+            sectionBkgColor: "#f3f4f6",
+            altSectionBkgColor: "#ffffff",
+            gridColor: "#e5e7eb",
+            secondaryColor: "#e0e7ff",
+            tertiaryColor: "#f1f5f9"
+          }
         });
-        mermaid.init(undefined, ".language-mermaid");
       });
     </script>
     """
   end
 
-  defp mermaid_js(_), do: ""
+  defp docs_before_closing_body_tag(_), do: ""
 end
