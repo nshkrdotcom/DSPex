@@ -91,24 +91,17 @@ defmodule DSPex.Context.Monitor do
       DSPex.Context.Monitor.inspect_context(ctx)
   """
   def inspect_context(context) do
-    info = DSPex.Context.get_backend(context)
-    id = DSPex.Context.get_id(context)
+    info = DSPex.Context.get_info(context)
+    session_id = DSPex.Context.get_session_id(context)
 
     IO.puts("""
 
     DSPex Context Inspection
     ========================
-    ID: #{id}
-    Backend: #{inspect(info.module)}
-    Type: #{info.type}
-    Requires Bridge: #{info.requires_bridge}
-    Switches: #{info.switches}
-
-    Capabilities:
-    #{format_capabilities(info.capabilities)}
-
-    History:
-    #{format_history(info.history)}
+    Session ID: #{session_id}
+    Programs: #{info.program_count}
+    Backend: #{info.metadata.backend}
+    Created: #{info.metadata.created_at}
     """)
 
     # Try to get variable count
@@ -194,7 +187,7 @@ defmodule DSPex.Context.Monitor do
       end
 
     # Report results
-    info = DSPex.Context.get_backend(context)
+    info = DSPex.Context.get_info(context)
 
     IO.puts("""
 
@@ -219,27 +212,13 @@ defmodule DSPex.Context.Monitor do
   """
   def watch_switches(context) do
     spawn_link(fn ->
-      initial = DSPex.Context.get_backend(context)
+      initial = DSPex.Context.get_info(context)
       watch_loop(context, initial.switches)
     end)
   end
 
   # Private helpers
 
-  defp format_capabilities(caps) do
-    caps
-    |> Enum.map(fn {k, v} -> "  #{k}: #{v}" end)
-    |> Enum.join("\n")
-  end
-
-  defp format_history(history) do
-    history
-    |> Enum.with_index()
-    |> Enum.map(fn {{module, timestamp}, index} ->
-      "  #{index + 1}. #{inspect(module)} at #{timestamp}"
-    end)
-    |> Enum.join("\n")
-  end
 
   defp format_time(microseconds) when microseconds < 1000 do
     "#{Float.round(microseconds, 2)} μs"
@@ -252,14 +231,14 @@ defmodule DSPex.Context.Monitor do
   defp watch_loop(context, last_switches) do
     Process.sleep(1000)
 
-    case DSPex.Context.get_backend(context) do
+    case DSPex.Context.get_info(context) do
       %{switches: ^last_switches} ->
         # No change
         watch_loop(context, last_switches)
 
       %{switches: new_switches} = info ->
         Logger.info(
-          "Context #{DSPex.Context.get_id(context)} switched backends! Now using #{inspect(info.module)}"
+          "Context #{DSPex.Context.get_session_id(context)} switched backends! Now using #{inspect(info.metadata.backend)}"
         )
 
         watch_loop(context, new_switches)
