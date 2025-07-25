@@ -184,9 +184,7 @@ defmodule DSPex.MixProject do
           DSPex.Native.Metrics
         ],
         "Python Bridge": [
-          DSPex.Python.Bridge,
-          DSPex.Python.Registry,
-          DSPex.Python.PoolManager
+          DSPex.Python.Bridge
         ]
       ],
       before_closing_head_tag: &docs_before_closing_head_tag/1,
