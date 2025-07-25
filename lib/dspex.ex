@@ -204,6 +204,7 @@ defmodule DSPex do
     case Snakepit.get_stats() do
       stats when is_map(stats) ->
         Map.put(stats, :status, :running)
+
       _ ->
         %{status: :not_available}
     end
