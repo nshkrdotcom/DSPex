@@ -1,0 +1,343 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "dspex-performance",
+    "title": "DSPex Performance Monitoring",
+    "tags": ["dspex", "performance", "telemetry"],
+    "timezone": "browser",
+    "schemaVersion": 37,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "id": 1,
+        "title": "Bridge Call Latency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.5, sum(rate(dspex_bridge_call_method_duration_bucket[5m])) by (le))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(dspex_bridge_call_method_duration_bucket[5m])) by (le))",
+            "legendFormat": "p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(dspex_bridge_call_method_duration_bucket[5m])) by (le))",
+            "legendFormat": "p99",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ms",
+            "label": "Latency"
+          }
+        ]
+      },
+      {
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "id": 2,
+        "title": "Tool Execution Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(dspex_tools_execute_duration_sum[5m])) by (tool_name) / sum(rate(dspex_tools_execute_duration_count[5m])) by (tool_name)",
+            "legendFormat": "{{tool_name}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ms",
+            "label": "Avg Duration"
+          }
+        ]
+      },
+      {
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8},
+        "id": 3,
+        "title": "Error Rates",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(dspex_bridge_call_method_exception_total[5m])) by (method) / sum(rate(dspex_bridge_call_method_total[5m])) by (method)",
+            "legendFormat": "Bridge: {{method}}",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(dspex_tools_execute_exception_total[5m])) by (tool_name) / sum(rate(dspex_tools_execute_total[5m])) by (tool_name)",
+            "legendFormat": "Tool: {{tool_name}}",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percentunit",
+            "label": "Error Rate"
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.05],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "name": "High Error Rate Alert",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8},
+        "id": 4,
+        "title": "Python Worker Pool Health",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "snakepit_worker_pool_size",
+            "legendFormat": "Pool Size",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(snakepit_worker_died_total[5m])",
+            "legendFormat": "Death Rate",
+            "refId": "B"
+          },
+          {
+            "expr": "snakepit_pool_queue_depth",
+            "legendFormat": "Queue Depth",
+            "refId": "C"
+          }
+        ]
+      },
+      {
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8},
+        "id": 5,
+        "title": "Session Metrics",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(dspex_session_created_total[5m])",
+            "legendFormat": "Sessions Created/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(dspex_session_lifetime_bucket[5m])) by (le))",
+            "legendFormat": "Session Lifetime p95",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(dspex_session_active)",
+            "legendFormat": "Active Sessions",
+            "refId": "C"
+          }
+        ]
+      },
+      {
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "id": 6,
+        "title": "Contract Validation Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(dspex_contract_validate_duration_bucket[5m])) by (le))",
+            "legendFormat": "Validation p95",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(dspex_types_cast_duration_sum[5m])) / sum(rate(dspex_types_cast_duration_count[5m]))",
+            "legendFormat": "Type Casting Avg",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "µs",
+            "label": "Duration"
+          }
+        ]
+      },
+      {
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "id": 7,
+        "title": "Request Tracing",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, sum by (correlation_id, trace_id) (dspex_trace_duration_ms))",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "styles": [
+          {
+            "alias": "Correlation ID",
+            "pattern": "correlation_id"
+          },
+          {
+            "alias": "Trace ID",
+            "pattern": "trace_id"
+          },
+          {
+            "alias": "Duration (ms)",
+            "pattern": "Value",
+            "type": "number",
+            "unit": "ms"
+          }
+        ]
+      },
+      {
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+        "id": 8,
+        "title": "Top Operations by Volume",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "topk(10, sum(rate(dspex_bridge_call_method_total[5m])) by (method, python_class))",
+            "legendFormat": "{{python_class}}.{{method}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ops",
+            "label": "Operations/sec"
+          }
+        ]
+      },
+      {
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 32},
+        "id": 9,
+        "title": "Current Alerts",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(dspex_alerts_active)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 32},
+        "id": 10,
+        "title": "System Uptime",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(time() - dspex_application_start_time) / 3600",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "value",
+          "unit": "h"
+        }
+      },
+      {
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 32},
+        "id": 11,
+        "title": "Total Operations",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(dspex_bridge_call_method_total[24h]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "value",
+          "unit": "short"
+        }
+      },
+      {
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 32},
+        "id": 12,
+        "title": "Cache Hit Rate",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "sum(rate(dspex_cache_hits_total[5m])) / sum(rate(dspex_cache_requests_total[5m]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true,
+          "unit": "percentunit"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 0.5},
+                {"color": "green", "value": 0.8}
+              ]
+            },
+            "min": 0,
+            "max": 1
+          }
+        }
+      }
+    ]
+  }
+}

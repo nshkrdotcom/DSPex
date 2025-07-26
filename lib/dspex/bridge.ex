@@ -82,12 +82,34 @@ defmodule DSPex.Bridge do
                  "enhanced" => true
                }}
             else
-              Snakepit.execute_in_session(session_id, "call_dspy", %{
-                "module_path" => @class_path,
-                "function_name" => "__init__",
-                "args" => [],
-                "kwargs" => args
-              })
+              metadata = %{
+                module: @class_path,
+                function: "__init__",
+                args: args,
+                session_id: session_id
+              }
+              
+              :telemetry.span(
+                [:dspex, :bridge, :call],
+                metadata,
+                fn ->
+                  result = Snakepit.execute_in_session(session_id, "call_dspy", %{
+                    "module_path" => @class_path,
+                    "function_name" => "__init__",
+                    "args" => [],
+                    "kwargs" => args
+                  })
+                  
+                  case result do
+                    {:ok, %{"success" => true} = res} ->
+                      {result, Map.put(metadata, :success, true)}
+                    {:ok, %{"success" => false, "error" => error}} ->
+                      {result, Map.merge(metadata, %{success: false, error: error})}
+                    {:error, error} ->
+                      {result, Map.merge(metadata, %{success: false, error: error})}
+                  end
+                end
+              )
             end
 
           case call_result do
@@ -127,7 +149,29 @@ defmodule DSPex.Bridge do
             signature = opts[:signature] || args["signature"] || "input -> output"
             enhanced_args = Map.put(args, "signature", signature)
 
-            call_result = Snakepit.execute_in_session(session_id, tool_name, enhanced_args)
+            metadata = %{
+              module: @class_path,
+              function: tool_name,
+              args: enhanced_args,
+              session_id: session_id,
+              enhanced_mode: true
+            }
+            
+            call_result = :telemetry.span(
+              [:dspex, :bridge, :call],
+              metadata,
+              fn ->
+                result = Snakepit.execute_in_session(session_id, tool_name, enhanced_args)
+                case result do
+                  {:ok, %{"success" => true}} ->
+                    {result, Map.put(metadata, :success, true)}
+                  {:ok, %{"success" => false, "error" => error}} ->
+                    {result, Map.merge(metadata, %{success: false, error: error})}
+                  {:error, error} ->
+                    {result, Map.merge(metadata, %{success: false, error: error})}
+                end
+              end
+            )
 
             case call_result do
               {:ok, %{"success" => true} = result} ->
@@ -150,13 +194,35 @@ defmodule DSPex.Bridge do
             # Standard execution path
             method_name = @config[:execute_method] || "__call__"
 
+            metadata = %{
+              module: "stored.#{instance_id}",
+              function: method_name,
+              args: args,
+              session_id: session_id
+            }
+            
             call_result =
-              Snakepit.execute_in_session(session_id, "call_dspy", %{
-                "module_path" => "stored.#{instance_id}",
-                "function_name" => method_name,
-                "args" => [],
-                "kwargs" => args
-              })
+              :telemetry.span(
+                [:dspex, :bridge, :call],
+                metadata,
+                fn ->
+                  result = Snakepit.execute_in_session(session_id, "call_dspy", %{
+                    "module_path" => "stored.#{instance_id}",
+                    "function_name" => method_name,
+                    "args" => [],
+                    "kwargs" => args
+                  })
+                  
+                  case result do
+                    {:ok, %{"success" => true} = res} ->
+                      {result, Map.put(metadata, :success, true)}
+                    {:ok, %{"success" => false, "error" => error}} ->
+                      {result, Map.merge(metadata, %{success: false, error: error})}
+                    {:error, error} ->
+                      {result, Map.merge(metadata, %{success: false, error: error})}
+                  end
+                end
+              )
 
             case call_result do
               {:ok, %{"success" => true, "result" => result}} ->
@@ -189,13 +255,35 @@ defmodule DSPex.Bridge do
               Call #{unquote(method_name)} method on the DSPy instance.
               """
               def unquote(String.to_atom(elixir_name))({session_id, instance_id}, args \\ %{}) do
+                metadata = %{
+                  module: "stored.#{instance_id}",
+                  function: unquote(method_name),
+                  args: args,
+                  session_id: session_id
+                }
+                
                 call_result =
-                  Snakepit.execute_in_session(session_id, "call_dspy", %{
-                    "module_path" => "stored.#{instance_id}",
-                    "function_name" => unquote(method_name),
-                    "args" => [],
-                    "kwargs" => args
-                  })
+                  :telemetry.span(
+                    [:dspex, :bridge, :call],
+                    metadata,
+                    fn ->
+                      result = Snakepit.execute_in_session(session_id, "call_dspy", %{
+                        "module_path" => "stored.#{instance_id}",
+                        "function_name" => unquote(method_name),
+                        "args" => [],
+                        "kwargs" => args
+                      })
+                      
+                      case result do
+                        {:ok, %{"success" => true} = res} ->
+                          {result, Map.put(metadata, :success, true)}
+                        {:ok, %{"success" => false, "error" => error}} ->
+                          {result, Map.merge(metadata, %{success: false, error: error})}
+                        {:error, error} ->
+                          {result, Map.merge(metadata, %{success: false, error: error})}
+                      end
+                    end
+                  )
 
                 case call_result do
                   {:ok, %{"success" => true, "result" => result}} ->
@@ -245,45 +333,91 @@ defmodule DSPex.Bridge do
   """
   def call_dspy(module_path, function_name, args \\ %{}, opts \\ []) do
     session_id = opts[:session_id] || ID.generate("session")
+    
+    metadata = %{
+      module: module_path,
+      function: function_name,
+      args: args,
+      session_id: session_id
+    }
+    
+    :telemetry.span(
+      [:dspex, :bridge, :call],
+      metadata,
+      fn ->
+        call_result =
+          Snakepit.execute_in_session(session_id, "call_dspy", %{
+            "module_path" => module_path,
+            "function_name" => function_name,
+            "args" => [],
+            "kwargs" => args
+          })
 
-    call_result =
-      Snakepit.execute_in_session(session_id, "call_dspy", %{
-        "module_path" => module_path,
-        "function_name" => function_name,
-        "args" => [],
-        "kwargs" => args
-      })
-
-    case call_result do
-      {:ok, %{"success" => true} = result} -> {:ok, result}
-      {:ok, %{"success" => false, "error" => error}} -> {:error, error}
-      {:error, error} -> {:error, error}
-    end
+        case call_result do
+          {:ok, %{"success" => true} = result} -> 
+            {{:ok, result}, Map.put(metadata, :success, true)}
+          {:ok, %{"success" => false, "error" => error}} -> 
+            {{:error, error}, Map.merge(metadata, %{success: false, error: error})}
+          {:error, error} -> 
+            {{:error, error}, Map.merge(metadata, %{success: false, error: error})}
+        end
+      end
+    )
   end
 
   @doc """
   Create a DSPy instance and return the session and instance ID.
   """
   def create_instance(class_path, args \\ %{}, opts \\ []) do
-    case call_dspy(class_path, "__init__", args, opts) do
-      {:ok, %{"instance_id" => instance_id, "type" => "constructor"}} ->
-        session_id = opts[:session_id] || ID.generate("session")
-        {:ok, {session_id, instance_id}}
+    metadata = %{
+      python_class: class_path,
+      args: args,
+      session_id: opts[:session_id] || ID.generate("session")
+    }
+    
+    :telemetry.span(
+      [:dspex, :bridge, :create_instance],
+      metadata,
+      fn ->
+        case call_dspy(class_path, "__init__", args, opts) do
+          {:ok, %{"instance_id" => instance_id, "type" => "constructor"}} ->
+            session_id = metadata.session_id
+            result = {:ok, {session_id, instance_id}}
+            {result, Map.put(metadata, :success, true)}
 
-      {:error, error} ->
-        {:error, error}
-    end
+          {:error, error} ->
+            result = {:error, error}
+            {result, Map.merge(metadata, %{success: false, error: error})}
+        end
+      end
+    )
   end
 
   @doc """
   Call a method on a stored DSPy instance.
   """
   def call_method({session_id, instance_id}, method_name, args \\ %{}, opts \\ []) do
-    call_dspy(
-      "stored.#{instance_id}",
-      method_name,
-      args,
-      Keyword.put(opts, :session_id, session_id)
+    metadata = %{
+      instance_id: instance_id,
+      method_name: method_name,
+      args: args,
+      session_id: session_id
+    }
+    
+    :telemetry.span(
+      [:dspex, :bridge, :call_method],
+      metadata,
+      fn ->
+        result = call_dspy(
+          "stored.#{instance_id}",
+          method_name,
+          args,
+          Keyword.put(opts, :session_id, session_id)
+        )
+        
+        success = match?({:ok, _}, result)
+        {result, Map.put(metadata, :success, success)}
+      end
     )
   end
 
@@ -297,14 +431,30 @@ defmodule DSPex.Bridge do
   """
   def discover_schema(module_path \\ "dspy", opts \\ []) do
     session_id = opts[:session_id] || ID.generate("discovery")
-
-    case Snakepit.execute_in_session(session_id, "discover_dspy_schema", %{
-           "module_path" => module_path
-         }) do
-      {:ok, %{"success" => true, "schema" => schema}} -> {:ok, schema}
-      {:ok, %{"success" => false, "error" => error}} -> {:error, error}
-      {:error, error} -> {:error, error}
-    end
+    
+    metadata = %{
+      module: module_path,
+      function: "discover_dspy_schema",
+      args: %{"module_path" => module_path},
+      session_id: session_id
+    }
+    
+    :telemetry.span(
+      [:dspex, :bridge, :call],
+      metadata,
+      fn ->
+        case Snakepit.execute_in_session(session_id, "discover_dspy_schema", %{
+               "module_path" => module_path
+             }) do
+          {:ok, %{"success" => true, "schema" => schema}} -> 
+            {{:ok, schema}, Map.put(metadata, :success, true)}
+          {:ok, %{"success" => false, "error" => error}} -> 
+            {{:error, error}, Map.merge(metadata, %{success: false, error: error})}
+          {:error, error} -> 
+            {{:error, error}, Map.merge(metadata, %{success: false, error: error})}
+        end
+      end
+    )
   end
 
   @doc """
@@ -448,11 +598,27 @@ defmodule DSPex.Bridge do
       |> Map.put("signature", signature)
       |> Map.merge(opts[:additional_inputs] || %{})
 
-    case Snakepit.execute_in_session(session_id, tool_name, enhanced_inputs) do
-      {:ok, %{"success" => true} = result} -> {:ok, result}
-      {:ok, %{"success" => false, "error" => error}} -> {:error, error}
-      {:error, error} -> {:error, error}
-    end
+    metadata = %{
+      module: "enhanced_tools",
+      function: tool_name,
+      args: enhanced_inputs,
+      session_id: session_id
+    }
+    
+    :telemetry.span(
+      [:dspex, :bridge, :call],
+      metadata,
+      fn ->
+        case Snakepit.execute_in_session(session_id, tool_name, enhanced_inputs) do
+          {:ok, %{"success" => true} = result} -> 
+            {{:ok, result}, Map.put(metadata, :success, true)}
+          {:ok, %{"success" => false, "error" => error}} -> 
+            {{:error, error}, Map.merge(metadata, %{success: false, error: error})}
+          {:error, error} -> 
+            {{:error, error}, Map.merge(metadata, %{success: false, error: error})}
+        end
+      end
+    )
   end
 
   @doc """
@@ -477,17 +643,60 @@ defmodule DSPex.Bridge do
   Get list of available Elixir tools in a session.
   """
   def list_elixir_tools(session_id) do
-    case Snakepit.execute_in_session(session_id, "list_stored_objects", %{}) do
-      {:ok, %{"success" => true, "objects" => objects}} ->
-        elixir_tools =
-          objects
-          |> Enum.filter(fn obj -> obj["name"] |> String.starts_with?("elixir_tool_") end)
-          |> Enum.map(fn obj -> String.replace_prefix(obj["name"], "elixir_tool_", "") end)
+    metadata = %{
+      module: "tools",
+      function: "list_stored_objects",
+      args: %{},
+      session_id: session_id
+    }
+    
+    :telemetry.span(
+      [:dspex, :bridge, :call],
+      metadata,
+      fn ->
+        case Snakepit.execute_in_session(session_id, "list_stored_objects", %{}) do
+          {:ok, %{"success" => true, "objects" => objects}} ->
+            elixir_tools =
+              objects
+              |> Enum.filter(fn obj -> obj["name"] |> String.starts_with?("elixir_tool_") end)
+              |> Enum.map(fn obj -> String.replace_prefix(obj["name"], "elixir_tool_", "") end)
 
-        {:ok, elixir_tools}
+            {{:ok, elixir_tools}, Map.put(metadata, :success, true)}
 
-      {:error, error} ->
-        {:error, error}
-    end
+          {:error, error} ->
+            {{:error, error}, Map.merge(metadata, %{success: false, error: error})}
+        end
+      end
+    )
   end
+
+  @doc """
+  Register tools for bidirectional communication.
+  
+  This function is used by the WrapperOrchestrator to register
+  Elixir functions that can be called from Python.
+  
+  ## Parameters
+  
+  - `ref` - The Python object reference (session_id, instance_id)
+  - `tools` - List of {name, function} tuples
+  
+  ## Returns
+  
+  - `:ok` on success
+  - `{:error, reason}` on failure
+  """
+  def register_tools({session_id, instance_id}, tools) when is_list(tools) do
+    Enum.each(tools, fn {name, function} when is_binary(name) and is_function(function, 1) ->
+      # Register each tool with the session
+      DSPex.Bridge.Tools.register_tool(session_id, name, function, %{
+        instance_id: instance_id,
+        registered_at: DateTime.utc_now()
+      })
+    end)
+    
+    :ok
+  end
+  
+  def register_tools(_ref, _tools), do: {:error, :invalid_arguments}
 end

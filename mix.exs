@@ -46,6 +46,7 @@ defmodule DSPex.MixProject do
       #       git: "https://github.com/nshkrdotcom/snakepit.git",
       #       branch: "feature/unified-grpc-bridge-stage2"},
       #      {:snakepit, path: "./snakepit"},
+      {:snakepit_grpc_bridge, path: "./snakepit_grpc_bridge"},
       {:sinter, "~> 0.0.1"},
       {:jason, "~> 1.4"},
       {:telemetry, "~> 1.2"},
@@ -59,7 +60,8 @@ defmodule DSPex.MixProject do
       # Development dependencies
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:meck, "~> 0.9", only: :test}
     ]
   end
 

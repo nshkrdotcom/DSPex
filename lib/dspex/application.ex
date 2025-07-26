@@ -10,7 +10,17 @@ defmodule DSPex.Application do
       {Registry, keys: :unique, name: DSPex.ProcessRegistry},
 
       # Native module registry
-      DSPex.Native.Registry
+      DSPex.Native.Registry,
+      
+      # Tool registry for bidirectional bridge
+      DSPex.Bridge.Tools.Registry,
+      
+      # Telemetry infrastructure
+      DSPex.Telemetry.Handler,
+      DSPex.Telemetry.Metrics,
+      DSPex.Telemetry.Reporter,
+      DSPex.Telemetry.Alerts,
+      DSPex.Telemetry.OpenTelemetry
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
@@ -19,8 +29,23 @@ defmodule DSPex.Application do
 
     result = Supervisor.start_link(children, opts)
 
-    # Log startup
-    :telemetry.execute([:dspex, :application, :start], %{}, %{})
+    # Attach telemetry handlers
+    DSPex.Telemetry.Metrics.attach()
+    DSPex.Telemetry.Reporter.attach()
+    DSPex.Telemetry.Alerts.attach()
+
+    # Log startup with timing
+    start_time = System.monotonic_time(:millisecond)
+    :telemetry.execute(
+      [:dspex, :application, :start], 
+      %{
+        system_time: System.system_time(),
+        start_time: start_time
+      }, 
+      %{
+        version: Application.spec(:dspex, :vsn) |> to_string()
+      }
+    )
 
     result
   end
