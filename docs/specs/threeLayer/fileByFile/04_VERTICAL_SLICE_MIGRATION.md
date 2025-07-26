@@ -248,17 +248,24 @@ SnakepitGrpcBridge:
    - Use feature flags if needed
    - Maintain backwards compatibility
 
-4. **Validate with Integration Tests**
+4. **Update Documentation**
+   - Update module docs (`@moduledoc`)
+   - Update function docs (`@doc`) 
+   - Update README if needed
+   - Add examples for new features
+   - Document any breaking changes
+
+5. **Validate with Integration Tests**
    - All existing tests must pass
    - Performance should not degrade
    - Telemetry should show improvements
 
-5. **Deploy to Staging**
+6. **Deploy to Staging**
    - Monitor for issues
    - Compare metrics before/after
    - Run soak tests
 
-6. **Graduate to Production**
+7. **Graduate to Production**
    - Gradual rollout
    - Monitor closely
    - Have rollback plan
@@ -319,8 +326,10 @@ end
 - **Week 5**: Performance Monitoring (Observability)
 - **Week 6**: Complex Components (Full Features)
 - **Weeks 7-8**: Production Readiness (Hardening)
+- **Weeks 9-10**: Buffer for Testing and Refinement
+- **Weeks 11-12**: Production Rollout and Monitoring
 
-Total: 8 weeks for complete migration with validation at each step.
+Target: 8-12 weeks for complete migration with validation at each step. The additional buffer ensures we can handle unexpected challenges without compromising quality.
 
 ## Conclusion
 

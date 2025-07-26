@@ -113,31 +113,75 @@ defmodule DSPex.Bridge.MethodRegistry do
 end
 ```
 
-### 4. Schema Definitions
+### 4. Contract Definitions (Primary Approach)
 
-Define schemas for each component type:
+Define explicit contracts for each component type:
 
 ```elixir
-defmodule DSPex.Schemas.Predict do
-  use DSPex.Schema
+defmodule DSPex.Contracts.Predict do
+  use DSPex.Contract
+  
+  @moduledoc """
+  Explicit contract for dspy.Predict.
+  This is the source of truth - no runtime discovery needed.
+  """
   
   @python_class "dspy.Predict"
   
-  defmethod :__init__, "__init__",
+  defmethod :create, :__init__,
     params: [
       signature: {:required, :string}
     ],
     returns: :reference
     
-  defmethod :__call__, "__call__",
+  defmethod :predict, :__call__,
     params: [
-      inputs: {:required, :map}
+      question: {:required, :string}
     ],
     returns: {:struct, DSPex.Types.Prediction}
     
   defmethod :forward, "forward",
     params: :variable_keyword,
     returns: {:struct, DSPex.Types.Prediction}
+    
+  @doc """
+  Version this contract was created against.
+  Update when Python API changes.
+  """
+  def contract_version, do: "1.0.0"
+end
+```
+
+### 5. Schema Discovery (Development Tool Only)
+
+Use schema discovery as a development aid, not a runtime dependency:
+
+```bash
+# Generate a contract template from Python class
+mix dspex.gen.contract dspy.ChainOfThought --output lib/dspex/contracts/chain_of_thought.ex
+
+# Review the generated file and customize
+# The generated contract is a starting point, not the final version
+```
+
+Generated template example:
+```elixir
+# GENERATED CONTRACT TEMPLATE - REVIEW AND CUSTOMIZE
+defmodule DSPex.Contracts.ChainOfThought do
+  use DSPex.Contract
+  
+  @moduledoc """
+  Contract for dspy.ChainOfThought
+  Generated on: 2024-01-15
+  
+  TODO: Review methods and types
+  TODO: Add business logic validations
+  TODO: Document version compatibility
+  """
+  
+  @python_class "dspy.ChainOfThought"
+  
+  # Methods discovered from Python...
 end
 ```
 
@@ -147,25 +191,25 @@ end
 
 ```elixir
 defmodule MyApp.TypedPredictor do
-  @behaviour DSPex.Component
+  use DSPex.Bridge.ContractBased
   
-  use DSPex.Schemas.Predict
+  # Use explicit contract
+  use_contract DSPex.Contracts.Predict
   
   defstruct [:ref, :signature]
   
-  @impl DSPex.Component
-  def create(signature) when is_binary(signature) do
-    case __init__(signature) do
-      {:ok, ref} ->
-        {:ok, %__MODULE__{ref: ref, signature: signature}}
-      error ->
-        error
-    end
-  end
+  # Contract generates these typed functions:
+  # - create(signature) with compile-time validation
+  # - predict(ref, question) with proper types
+  # - forward(ref, opts) with keyword validation
   
-  @impl DSPex.Component
-  def execute(%__MODULE__{ref: ref}, inputs) when is_map(inputs) do
-    __call__(ref, inputs)
+  # Additional business logic
+  def predict_with_context(%__MODULE__{ref: ref}, question, context) do
+    # Combine question and context
+    enhanced_question = "Context: #{context}\nQuestion: #{question}"
+    
+    # Use contract-generated function
+    predict(ref, question: enhanced_question)
   end
 end
 ```
@@ -370,6 +414,61 @@ case DSPex.Contracts.validate_prediction(result) do
 end
 ```
 
+## Compile-Time Considerations
+
+### Challenges with Runtime Discovery
+
+Attempting Python introspection at compile time creates several problems:
+
+1. **Build Environment Complexity**
+   - CI/CD servers need Python + DSPy installed
+   - Version mismatches cause build failures
+   - Docker images become bloated
+
+2. **Compilation Performance**
+   - Every `mix compile` potentially starts Python
+   - Incremental compilation slows dramatically
+   - Developer experience degrades
+
+3. **Failure Modes**
+   - Network issues fetching Python deps = build fails
+   - Python version mismatch = build fails
+   - Missing dependencies = build fails
+
+### Solution: Explicit Contracts + Dev Tools
+
+```elixir
+# Development workflow
+# 1. Developer runs mix task in their environment
+mix dspex.gen.contract dspy.NewComponent
+
+# 2. Reviews and customizes generated contract
+vim lib/dspex/contracts/new_component.ex
+
+# 3. Commits contract to version control
+git add lib/dspex/contracts/new_component.ex
+git commit -m "Add contract for dspy.NewComponent"
+
+# 4. CI/CD builds with pure Elixir - no Python needed!
+```
+
+### Contract Versioning Strategy
+
+```elixir
+defmodule DSPex.Contracts.Predict do
+  use DSPex.Contract
+  
+  # Track compatibility
+  @contract_version "1.2.0"
+  @compatible_with_dspy "~> 2.1"
+  
+  # Runtime validation (optional)
+  def validate_compatibility(python_version) do
+    Version.match?(python_version, @compatible_with_dspy)
+  end
+end
+```
+
 ## Migration Strategy
 
 ### Phase 1: Define Core Types
@@ -377,17 +476,22 @@ end
 2. Define structs for all return types
 3. Add from_python_result/1 functions
 
-### Phase 2: Create Schema DSL
-1. Implement DSPex.Schema behaviour
-2. Create defmethod macro
-3. Add validation infrastructure
+### Phase 2: Create Contract Infrastructure
+1. Implement DSPex.Contract behaviour
+2. Create defmethod macro for contracts
+3. Add compile-time validation
 
-### Phase 3: Generate Contracts
-1. For each DSPy class, create a contract module
-2. Use schema introspection to generate automatically
-3. Allow manual overrides for complex cases
+### Phase 3: Build Development Tools
+1. Create mix dspex.gen.contract task
+2. Add contract validation helpers
+3. Document contract update workflow
 
-### Phase 4: Deprecate String-Based API
+### Phase 4: Migrate Existing Code
+1. Generate contracts for existing DSPy usage
+2. Review and customize each contract
+3. Update code to use contract-based approach
+
+### Phase 5: Deprecate String-Based API
 1. Mark Bridge.call_method/3 as deprecated
 2. Provide migration guide
 3. Remove in next major version

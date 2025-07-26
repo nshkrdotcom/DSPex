@@ -71,7 +71,7 @@ Bridge.call_method(ref, "perdict", %{qeustion: "oops"})
 
 **After**: Compile-time validation
 ```elixir
-# Generated from schema discovery
+# Generated from contract definition
 @spec predict(ref, question: String.t()) :: {:ok, Prediction.t()} | {:error, term()}
 def predict(ref, question: question) when is_binary(question)
 ```
@@ -217,27 +217,27 @@ Comprehensive telemetry for everything:
 
 ## Benefits Realized
 
-### Quantifiable Improvements
+### Target Improvements
 
-1. **Code Quality**
-   - Average module size: 500 → 150 lines
-   - Cyclomatic complexity: 15 → 5
-   - Test coverage: 60% → 85%
+1. **Code Quality Targets**
+   - Average module size: Target 150 lines (from 500)
+   - Cyclomatic complexity: Target < 5 (from 15)
+   - Test coverage: Target 85% (from 60%)
 
-2. **Performance**
-   - P50 latency: No change (good!)
-   - P99 latency: 20% improvement (routing)
-   - Throughput: 30% improvement (pooling)
+2. **Performance Targets**
+   - P50 latency: Maintain current performance
+   - P99 latency: Target 20% improvement via routing
+   - Throughput: Target 30% improvement via pooling
 
-3. **Reliability**
-   - Error rate: 0.1% → 0.05%
-   - Recovery time: 30s → 5s
-   - Memory leaks: Fixed
+3. **Reliability Targets**
+   - Error rate: Target < 0.05% (from 0.1%)
+   - Recovery time: Target < 5s (from 30s)
+   - Memory stability: Zero growth over 24h
 
-4. **Developer Experience**
-   - Onboarding time: 2 weeks → 3 days
-   - Bug fix time: 4 hours → 1 hour
-   - Feature velocity: 2x faster
+4. **Developer Experience Targets**
+   - Onboarding time: Target 3 days (from 2 weeks)
+   - Bug fix time: Target 1 hour (from 4 hours)
+   - Feature velocity: Target 2x improvement
 
 ### Architectural Wins
 
@@ -270,19 +270,27 @@ end
 
 ## Timeline and Resources
 
-### Timeline (8 weeks)
+### Timeline (8-12 weeks)
 - Week 1-2: Basic Predict + Testing
 - Week 3: Session Management
 - Week 4: Bidirectional Bridge
 - Week 5: Observability
 - Week 6: Complex Components
 - Week 7-8: Production Hardening
+- Week 9-10: Buffer for unforeseen challenges
+- Week 11-12: Production rollout and monitoring
 
 ### Resources Needed
 - 2 Senior Engineers (full time)
 - 1 SRE (part time for observability)
 - Python expertise for weeks 3-5
 - Load testing infrastructure
+
+The extended timeline provides realistic buffer for:
+- Integration challenges
+- Performance tuning
+- Documentation updates
+- Team knowledge transfer
 
 ## Risk Mitigation
 

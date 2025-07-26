@@ -377,7 +377,7 @@ def test_bidirectional_calls():
 ## Success Criteria
 
 1. **No Behavior Changes**: All existing functionality works identically
-2. **Better Performance**: 10% reduction in latency from better routing
+2. **Performance Enablement**: Infrastructure supports intelligent routing, enabling potential latency reduction of >10% on suitable workloads
 3. **Higher Test Coverage**: From 40% to 80%
 4. **Cleaner Code**: Average module size < 200 lines
 5. **Better Errors**: Specific, actionable error messages

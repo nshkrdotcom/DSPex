@@ -170,20 +170,12 @@ defmodule DSPex.Bridge.Bidirectional do
       
       defoverridable [on_python_callback: 3]
       
-      # Override create to register tools
-      def create(args \\ %{}) do
-        case super(args) do
-          {:ok, ref} = success ->
-            # Register tools with the session
-            DSPex.Bridge.register_tools(ref, elixir_tools())
-            success
-            
-          error ->
-            error
-        end
-      end
+      # Instead of using super, inject behavior through module attributes
+      Module.register_attribute(__MODULE__, :dspex_behaviors, accumulate: true)
+      @dspex_behaviors :bidirectional
       
-      defoverridable [create: 0, create: 1]
+      # The wrapper macro will orchestrate all behaviors
+      # No fragile super chains!
     end
   end
 end
@@ -218,105 +210,175 @@ defmodule DSPex.Bridge.Observable do
       
       defoverridable [telemetry_metadata: 2, before_execute: 2, after_execute: 3]
       
-      # Wrap create with telemetry
-      def create(args \\ %{}) do
-        metadata = telemetry_metadata(:create, args)
-        
-        :telemetry.span(
-          [:dspex, :wrapper, :create],
-          metadata,
-          fn ->
-            before_execute(:create, args)
-            result = super(args)
-            after_execute(:create, args, result)
-            {result, metadata}
-          end
-        )
-      end
-      
-      # Wrap call with telemetry
-      def call(ref, method, args \\ %{}) do
-        metadata = telemetry_metadata(:call, Map.put(args, :method, method))
-        
-        :telemetry.span(
-          [:dspex, :wrapper, :call],
-          metadata,
-          fn ->
-            before_execute(:call, args)
-            result = super(ref, method, args)
-            after_execute(:call, args, result)
-            {result, metadata}
-          end
-        )
-      end
-      
-      defoverridable [create: 0, create: 1, call: 2, call: 3]
+      # Register this behavior
+      Module.register_attribute(__MODULE__, :dspex_behaviors, accumulate: true)
+      @dspex_behaviors :observable
     end
   end
 end
 ```
 
-### Step 5: Schema Discovery
+### Step 5: Behavior Orchestration (No Super!)
 
-Compile-time validation and type generation:
+Instead of fragile `super` chains, the wrapper macro orchestrates behaviors:
 
 ```elixir
-# lib/dspex/bridge/schema_aware.ex
-defmodule DSPex.Bridge.SchemaAware do
+defmodule DSPex.Bridge.WrapperOrchestrator do
   @moduledoc """
-  Discovers Python class schema at compile time and generates typed functions.
+  Orchestrates multiple behaviors without relying on super.
+  Order-independent and explicit.
   """
   
-  defmacro discover_schema(python_class, opts \\ []) do
-    # This runs at compile time
-    schema = fetch_schema_at_compile_time(python_class, opts)
-    
-    # Generate functions for each method
-    method_defs = for {method_name, spec} <- schema.methods do
-      generate_method_def(python_class, method_name, spec)
-    end
-    
+  def generate_create_function(behaviors) do
     quote do
-      # Store schema for runtime access
-      @schema unquote(Macro.escape(schema))
-      def __schema__, do: @schema
-      
-      # Generated typed methods
-      unquote_splicing(method_defs)
-    end
-  end
-  
-  defp fetch_schema_at_compile_time(python_class, opts) do
-    # Start temporary Python process during compilation
-    case DSPex.Bridge.SchemaIntrospector.introspect(python_class, opts) do
-      {:ok, schema} -> schema
-      {:error, reason} -> 
-        raise CompileError, "Failed to introspect #{python_class}: #{inspect(reason)}"
-    end
-  end
-  
-  defp generate_method_def(python_class, method_name, spec) do
-    # Convert Python method name to Elixir function name
-    elixir_name = pythonic_to_elixir(method_name)
-    param_specs = generate_param_specs(spec.params)
-    
-    quote do
-      @doc unquote(spec.doc || "Calls #{method_name} on #{python_class}")
-      @spec unquote(elixir_name)(reference(), unquote_splicing(param_specs)) :: 
-        {:ok, unquote(spec.return_type)} | {:error, term()}
+      def create(args \\ %{}) do
+        # Collect all behavior metadata
+        behaviors = @dspex_behaviors
         
-      def unquote(elixir_name)(ref, unquote_splicing(generate_params(spec.params))) do
-        args = unquote(generate_args_map(spec.params))
-        
-        case call(ref, unquote(method_name), args) do
-          {:ok, result} -> {:ok, unquote(transform_result(spec.return_type, quote do result end))}
-          error -> error
+        # Pre-execution hooks
+        if :observable in behaviors do
+          metadata = telemetry_metadata(:create, args)
+          :telemetry.execute([:dspex, :wrapper, :create, :start], %{}, metadata)
         end
+        
+        # Core execution
+        result = DSPex.Bridge.create_instance(@python_class, args)
+        
+        # Post-execution hooks
+        with {:ok, ref} = result do
+          if :bidirectional in behaviors do
+            DSPex.Bridge.register_tools(ref, elixir_tools())
+          end
+        end
+        
+        # Telemetry completion
+        if :observable in behaviors do
+          :telemetry.execute([:dspex, :wrapper, :create, :stop], 
+            %{duration: 0}, Map.put(metadata, :success, match?({:ok, _}, result)))
+        end
+        
+        result
       end
     end
   end
   
-  # ... helper functions for code generation
+  def generate_call_function(behaviors) do
+    # Similar orchestration for call/3
+  end
+end
+```
+
+This approach:
+- **No super chains**: Each behavior is independent
+- **Order doesn't matter**: Use statements can be in any order
+- **Explicit flow**: You can see exactly what happens when
+- **Easy to extend**: Add new behaviors without touching existing ones
+
+### Step 6: Contract-Based Wrapper
+
+Use explicit contracts instead of runtime discovery:
+
+```elixir
+# lib/dspex/bridge/contract_based.ex
+defmodule DSPex.Bridge.ContractBased do
+  @moduledoc """
+  Uses explicit contract modules to generate typed functions.
+  No Python needed at compile time!
+  """
+  
+  defmacro use_contract(contract_module) do
+    quote do
+      # Import the contract's method definitions
+      @contract_module unquote(contract_module)
+      @python_class @contract_module.python_class()
+      
+      # Register as contract-based
+      Module.register_attribute(__MODULE__, :dspex_behaviors, accumulate: true)
+      @dspex_behaviors :contract_based
+      
+      # Generate functions from contract
+      for {method_name, method_def} <- @contract_module.__methods__() do
+        DSPex.Bridge.ContractBased.generate_method(__MODULE__, method_name, method_def)
+      end
+    end
+  end
+  
+  def generate_method(module, method_name, method_def) do
+    # Generate properly typed function from contract definition
+    # This happens at compile time but doesn't need Python!
+  end
+end
+```
+
+### Step 7: Mix Task for Contract Generation
+
+Helper tool for developers (not used at compile time):
+
+```elixir
+defmodule Mix.Tasks.Dspex.Gen.Contract do
+  use Mix.Task
+  
+  @shortdoc "Generate a contract template from Python class"
+  
+  @moduledoc """
+  Generates an Elixir contract module from a Python class.
+  
+  This is a development tool - the generated contract becomes
+  the source of truth and is checked into version control.
+  
+  Usage:
+      mix dspex.gen.contract dspy.Predict --out lib/contracts/predict.ex
+  """
+  
+  def run(args) do
+    {opts, [python_class], _} = OptionParser.parse(args, 
+      strict: [out: :string, force: :boolean])
+    
+    # Start Python and introspect (only during development!)
+    Mix.Task.run("app.start")
+    
+    case DSPex.SchemaIntrospector.discover(python_class) do
+      {:ok, schema} ->
+        content = generate_contract(python_class, schema)
+        path = opts[:out] || default_path(python_class)
+        
+        if File.exists?(path) and not opts[:force] do
+          Mix.raise("Contract already exists at #{path}. Use --force to overwrite.")
+        end
+        
+        File.write!(path, content)
+        Mix.shell().info("Generated contract at #{path}")
+        Mix.shell().info("Please review and customize before committing!")
+        
+      {:error, reason} ->
+        Mix.raise("Failed to introspect #{python_class}: #{inspect(reason)}")
+    end
+  end
+  
+  defp generate_contract(python_class, schema) do
+    # Generate a well-formatted contract module
+    """
+    defmodule #{contract_module_name(python_class)} do
+      use DSPex.Contract
+      
+      @moduledoc \"\"\"
+      Contract for #{python_class}
+      
+      Generated on: #{Date.utc_today()}
+      
+      IMPORTANT: Review and customize this contract!
+      - Verify method signatures match your usage
+      - Add domain-specific validations
+      - Document any version constraints
+      \"\"\"
+      
+      @python_class "#{python_class}"
+      @contract_version "1.0.0"
+      
+      #{Enum.map_join(schema.methods, "\n", &format_method/1)}
+    end
+    """
+  end
 end
 ```
 
@@ -368,13 +430,13 @@ defmodule MyApp.EnhancedPredict do
   end
 end
 
-# Example 4: Full featured with schema
+# Example 4: Full featured with explicit contract
 defmodule MyApp.TypedChainOfThought do
-  use DSPex.Bridge.SchemaAware
-  use DSPex.Bridge.Bidirectional
-  use DSPex.Bridge.Observable
+  use DSPex.Bridge.ContractBased    # Explicit contract
+  use DSPex.Bridge.Bidirectional    # Python callbacks
+  use DSPex.Bridge.Observable       # Telemetry
   
-  discover_schema "dspy.ChainOfThought"
+  use_contract DSPex.Contracts.ChainOfThought
   
   @impl DSPex.Bridge.Bidirectional
   def elixir_tools do
@@ -461,6 +523,33 @@ defmodule DSPex.Bridge.ObservableTest do
     assert {:create, measurements, metadata} = find_event(events, [:dspex, :wrapper, :create])
     assert metadata.test == true
     assert measurements.duration > 0
+  end
+end
+
+# test/dspex/bridge/contract_based_test.exs
+defmodule DSPex.Bridge.ContractBasedTest do
+  use ExUnit.Case
+  
+  # Assume DSPex.Contracts.TestComponent exists
+  defmodule TestContractWrapper do
+    use DSPex.Bridge.ContractBased
+    use_contract DSPex.Contracts.TestComponent
+  end
+  
+  test "generates functions from the contract" do
+    # Assert that functions defined in the contract are generated
+    assert function_exported?(TestContractWrapper, :create, 1)
+    assert function_exported?(TestContractWrapper, :process, 2)
+  end
+  
+  test "contract enforces compile-time safety" do
+    # This would be in a separate test file to check compile errors
+    # The contract system prevents undefined method calls at compile time
+  end
+  
+  test "uses contract metadata" do
+    assert TestContractWrapper.__contract_module__() == DSPex.Contracts.TestComponent
+    assert TestContractWrapper.__python_class__() == "test.Component"
   end
 end
 ```

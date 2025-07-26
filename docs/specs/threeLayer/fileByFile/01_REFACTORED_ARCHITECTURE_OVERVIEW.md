@@ -8,7 +8,7 @@ This document presents a refactored architecture that addresses the critiques of
 
 ### Layer 1: Snakepit Core (Infrastructure)
 **Purpose**: Pure OTP infrastructure for process management
-**Size**: ~1,500 lines
+**Size**: ~1,500 lines (estimate as of 2024-01)
 **Responsibilities**:
 - Worker pool management
 - Session routing
@@ -17,7 +17,7 @@ This document presents a refactored architecture that addresses the critiques of
 
 ### Layer 2: SnakepitGrpcBridge (Bridge Implementation)
 **Purpose**: gRPC bridge with comprehensive observability
-**Size**: ~7,000 lines
+**Size**: ~7,000 lines (estimate as of 2024-01)
 **Responsibilities**:
 - gRPC server/client implementation
 - Session and variable storage
@@ -27,7 +27,7 @@ This document presents a refactored architecture that addresses the critiques of
 
 ### Layer 3: DSPex (User API)
 **Purpose**: Clean, ergonomic Elixir API for AI tasks
-**Size**: ~6,000 lines
+**Size**: ~6,000 lines (estimate as of 2024-01)
 **Responsibilities**:
 - High-level DSPy integration
 - Native Elixir components (Signature, Template, Validator)
@@ -71,25 +71,36 @@ defmodule MyApp.Predictor do
 end
 ```
 
-### 2. Schema-Aware Wrappers
+### 2. Contract-Based Wrappers
 
 **Before**: Stringly-typed API
 ```elixir
 Bridge.call_method(ref, "__call__", %{question: "..."})  # Hope the method exists!
 ```
 
-**After**: Compile-time schema validation
+**After**: Explicit contracts with compile-time validation
 ```elixir
-# At compile time, discover schema and generate typed functions
+# Define explicit contract (no Python needed at compile time!)
+defmodule DSPex.Contracts.Predict do
+  use DSPex.Contract
+  
+  @python_class "dspy.Predict"
+  
+  defmethod :create, :__init__,
+    params: [signature: :string],
+    returns: :reference
+    
+  defmethod :predict, :__call__,
+    params: [question: :string],
+    returns: {:ok, %Prediction{}}
+end
+
+# Use the contract
 defmodule MyApp.Predictor do
-  use DSPex.Bridge.SchemaAware
+  use DSPex.Bridge.ContractBased
+  use_contract DSPex.Contracts.Predict
   
-  discover_schema "dspy.Predict"
-  
-  # Generates:
-  # def __init__(signature) 
-  # def __call__(question: question)
-  # def forward(**inputs)
+  # Typed functions generated from contract
 end
 ```
 

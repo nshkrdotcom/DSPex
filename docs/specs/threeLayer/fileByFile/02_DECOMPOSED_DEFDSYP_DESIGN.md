@@ -38,27 +38,28 @@ defmodule MyApp.BasicPredictor do
 end
 ```
 
-### 2. Schema-Aware Wrapper
+### 2. Contract-Based Wrapper
 
-For compile-time validation and better DX:
+For explicit, version-controlled contracts:
 
 ```elixir
 defmodule MyApp.TypedPredictor do
-  use DSPex.Bridge.SchemaAware
+  use DSPex.Bridge.ContractBased
   
-  discover_schema "dspy.Predict"
+  # Reference an explicit contract module
+  use_contract DSPex.Contracts.Predict
   
-  # At compile time:
-  # 1. Queries Python for class schema
-  # 2. Generates typed functions
-  # 3. Validates at compile time
+  # The contract defines the exact API:
+  # - Method names and signatures
+  # - Parameter types and validation
+  # - Return types and transformations
   
-  # Generated functions match Python API exactly:
-  # @spec __init__(String.t()) :: {:ok, reference()} | {:error, term()}
-  # def __init__(signature) when is_binary(signature)
+  # Generated functions match the contract exactly:
+  # @spec create(String.t()) :: {:ok, reference()} | {:error, term()}
+  # def create(signature) when is_binary(signature)
   #
-  # @spec __call__(reference(), keyword()) :: {:ok, map()} | {:error, term()}
-  # def __call__(ref, question: question) when is_binary(question)
+  # @spec predict(reference(), question: String.t()) :: {:ok, Prediction.t()} | {:error, term()}
+  # def predict(ref, question: question) when is_binary(question)
 end
 ```
 
@@ -150,12 +151,12 @@ The power comes from mixing and matching:
 
 ```elixir
 defmodule MyApp.FullFeaturedPredictor do
-  use DSPex.Bridge.SchemaAware      # Typed API
+  use DSPex.Bridge.ContractBased    # Explicit contract
   use DSPex.Bridge.Bidirectional    # Python callbacks
   use DSPex.Bridge.Observable       # Telemetry
   use DSPex.Bridge.ResultTransform  # Result shaping
   
-  discover_schema "dspy.ChainOfThought"
+  use_contract DSPex.Contracts.ChainOfThought
   
   @impl DSPex.Bridge.Bidirectional
   def elixir_tools do
@@ -233,24 +234,53 @@ defmodule DSPex.Bridge.SimpleWrapper do
 end
 ```
 
-### Phase 3: Schema Discovery
+### Phase 3: Contract Definition with Schema Helper
 
-Build compile-time schema introspection:
+Explicit contracts with optional generation assistance:
 
 ```elixir
-defmodule DSPex.Bridge.SchemaAware do
-  defmacro discover_schema(python_class) do
-    # At compile time, start a Python process and introspect
-    schema = DSPex.Bridge.SchemaIntrospector.get_schema(python_class)
-    
-    # Generate functions based on schema
-    for {method_name, method_spec} <- schema.methods do
-      generate_method(method_name, method_spec)
-    end
-  end
+# Manual contract definition (primary approach)
+defmodule DSPex.Contracts.Predict do
+  use DSPex.Contract
   
-  defp generate_method(name, spec) do
-    # Generate typed function with proper spec
+  @python_class "dspy.Predict"
+  
+  defmethod :create, :__init__,
+    params: [signature: :string],
+    returns: :reference
+    
+  defmethod :predict, :__call__,
+    params: [question: :string],
+    returns: {:ok, %Prediction{}}
+end
+
+# Optional: Mix task for generating contract templates
+# Run: mix dspex.gen.contract dspy.Predict --output lib/contracts/predict.ex
+# This generates a template you can review and customize
+```
+
+### Schema Discovery as Development Tool
+
+```elixir
+# Mix task implementation (NOT compile-time)
+defmodule Mix.Tasks.Dspex.Gen.Contract do
+  use Mix.Task
+  
+  @shortdoc "Generate contract template from Python class"
+  
+  def run([python_class | opts]) do
+    # Start Python only when explicitly requested
+    {:ok, schema} = DSPex.SchemaIntrospector.discover(python_class)
+    
+    # Generate template contract module
+    content = generate_contract_template(python_class, schema)
+    
+    # Write to file for developer review
+    path = parse_output_path(opts)
+    File.write!(path, content)
+    
+    Mix.shell().info("Generated contract template at #{path}")
+    Mix.shell().info("Please review and customize before committing")
   end
 end
 ```
@@ -273,11 +303,11 @@ defdsyp MyModule, "dspy.Predict", %{
 ```elixir
 # New
 defmodule MyModule do
-  use DSPex.Bridge.SchemaAware
+  use DSPex.Bridge.ContractBased
   use DSPex.Bridge.Bidirectional
   use DSPex.Bridge.ResultTransform
   
-  discover_schema "dspy.Predict"
+  use_contract DSPex.Contracts.Predict
   
   @impl DSPex.Bridge.Bidirectional
   def elixir_tools do
@@ -333,12 +363,15 @@ use DSPex.Bridge.EverythingBehavior
 use DSPex.Bridge.AutoMagic  # What does this even do?
 ```
 
-### 3. Compile-Time Coupling
+### 3. Runtime Dependencies
 ```elixir
-# BAD: Too much compile-time dependency
-discover_schema "dspy.Predict", 
-  validate_at_compile_time: true,
-  fail_on_schema_change: true  # Brittle!
+# BAD: Python required at compile time
+use DSPex.Bridge.CompileTimeDiscovery
+discover_schema "dspy.Predict"  # Requires Python during compilation!
+
+# GOOD: Explicit contracts, no compile-time Python
+use DSPex.Bridge.ContractBased
+use_contract DSPex.Contracts.Predict  # Pure Elixir module
 ```
 
 ## Summary

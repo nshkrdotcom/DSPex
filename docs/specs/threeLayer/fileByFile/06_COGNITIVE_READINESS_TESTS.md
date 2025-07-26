@@ -6,7 +6,73 @@ Instead of vague "cognitive" features, we define concrete, testable capabilities
 
 ## Test Categories
 
-### 1. Performance Baseline Tests
+### 1. Contract System Validation Tests
+
+**Purpose**: Verify the contract-based macro system provides compile-time safety.
+
+```elixir
+defmodule SnakepitGrpcBridge.Tests.ContractValidation do
+  use ExUnit.Case
+  
+  test "contract prevents calling undefined methods at compile time" do
+    # This should fail to compile
+    assert_raise CompileError, fn ->
+      defmodule InvalidWrapper do
+        use DSPex.Bridge.ContractBased
+        use_contract DSPex.Contracts.Predict
+        
+        # Try to call non-existent method
+        def invalid_call(ref) do
+          non_existent_method(ref, "arg")  # Contract doesn't define this!
+        end
+      end
+    end
+  end
+  
+  test "contract enforces parameter types" do
+    # Define a strict contract
+    defmodule StrictContract do
+      use DSPex.Contract
+      
+      defmethod :process, :process,
+        params: [count: {:required, :integer}],
+        returns: :ok
+    end
+    
+    defmodule StrictWrapper do
+      use DSPex.Bridge.ContractBased
+      use_contract StrictContract
+    end
+    
+    # This should fail at runtime with clear error
+    {:error, {:invalid_type, :integer, "not a number"}} = 
+      StrictWrapper.process(ref, count: "not a number")
+  end
+  
+  test "from_python_result transformation is applied" do
+    defmodule TransformContract do
+      use DSPex.Contract
+      
+      defmethod :get_data, :get_data,
+        params: [],
+        returns: {:struct, MyApp.Data}
+    end
+    
+    # Verify the transformation happens automatically
+    {:ok, result} = TransformWrapper.get_data(ref)
+    assert %MyApp.Data{} = result
+    assert result.__struct__ == MyApp.Data
+  end
+  
+  test "contract version checking works" do
+    # Contracts can validate compatibility
+    assert DSPex.Contracts.Predict.validate_compatibility("2.1.3")
+    refute DSPex.Contracts.Predict.validate_compatibility("1.0.0")
+  end
+end
+```
+
+### 2. Performance Baseline Tests
 
 **Purpose**: Establish that the system performs well enough for interactive use.
 
@@ -141,6 +207,8 @@ defmodule SnakepitGrpcBridge.Tests.Bidirectional do
     DSPex.Tools.register("check_domain", &MyApp.DomainChecker.valid?/1)
     
     # Python component that orchestrates Elixir tools
+    # SECURITY NOTE: DSPex.Custom.new is ONLY available in test environment
+    # This prevents arbitrary code execution in production
     email_processor = DSPex.Custom.new("""
     def process_email(session_context, email):
         # Step 1: Validate format
@@ -167,6 +235,26 @@ defmodule SnakepitGrpcBridge.Tests.Bidirectional do
   end
 end
 ```
+
+### Security Note: DSPex.Custom
+
+The `DSPex.Custom.new("""...""")` helper shown in tests is a powerful but dangerous feature that allows arbitrary Python code execution. This feature:
+
+1. **MUST be restricted to test environment only**
+   ```elixir
+   defmodule DSPex.Custom do
+     def new(python_code) do
+       unless Mix.env() == :test do
+         raise "DSPex.Custom is only available in test environment for security"
+       end
+       # Implementation...
+     end
+   end
+   ```
+
+2. **Should never be exposed in production**
+3. **Is intended only for testing complex scenarios**
+4. **Could be replaced with pre-defined test components if security is a concern**
 
 ### 4. State Management Tests
 
