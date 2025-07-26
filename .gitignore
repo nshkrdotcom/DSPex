@@ -164,6 +164,7 @@ snakepit/
 
 # Snakepit DSPy adapter project
 snakepit_dspy/
+snakepit_grpc_bridge/
 
 # Cloned gemini_ex repository
 gemini_ex/
