@@ -28,7 +28,7 @@ defmodule DSPex do
       {:ok, result} = DSPex.run_pipeline(pipeline, %{query: "machine learning"})
   """
 
-  alias DSPex.Pipeline
+  alias SnakepitGRPCBridge.API
 
   # Type aliases for cleaner specs
   @type signature :: DSPex.Native.Signature.t()
@@ -58,13 +58,19 @@ defmodule DSPex do
       DSPex.signature("question: str 'User query' -> answer: str 'Generated response'")
   """
   @spec signature(String.t() | map()) :: {:ok, signature()} | {:error, term()}
-  defdelegate signature(spec), to: DSPex.Native.Signature, as: :parse
+  def signature(spec) do
+    # TODO: Implement via platform API
+    {:error, :not_implemented}
+  end
 
   @doc """
   Compile a signature for optimized repeated use.
   """
   @spec compile_signature(binary()) :: {:ok, signature_compiled()} | {:error, term()}
-  defdelegate compile_signature(spec), to: DSPex.Native.Signature, as: :compile
+  def compile_signature(spec) do
+    # TODO: Implement via platform API
+    {:error, :not_implemented}
+  end
 
   # Module operations - routed to appropriate implementation
 
@@ -80,7 +86,9 @@ defmodule DSPex do
   """
   @spec predict(signature(), map(), keyword()) :: {:ok, map()} | {:error, term()}
   def predict(signature, inputs, opts \\ []) do
-    DSPex.Modules.Predict.predict(signature, inputs, opts)
+    with {:ok, session_id} <- get_or_create_session(opts) do
+      API.DSPy.predict(session_id, signature, inputs, opts)
+    end
   end
 
   @doc """
@@ -90,7 +98,11 @@ defmodule DSPex do
   """
   @spec chain_of_thought(signature(), map(), keyword()) :: {:ok, map()} | {:error, term()}
   def chain_of_thought(signature, inputs, opts \\ []) do
-    DSPex.Modules.ChainOfThought.think(signature, inputs, opts)
+    with {:ok, session_id} <- get_or_create_session(opts) do
+      config = Map.new(opts)
+      {:ok, module_id} = API.DSPy.create_module(session_id, "dspy.ChainOfThought", config)
+      API.DSPy.execute_module(session_id, module_id, inputs, opts)
+    end
   end
 
   @doc """
@@ -108,7 +120,16 @@ defmodule DSPex do
   @spec react(signature(), map(), list(map()), keyword()) ::
           {:ok, map()} | {:error, term()}
   def react(signature, inputs, tools, opts \\ []) do
-    DSPex.Modules.ReAct.reason_and_act(signature, inputs, tools, opts)
+    with {:ok, session_id} <- get_or_create_session(opts) do
+      # Register tools
+      Enum.each(tools, fn tool ->
+        API.Tools.register_elixir_tool(session_id, tool, tool.function)
+      end)
+      
+      config = Map.merge(%{tools: tools}, Map.new(opts))
+      {:ok, module_id} = API.DSPy.create_module(session_id, "dspy.ReAct", config)
+      API.DSPy.execute_module(session_id, module_id, inputs, opts)
+    end
   end
 
   # Pipeline operations
@@ -118,8 +139,10 @@ defmodule DSPex do
 
   Pipelines can mix native and Python implementations seamlessly.
   """
-  @spec pipeline(list(Pipeline.step())) :: Pipeline.t()
-  defdelegate pipeline(steps), to: Pipeline, as: :new
+  @spec pipeline(list(map())) :: map()
+  def pipeline(steps) do
+    %{steps: steps, id: generate_id()}
+  end
 
   @doc """
   Execute a pipeline with given input.
@@ -130,8 +153,11 @@ defmodule DSPex do
     * `:continue_on_error` - Continue execution on step failure
     * `:stream` - Enable streaming for supported steps
   """
-  @spec run_pipeline(Pipeline.t(), map(), keyword()) :: {:ok, term()} | {:error, term()}
-  defdelegate run_pipeline(pipeline, input, opts \\ []), to: Pipeline, as: :run
+  @spec run_pipeline(map(), map(), keyword()) :: {:ok, term()} | {:error, term()}
+  def run_pipeline(pipeline, input, opts \\ []) do
+    # TODO: Implement pipeline execution via platform API
+    {:error, :not_implemented}
+  end
 
   # LLM operations
 
@@ -155,17 +181,24 @@ defmodule DSPex do
       )
   """
   @spec lm_client(keyword()) :: {:ok, map()} | {:error, term()}
-  defdelegate lm_client(opts), to: DSPex.LLM.Client, as: :new
+  def lm_client(opts) do
+    with {:ok, session_id} <- get_or_create_session(opts) do
+      API.DSPy.configure_lm(session_id, Map.new(opts))
+      {:ok, %{session_id: session_id}}
+    end
+  end
 
   @doc """
   Generate text using an LLM client.
   """
   @spec lm_generate(
-          %{:adapter_module => atom(), any() => any()},
+          %{:session_id => String.t(), any() => any()},
           binary() | list(map()),
           Keyword.t()
         ) :: {:error, any()} | {:ok, map()}
-  defdelegate lm_generate(client, prompt, opts \\ []), to: DSPex.LLM.Client, as: :generate
+  def lm_generate(%{session_id: session_id}, prompt, opts \\ []) do
+    API.DSPy.predict(session_id, "prompt -> response", %{prompt: prompt}, opts)
+  end
 
   # Utility functions
 
@@ -173,13 +206,19 @@ defmodule DSPex do
   Validate data against a signature.
   """
   @spec validate(map(), signature()) :: :ok | {:error, list(String.t())}
-  defdelegate validate(data, signature), to: DSPex.Native.Validator
+  def validate(data, signature) do
+    # TODO: Implement validation via platform API
+    {:error, :not_implemented}
+  end
 
   @doc """
   Render a template with context.
   """
   @spec render_template(String.t(), map()) :: String.t()
-  defdelegate render_template(template, context), to: DSPex.Native.Template, as: :render
+  def render_template(template, context) do
+    # Simple EEx rendering as fallback
+    EEx.eval_string(template, assigns: Map.to_list(context))
+  end
 
   @doc """
   Check system health and status.
@@ -187,28 +226,34 @@ defmodule DSPex do
   @spec health_check() :: %{
           status: :ok,
           version: String.t(),
-          pools: map(),
-          native_modules: term(),
-          python_modules: term()
+          platform_status: map()
         }
   def health_check do
     %{
       status: :ok,
-      version: "0.1.0",
-      snakepit_status: snakepit_status(),
-      native_modules: DSPex.Native.Registry.list()
+      version: "0.2.0",
+      platform_status: platform_status()
     }
   end
 
-  defp snakepit_status do
-    case Snakepit.get_stats() do
-      stats when is_map(stats) ->
-        Map.put(stats, :status, :running)
-
-      _ ->
-        %{status: :not_available}
+  defp platform_status do
+    # TODO: Get actual platform status
+    %{status: :ok}
+  end
+  
+  # Helper functions
+  
+  defp get_or_create_session(opts) do
+    case Keyword.get(opts, :session_id) do
+      nil -> 
+        session_id = generate_id()
+        API.Sessions.create_session(session_id)
+      session_id -> 
+        {:ok, session_id}
     end
-  catch
-    _, _ -> %{status: :error}
+  end
+  
+  defp generate_id do
+    "dspex_#{:erlang.system_time(:microsecond)}_#{:rand.uniform(10000)}"
   end
 end
