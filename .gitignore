@@ -1,35 +1,43 @@
 # The directory Mix will write compiled artifacts to.
 /_build/
 examples/**/_build/
+demos/**/_build/
 
 # If you run "mix test --cover", coverage assets end up here.
 /cover/
 examples/**/cover/
+demos/**/cover/
 
 # The directory Mix downloads your dependencies sources to.
 /deps/
 examples/**/deps/
+demos/**/deps/
 
 # Where third-party dependencies like ExDoc output generated docs.
 /doc/
 examples/**/doc/
+demos/**/doc/
 
 # If the VM crashes, it generates a dump, let's ignore it too.
 erl_crash.dump
 examples/**/erl_crash.dump
+demos/**/erl_crash.dump
 
 # Also ignore archive artifacts (built via "mix archive.build").
 *.ez
 examples/**/*.ez
+demos/**/*.ez
 
 # Ignore package tarball (built via "mix hex.build").
 dspex-*.tar
 *.tar
 examples/**/*.tar
+demos/**/*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
 examples/**/tmp/
+demos/**/tmp/
 
 # Ignore dialyzer output and cache
 /priv/plts/
@@ -40,16 +48,23 @@ examples/**/priv/plts/
 examples/**/.dialyzer/
 examples/**/.dialyzer_plt
 examples/**/.dialyzer_plt.hash
+demos/**/priv/plts/
+demos/**/.dialyzer/
+demos/**/.dialyzer_plt
+demos/**/.dialyzer_plt.hash
 
 # Ignore LSP cache and temp files
 .elixir_ls/
 .lexical/
 examples/**/.elixir_ls/
 examples/**/.lexical/
+demos/**/.elixir_ls/
+demos/**/.lexical/
 
 # Ignore Credo configuration cache
 .credo/
 examples/**/.credo/
+demos/**/.credo/
 
 # Environment variables and secrets
 .env
@@ -62,6 +77,11 @@ examples/**/.env.local
 examples/**/.env.production
 examples/**/.env.test
 examples/**/*.env
+demos/**/.env
+demos/**/.env.local
+demos/**/.env.production
+demos/**/.env.test
+demos/**/*.env
 
 # OS generated files
 .DS_Store
@@ -78,6 +98,13 @@ examples/**/.Spotlight-V100
 examples/**/.Trashes
 examples/**/ehthumbs.db
 examples/**/Thumbs.db
+demos/**/.DS_Store
+demos/**/.DS_Store?
+demos/**/._*
+demos/**/.Spotlight-V100
+demos/**/.Trashes
+demos/**/ehthumbs.db
+demos/**/Thumbs.db
 
 # Editor/IDE files
 .vscode/
@@ -89,12 +116,18 @@ examples/**/.vscode/
 examples/**/.idea/
 examples/**/*.swp
 examples/**/*.swo
+demos/**/.vscode/
+demos/**/.idea/
+demos/**/*.swp
+demos/**/*.swo
 
 # Log files
 *.log
 logs/
 examples/**/*.log
 examples/**/logs/
+demos/**/*.log
+demos/**/logs/
 
 # Phoenix specific
 /priv/static/
@@ -111,24 +144,36 @@ examples/**/yarn-debug.log*
 examples/**/yarn-error.log*
 examples/**/package-lock.json
 examples/**/yarn.lock
+demos/**/priv/static/
+demos/**/node_modules/
+demos/**/npm-debug.log*
+demos/**/yarn-debug.log*
+demos/**/yarn-error.log*
+demos/**/package-lock.json
+demos/**/yarn.lock
 
 # Phoenix Live Dashboard local storage
 /priv/static/dashboard/
 examples/**/priv/static/dashboard/
+demos/**/priv/static/dashboard/
 
 # If using webpack or other asset builders
 /assets/node_modules/
 examples/**/assets/node_modules/
+demos/**/assets/node_modules/
 
 # Release artifacts
 rel/
 *.tar.gz
 examples/**/rel/
 examples/**/*.tar.gz
+demos/**/rel/
+demos/**/*.tar.gz
 
 # Hex docs
 hex_metadata.config
 examples/**/hex_metadata.config
+demos/**/hex_metadata.config
 
 # Ignore backup files
 *.bak
@@ -136,6 +181,8 @@ examples/**/hex_metadata.config
 *~
 examples/**/*.bak
 examples/**/*.backup
+demos/**/*.bak
+demos/**/*.backup
 
 # Ignore test artifacts and reports
 test-reports/
@@ -144,12 +191,17 @@ test_output/
 examples/**/test-reports/
 examples/**/*.junit.xml
 examples/**/test_output/
+demos/**/test-reports/
+demos/**/*.junit.xml
+demos/**/test_output/
 
 # Ignore coverage reports
 coverage/
 lcov.info
 examples/**/coverage/
 examples/**/lcov.info
+demos/**/coverage/
+demos/**/lcov.info
 
 docs/ashDocs/
 
