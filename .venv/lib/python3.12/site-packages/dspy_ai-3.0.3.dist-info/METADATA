@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: dspy-ai
+Version: 3.0.3
+Summary: DSPy
+Author-email: Omar Khattab <okhattab@stanford.edu>
+License: MIT License
+Project-URL: Homepage, https://github.com/stanfordnlp/dsp
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: dspy>=3.0.3

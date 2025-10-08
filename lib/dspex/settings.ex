@@ -22,7 +22,7 @@ defmodule DSPex.Settings do
         explain: false
       )
   """
-  def configure(settings, opts \\ []) do
+  def configure(_settings, opts \\ []) do
     session_id = opts[:session_id] || ID.generate("settings")
 
     # Use get_settings tool which returns current settings

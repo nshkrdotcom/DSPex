@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: dspex-adapters
+Version: 0.2.1
+Summary: DSPy gRPC adapters for DSPex
+Requires-Python: >=3.9
+Requires-Dist: grpcio>=1.60.0
+Requires-Dist: grpcio-tools>=1.60.0
+Requires-Dist: protobuf>=4.25.0
+Requires-Dist: dspy-ai>=2.6.0
+Requires-Dist: litellm>=1.0.0
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

@@ -1,0 +1,5 @@
+grpcio>=1.60.0
+grpcio-tools>=1.60.0
+protobuf>=4.25.0
+dspy-ai>=2.6.0
+litellm>=1.0.0
