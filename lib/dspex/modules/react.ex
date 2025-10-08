@@ -11,8 +11,6 @@ defmodule DSPex.Modules.ReAct do
   tool support and is currently not fully implemented.
   """
 
-  alias DSPex.Utils.ID
-
   @doc """
   Create a new ReAct module instance with tools.
 

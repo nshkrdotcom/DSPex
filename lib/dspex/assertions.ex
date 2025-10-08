@@ -11,8 +11,6 @@ defmodule DSPex.Assertions do
   and are currently not fully implemented. Helper functions return :not_implemented.
   """
 
-  alias DSPex.Utils.ID
-
   @doc """
   Create an assertion that must be satisfied.
 

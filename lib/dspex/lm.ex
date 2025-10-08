@@ -64,18 +64,16 @@ defmodule DSPex.LM do
 
   Lower-level interface for custom use cases.
   """
-  def generate(prompt, opts \\ []) do
-    session_id = opts[:session_id] || ID.generate("lm_generate")
-
+  def generate(_prompt, _opts \\ []) do
     # This would need a custom tool in dspy_grpc.py
     # For now, return not implemented
     {:error, :not_implemented}
   end
 
   @doc """
-  Get information about a configured LM.
+  Get information about a configured LLM.
   """
-  def inspect(lm_id \\ "default_lm", opts \\ []) do
+  def inspect(_lm_id \\ "default_lm", opts \\ []) do
     session_id = opts[:session_id] || ID.generate("lm_inspect")
 
     case Snakepit.execute_in_session(session_id, "get_settings", %{}) do
@@ -160,7 +158,7 @@ defmodule DSPex.LM do
     end
   end
 
-  defp normalize_model_name(model, model_type) do
+  defp normalize_model_name(model, _model_type) do
     # Remove provider prefix if present
     model
     |> String.replace(~r/^(openai|anthropic|gemini|google|ollama)\//, "")
