@@ -176,7 +176,7 @@ defmodule DSPex.Pipeline do
     Logger.debug("Executing Python step: #{module_name}")
 
     # Determine pool based on module
-    pool = select_pool_for_module(module_name)
+    _pool = select_pool_for_module(module_name)
 
     # Prepare arguments
     args = prepare_python_step_args(module_name, state.current, step_opts)
