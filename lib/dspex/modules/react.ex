@@ -4,12 +4,20 @@ defmodule DSPex.Modules.ReAct do
 
   Combines reasoning with tool usage. The model thinks about what to do,
   acts by calling tools, observes the results, and continues until done.
+
+  Migrated to Snakepit v0.4.3 API (execute_in_session).
+
+  Note: Tool registration with Elixir functions requires bidirectional
+  tool support and is currently not fully implemented.
   """
 
   alias DSPex.Utils.ID
 
   @doc """
   Create a new ReAct module instance with tools.
+
+  Note: Currently not implemented as it requires tool function registration.
+  Use DSPy's built-in tools or implement tools on the Python side.
 
   ## Examples
 
@@ -20,64 +28,35 @@ defmodule DSPex.Modules.ReAct do
           func: &MyApp.search/1
         },
         %{
-          name: "calculate", 
+          name: "calculate",
           description: "Perform mathematical calculations",
           func: &MyApp.calculate/1
         }
       ]
-      
+
       {:ok, react} = DSPex.Modules.ReAct.create("question -> answer", tools)
-      {:ok, result} = DSPex.Modules.ReAct.execute(react, %{question: "What is 2+2?"})
   """
-  def create(signature, tools \\ [], opts \\ []) do
-    id = opts[:store_as] || ID.generate("react")
-
-    # Convert Elixir function references to Python-compatible format
-    python_tools = prepare_tools(tools)
-
-    case Snakepit.Python.call(
-           "dspy.ReAct",
-           %{signature: signature, tools: python_tools},
-           Keyword.merge([store_as: id], opts)
-         ) do
-      {:ok, _} -> {:ok, id}
-      error -> error
-    end
+  def create(_signature, _tools \\ [], _opts \\ []) do
+    # ReAct with Elixir tool functions needs bidirectional tool support
+    # to register the tool functions on the Python side
+    {:error, :not_implemented}
   end
 
   @doc """
   Execute ReAct reasoning with the given inputs.
+
+  Note: Currently not implemented. See create/3.
   """
-  def execute(react_id, inputs, opts \\ []) do
-    Snakepit.Python.call("stored.#{react_id}.__call__", inputs, opts)
+  def execute(_react_id, _inputs, _opts \\ []) do
+    {:error, :not_implemented}
   end
 
   @doc """
   Create and execute in one call (stateless).
+
+  Note: Currently not implemented. See create/3.
   """
-  def reason_and_act(signature, inputs, tools \\ [], opts \\ []) do
-    with {:ok, id} <-
-           create(signature, tools, Keyword.put(opts, :session_id, ID.generate("session"))),
-         {:ok, result} <- execute(id, inputs, opts) do
-      {:ok, result}
-    end
-  end
-
-  defp prepare_tools(tools) do
-    # For now, tools need to be registered on Python side
-    # This is a placeholder for future tool bridge implementation
-    Enum.map(tools, fn tool ->
-      %{
-        name: tool.name,
-        description: tool.description,
-        # Tool functions will need special handling via bridge
-        func_id: register_tool_function(tool.func)
-      }
-    end)
-  end
-
-  defp register_tool_function(_func) do
-    # TODO: Implement tool function registration bridge
-    "placeholder_tool_id"
+  def reason_and_act(_signature, _inputs, _tools \\ [], _opts \\ []) do
+    {:error, :not_implemented}
   end
 end

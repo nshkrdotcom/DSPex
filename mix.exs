@@ -4,7 +4,7 @@ defmodule DSPex.MixProject do
   def project do
     [
       app: :dspex,
-      version: "0.2.0",
+      version: "0.2.1",
       elixir: "~> 1.18",
       erlang: "~> 27.0",
       start_permanent: Mix.env() == :prod,
@@ -41,7 +41,7 @@ defmodule DSPex.MixProject do
   defp deps do
     [
       # Core dependencies
-      {:snakepit, "~> 0.4.1"},
+      {:snakepit, "~> 0.4.3"},
       #      {:snakepit,
       #       git: "https://github.com/nshkrdotcom/snakepit.git",
       #       branch: "feature/unified-grpc-bridge-stage2"},

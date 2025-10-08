@@ -4,6 +4,8 @@ defmodule DSPex.Modules.ProgramOfThought do
 
   Generates and executes code to solve problems, particularly useful
   for mathematical and algorithmic tasks.
+
+  Migrated to Snakepit v0.4.3 API (execute_in_session).
   """
 
   alias DSPex.Utils.ID
@@ -19,31 +21,42 @@ defmodule DSPex.Modules.ProgramOfThought do
       })
   """
   def create(signature, opts \\ []) do
-    id = opts[:store_as] || ID.generate("pot")
+    session_id = opts[:session_id] || ID.generate("session")
 
-    case Snakepit.Python.call(
+    case DSPex.Bridge.create_instance(
            "dspy.ProgramOfThought",
            %{signature: signature},
-           Keyword.merge([store_as: id], opts)
+           Keyword.put(opts, :session_id, session_id)
          ) do
-      {:ok, _} -> {:ok, id}
-      error -> error
+      {:ok, instance_ref} -> {:ok, instance_ref}
+      {:error, error} -> {:error, error}
     end
   end
 
   @doc """
   Execute program generation and execution with the given inputs.
   """
-  def execute(pot_id, inputs, opts \\ []) do
-    Snakepit.Python.call("stored.#{pot_id}.__call__", inputs, opts)
+  def execute({session_id, instance_id} = _instance_ref, inputs, opts \\ []) do
+    case DSPex.Bridge.call_method(
+           {session_id, instance_id},
+           "__call__",
+           inputs,
+           opts
+         ) do
+      {:ok, %{"success" => true, "result" => result}} -> {:ok, result}
+      {:ok, %{"success" => false, "error" => error}} -> {:error, error}
+      {:error, error} -> {:error, error}
+    end
   end
 
   @doc """
   Create and execute in one call (stateless).
   """
   def solve_with_code(signature, inputs, opts \\ []) do
-    with {:ok, id} <- create(signature, Keyword.put(opts, :session_id, ID.generate("session"))),
-         {:ok, result} <- execute(id, inputs, opts) do
+    session_id = opts[:session_id] || ID.generate("session")
+
+    with {:ok, instance_ref} <- create(signature, Keyword.put(opts, :session_id, session_id)),
+         {:ok, result} <- execute(instance_ref, inputs, opts) do
       {:ok, result}
     end
   end

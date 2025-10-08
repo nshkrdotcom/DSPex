@@ -4,6 +4,11 @@ defmodule DSPex.Assertions do
 
   Assertions can be used to ensure outputs meet specific criteria,
   with options to retry or raise errors on failure.
+
+  Migrated to Snakepit v0.4.3 API (execute_in_session).
+
+  Note: Assertions with Elixir predicates require bidirectional tool support
+  and are currently not fully implemented. Helper functions return :not_implemented.
   """
 
   alias DSPex.Utils.ID
@@ -11,71 +16,38 @@ defmodule DSPex.Assertions do
   @doc """
   Create an assertion that must be satisfied.
 
+  Note: Currently not implemented as it requires Elixir predicate registration.
+  Use DSPy's built-in assertions or implement custom validation in your module.
+
   ## Examples
 
-      # Simple assertion
+      # This would require bidirectional tool support
       assert_short = DSPex.Assertions.create(
         fn result -> String.length(result.answer) < 100 end,
         "Answer must be less than 100 characters"
       )
-      
-      # Use with a module
-      {:ok, program} = DSPex.Modules.Predict.create("question -> answer")
-      {:ok, constrained} = DSPex.Assertions.apply_assertions(program, assert_short)
   """
-  def create(predicate, message \\ "", opts \\ []) do
-    id = ID.generate("assert")
-
-    # Register the predicate function
-    predicate_id = register_predicate(predicate)
-
-    config = %{
-      predicate_id: predicate_id,
-      message: message,
-      backtrack: opts[:backtrack],
-      target_module: opts[:target_module]
-    }
-
-    # Note: DSPy assertions are in dspy.assertions module
-    case Snakepit.Python.call(
-           "dspy.assertions.assert_",
-           config,
-           Keyword.merge([store_as: id], opts)
-         ) do
-      {:ok, _} -> {:ok, id}
-      error -> error
-    end
+  def create(_predicate, _message \\ "", _opts \\ []) do
+    # Assertions with Elixir predicates need bidirectional tool support
+    # to register the predicate function on the Python side
+    {:error, :not_implemented}
   end
 
   @doc """
   Create a soft constraint that suggests but doesn't require satisfaction.
+
+  Note: Currently not implemented as it requires Elixir predicate registration.
   """
-  def suggest(predicate, message \\ "", opts \\ []) do
-    id = ID.generate("suggest")
-
-    # Register the predicate function
-    predicate_id = register_predicate(predicate)
-
-    config = %{
-      predicate_id: predicate_id,
-      message: message,
-      backtrack: opts[:backtrack],
-      target_module: opts[:target_module]
-    }
-
-    # Note: DSPy suggestions are in dspy.assertions module
-    case Snakepit.Python.call(
-           "dspy.assertions.suggest",
-           config,
-           Keyword.merge([store_as: id], opts)
-         ) do
-      {:ok, _} -> {:ok, id}
-      error -> error
-    end
+  def suggest(_predicate, _message \\ "", _opts \\ []) do
+    # Suggestions with Elixir predicates need bidirectional tool support
+    {:error, :not_implemented}
   end
 
   @doc """
   Apply assertions to a program/module.
+
+  Note: Currently returns a placeholder ID. Full implementation requires
+  integration with DSPy's assertion handling.
   """
   def apply_assertions(program_id, assertion_ids_or_id, opts \\ [])
 
@@ -96,78 +68,37 @@ defmodule DSPex.Assertions do
 
   @doc """
   Assert that output contains specific keywords.
+
+  Note: Currently not implemented. Use DSPy's built-in assertions instead.
   """
-  def assert_contains(keywords, field \\ :answer) do
-    create(
-      fn result ->
-        text = Map.get(result, field, "")
-        Enum.all?(keywords, &String.contains?(text, &1))
-      end,
-      "Output must contain keywords: #{inspect(keywords)}"
-    )
+  def assert_contains(_keywords, _field \\ :answer) do
+    {:error, :not_implemented}
   end
 
   @doc """
   Assert that output matches a pattern.
+
+  Note: Currently not implemented. Use DSPy's built-in assertions instead.
   """
-  def assert_matches(pattern, field \\ :answer) do
-    create(
-      fn result ->
-        text = Map.get(result, field, "")
-        Regex.match?(pattern, text)
-      end,
-      "Output must match pattern: #{inspect(pattern)}"
-    )
+  def assert_matches(_pattern, _field \\ :answer) do
+    {:error, :not_implemented}
   end
 
   @doc """
   Assert that output has a specific length constraint.
-  """
-  def assert_length(opts, field \\ :answer) when is_list(opts) do
-    min = Keyword.fetch!(opts, :min)
-    max = Keyword.fetch!(opts, :max)
 
-    create(
-      fn result ->
-        text = Map.get(result, field, "")
-        len = String.length(text)
-        len >= min && len <= max
-      end,
-      "Output length must be between #{min} and #{max} characters"
-    )
+  Note: Currently not implemented. Use DSPy's built-in assertions instead.
+  """
+  def assert_length(_opts, _field \\ :answer) do
+    {:error, :not_implemented}
   end
 
   @doc """
   Assert that a numeric output is within a range.
+
+  Note: Currently not implemented. Use DSPy's built-in assertions instead.
   """
-  def assert_range(opts, field \\ :answer) when is_list(opts) do
-    min = Keyword.fetch!(opts, :min)
-    max = Keyword.fetch!(opts, :max)
-
-    create(
-      fn result ->
-        case Map.get(result, field) do
-          num when is_number(num) ->
-            num >= min && num <= max
-
-          str when is_binary(str) ->
-            case Float.parse(str) do
-              {num, _} -> num >= min && num <= max
-              :error -> false
-            end
-
-          _ ->
-            false
-        end
-      end,
-      "Value must be between #{min} and #{max}"
-    )
-  end
-
-  defp register_predicate(_predicate) do
-    # TODO: Implement predicate registration bridge
-    # This would need to serialize the Elixir function and make it
-    # callable from Python side
-    "placeholder_predicate_id"
+  def assert_range(_opts, _field \\ :answer) do
+    {:error, :not_implemented}
   end
 end

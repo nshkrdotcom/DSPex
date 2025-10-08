@@ -3,7 +3,10 @@ defmodule DSPex.Config do
   Configuration and initialization for DSPex.
 
   Handles DSPy environment setup and global configuration.
+  Migrated to Snakepit v0.4.3 API (execute_in_session).
   """
+
+  alias DSPex.Utils.ID
 
   @doc """
   Initialize DSPex with DSPy.
@@ -15,29 +18,19 @@ defmodule DSPex.Config do
 
       # Basic initialization
       DSPex.Config.init()
-      
-      # With specific Python path
-      DSPex.Config.init(python_path: "/usr/bin/python3.11")
+
+      # With specific session
+      DSPex.Config.init(session_id: "my_session")
   """
   def init(opts \\ []) do
     # Try to initialize DSPy, but don't fail if it's not available
-    case test_dspy_available(opts) do
-      {:ok, :available} ->
-        case get_dspy_version(opts) do
-          {:ok, version} ->
-            {:ok,
-             %{
-               dspy_version: version,
-               status: :ready
-             }}
-
-          _ ->
-            {:ok,
-             %{
-               dspy_version: "unknown",
-               status: :ready_without_version
-             }}
-        end
+    case check_dspy_available(opts) do
+      {:ok, version} ->
+        {:ok,
+         %{
+           dspy_version: version,
+           status: :ready
+         }}
 
       {:error, reason} ->
         {:error, reason}
@@ -45,39 +38,37 @@ defmodule DSPex.Config do
   end
 
   @doc """
-  Get DSPy version information.
+  Check if DSPy is available and get version.
   """
-  def get_dspy_version(opts \\ []) do
-    case Snakepit.Python.call("dspy.__version__", %{}, opts) do
-      {:ok, %{"result" => %{"value" => version}}} -> {:ok, version}
-      {:ok, %{"result" => version}} when is_binary(version) -> {:ok, version}
-      error -> error
+  def check_dspy_available(opts \\ []) do
+    session_id = opts[:session_id] || ID.generate("config_check")
+
+    case Snakepit.execute_in_session(session_id, "check_dspy", %{}) do
+      {:ok, %{"available" => true, "version" => version}} ->
+        {:ok, version}
+
+      {:ok, %{"available" => false, "error" => error}} ->
+        {:error, "DSPy not available: #{error}"}
+
+      {:error, error} ->
+        {:error, "Failed to check DSPy: #{inspect(error)}"}
     end
   end
 
-  defp test_dspy_available(opts) do
-    # Test if dspy module is importable
-    case Snakepit.Python.call("dspy.__name__", %{}, opts) do
-      {:ok, %{"result" => %{"value" => "dspy"}}} ->
-        {:ok, :available}
-
-      # Any successful response means dspy is available
-      {:ok, _} ->
-        {:ok, :available}
-
-      {:error, _} ->
-        # Try to help by showing how to install
-        {:error, "DSPy not found. Please install with: pip install dspy-ai"}
-    end
+  @doc """
+  Get DSPy version information.
+  """
+  def get_dspy_version(opts \\ []) do
+    check_dspy_available(opts)
   end
 
   @doc """
   Check if DSPy is properly initialized.
   """
   def ready?(opts \\ []) do
-    case Snakepit.Python.call("dspy.__name__", %{}, opts) do
-      {:ok, "dspy"} -> true
-      _ -> false
+    case check_dspy_available(opts) do
+      {:ok, _version} -> true
+      {:error, _} -> false
     end
   end
 
@@ -123,9 +114,9 @@ defmodule DSPex.Config do
 
   defp setup_retriever(nil), do: {:ok, :no_retriever}
 
-  defp setup_retriever(retriever_config) do
-    type = retriever_config[:type] || raise "Retriever type required"
-    DSPex.Retrievers.Retrieve.init(type, retriever_config)
+  defp setup_retriever(_retriever_config) do
+    # Retriever module not yet implemented
+    {:ok, :retriever_not_implemented}
   end
 
   defp apply_settings(nil), do: {:ok, :default_settings}

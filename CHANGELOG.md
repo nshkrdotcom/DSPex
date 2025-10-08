@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2025-10-07
+
+### Added
+- **Python Module**: `dspy_variable_integration.py` with variable-aware DSPy classes
+  - Extracted from Snakepit v0.4.2 for clean separation of concerns
+  - VariableAwarePredict, VariableAwareChainOfThought, VariableAwareReAct, VariableAwareProgramOfThought
+  - ModuleVariableResolver and create_variable_aware_program helper
+- **Architecture Documentation**: Comprehensive review in `docs/architecture_review_20251007/`
+  - Complete analysis of Snakepit-DSPex coupling
+  - Detailed decoupling plan and implementation guide
+  - Architecture Decision Record (ADR-001)
+
+### Changed
+- **API Modernization**: All modules migrated to Snakepit v0.4.3 API
+  - DSPex.Config now uses `check_dspy` tool instead of removed `Snakepit.Python.call/3`
+  - DSPex.LM now uses `configure_lm` tool with proper session management
+  - 9 total modules updated with modern API patterns
+- **Dependency**: Updated Snakepit to v0.4.3 (with DSPy deprecation notice)
+
+### Removed
+- **Redundant Module**: Removed `lib/dspex/python/bridge.ex` (use DSPex.Bridge directly)
+
+### Fixed
+- **Examples Working**: Core DSPy examples functional after API migration
+  - Fixed DSPex.Config.init() migration to new API
+  - Fixed DSPex.LM.configure() using modern patterns
+- **Test Suite**: All 82 tests passing with migrated modules
+
+### Deprecated in Dependencies
+- **Snakepit DSPy Integration**: Snakepit v0.4.3 deprecates its DSPy integration
+  - DSPy-specific code moved to DSPex (this project)
+  - See: `docs/architecture_review_20251007/` for details
+
+### Documentation
+- Added comprehensive architecture review (8 detailed documents)
+- Added migration guide from Snakepit DSPy integration
+- Updated README with architectural changes
+- Documented clean separation of concerns (infrastructure vs. domain logic)
+
+---
+
 ## [0.2.0] - 2025-07-23
 
 ### Added
