@@ -181,7 +181,15 @@ defmodule DSPex.Pipeline do
     # Prepare arguments
     args = prepare_python_step_args(module_name, state.current, step_opts)
 
-    case DSPex.Python.Bridge.execute(pool, module_name, args, step_opts) do
+    # Use DSPex.Bridge for Python calls
+    session_id = step_opts[:session_id] || DSPex.Utils.ID.generate("pipeline")
+
+    case DSPex.Bridge.call_dspy(
+           module_name,
+           "__call__",
+           args,
+           Keyword.put(step_opts, :session_id, session_id)
+         ) do
       {:ok, output} ->
         new_state = %{state | current: output, results: [output | state.results]}
         {:ok, new_state}
