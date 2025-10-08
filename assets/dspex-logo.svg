@@ -1,22 +1,22 @@
 <svg width="256" height="256" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="logoTitle logoDesc">
-  <title id="logoTitle">DSPex Professional Logo</title>
-  <desc id="logoDesc">A professional logo for DSPex, an Elixir-based orchestrator for DSPy. The logo is a dark hexagon containing a stylized, glowing cyan 'conductor' core. A sleek, purple serpent, representing a high-performance Python (Snakepit/DSPy) process, elegantly coils around the conductor, symbolizing that the core is orchestrating the powerful tool. The design conveys themes of control, power, and intelligence.</desc>
+  <title id="logoTitle">DSPex Logo</title>
+  <desc id="logoDesc">A hexagonal logo for DSPex. Inside is a purple octopus character with a sad mouth, an antenna, and wearing glowing cyan glasses, holding a phone. Its central tentacles form a cyan arrow, representing a DSPy signature (input -> output). The octopus mascot symbolizes DSPex's role as an orchestrator managing multiple concurrent DSPy processes.</desc>
 
   <defs>
-    <!-- Background gradient for the hexagon -->
+    <!-- Enhanced background gradient (darker, more professional) -->
     <linearGradient id="hexagonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#1a1a2e; stop-opacity:1" />
       <stop offset="100%" style="stop-color:#16213e; stop-opacity:1" />
     </linearGradient>
 
-    <!-- Gradient for the serpent's body -->
-    <linearGradient id="serpentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+    <!-- Gradient for octopus body (richer purple) -->
+    <linearGradient id="octopusGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#8A2BE2; stop-opacity:1" />
       <stop offset="100%" style="stop-color:#4B0082; stop-opacity:1" />
     </linearGradient>
 
-    <!-- Glowing effect for the central conductor -->
-    <filter id="conductorGlow" x="-50%" y="-50%" width="200%" height="200%">
+    <!-- Enhanced glow effect -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
       <feMerge>
         <feMergeNode in="coloredBlur"/>
@@ -25,25 +25,48 @@
     </filter>
   </defs>
 
-  <!-- Hexagon Background -->
+  <!-- Hexagon Background (enhanced) -->
   <path d="M60 5 L110 32.5 V 87.5 L60 115 L10 87.5 V 32.5 Z" fill="url(#hexagonGradient)" stroke="#0F3460" stroke-width="2"/>
 
-  <!-- Serpent Coiling around the Conductor -->
+  <!-- Octopus Character (Centered) -->
   <g>
-    <!-- Serpent Body -->
-    <path d="M 45,25 C 10,30 10,90 45,95 L 75,95 C 110,90 110,30 75,25 L 45,25 Z" fill="url(#serpentGradient)" stroke="#E94560" stroke-width="0" />
-    <path d="M 78,35 C 95,40 95,80 78,85" stroke="#9F70FD" stroke-width="5" fill="none" stroke-linecap="round"/>
-    <path d="M 42,35 C 25,40 25,80 42,85" stroke="#9F70FD" stroke-width="5" fill="none" stroke-linecap="round"/>
-    <!-- Serpent Head -->
-    <path d="M 75,25 C 80,20 80,15 75,10 L 68,10" stroke="url(#serpentGradient)" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    <!-- Serpent Tail -->
-     <path d="M 45,95 C 40,100 40,105 45,110 L 52,110" stroke="url(#serpentGradient)" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
+    <!-- Tentacles (Purple with gradient) -->
+    <path d="M25,60 C15,70 15,90 28,95" stroke="url(#octopusGradient)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M95,60 C105,70 105,90 92,95" stroke="url(#octopusGradient)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M38,75 C30,90 35,100 45,100" stroke="url(#octopusGradient)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M82,75 C90,90 85,100 75,100" stroke="url(#octopusGradient)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M30,45 C20,35 25,20 35,22" stroke="url(#octopusGradient)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M90,45 C100,35 95,20 85,22" stroke="url(#octopusGradient)" stroke-width="4" fill="none" stroke-linecap="round"/>
 
-  <!-- Central Conductor (Stylized Eye/Core) -->
-  <g filter="url(#conductorGlow)">
-    <path d="M60,40 L80,60 L60,80 L40,60 Z" fill="#00E5FF" stroke="#A6F6FF" stroke-width="1.5"/>
-    <circle cx="60" cy="60" r="8" fill="#E1F7F5"/>
-  </g>
+    <!-- Head and Body (with gradient) -->
+    <path d="M40,50 C40,20 80,20 80,50 C85,60 75,75 60,75 C45,75 35,60 40,50 Z" fill="url(#octopusGradient)"/>
 
+    <!-- Central Arrow Tentacles (Enhanced Cyan Glow) -->
+    <g filter="url(#glow)">
+        <!-- Arrow Line -->
+        <path d="M60,74 C60,60, 40,55, 40,45" stroke="#00E5FF" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+        <!-- Arrow Head -->
+        <path d="M60,74 C60,60, 80,55, 80,45" stroke="#00E5FF" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+        <path d="M72,49 L80,45 L76,39" stroke="#00E5FF" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+    <!-- Character Details (Enhanced Glow) -->
+    <g fill="none" stroke="#00E5FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">
+        <!-- Antenna (with glow tip) -->
+        <path d="M60,25 V 20" />
+        <circle cx="60" cy="18" r="2" fill="#00E5FF"/>
+
+        <!-- Sad Mouth -->
+        <path d="M55,46 Q60,42, 65,46" />
+
+        <!-- Glasses (enhanced) -->
+        <path d="M 48,35 H 72" /> <!-- Top Bar -->
+        <path d="M 48,35 C 48,42 56,42 56,35" /> <!-- Left Lens -->
+        <path d="M 64,35 C 64,42 72,42 72,35" /> <!-- Right Lens -->
+
+        <!-- Phone in tentacle (left side) -->
+        <rect x="20" y="85" width="8" height="12" rx="1.5" fill="#00E5FF" opacity="0.8"/>
+        <rect x="21" y="86" width="6" height="8" fill="#1a1a2e"/>
+    </g>
+  </g>
 </svg>

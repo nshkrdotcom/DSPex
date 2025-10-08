@@ -1,7 +1,7 @@
 # DSPex
 
 <p align="center">
-  <img src="assets/dspex-logo.svg" alt="DSPex Professional Logo" width="200" height="200">
+  <img src="assets/dspex-logo.svg" alt="DSPex Logo" width="200" height="200">
 </p>
 
 **DSPex** is a comprehensive Elixir implementation of [DSPy](https://github.com/stanfordnlp/dspy) (Declarative Self-improving Language Programs) that provides a unified interface for working with Large Language Models. It combines high-performance native Elixir implementations with seamless Python DSPy integration through [Snakepit](https://github.com/nshkrdotcom/snakepit) for complex ML workflows.
