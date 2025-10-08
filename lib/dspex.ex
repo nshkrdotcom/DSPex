@@ -96,17 +96,18 @@ defmodule DSPex do
   @doc """
   ReAct pattern - Reasoning + Acting with tools.
 
+  Note: Currently not implemented - requires bidirectional tool support.
+
   ## Example
 
       tools = [
         %{name: "search", description: "Search the web", function: &search/1},
         %{name: "calculate", description: "Perform calculations", function: &calc/1}
       ]
-      
+
       DSPex.react(signature, inputs, tools)
   """
-  @spec react(signature(), map(), list(map()), keyword()) ::
-          {:ok, map()} | {:error, term()}
+  @spec react(signature(), map(), list(map()), keyword()) :: {:error, :not_implemented}
   def react(signature, inputs, tools, opts \\ []) do
     DSPex.Modules.ReAct.reason_and_act(signature, inputs, tools, opts)
   end
@@ -187,9 +188,8 @@ defmodule DSPex do
   @spec health_check() :: %{
           status: :ok,
           version: String.t(),
-          pools: map(),
-          native_modules: term(),
-          python_modules: term()
+          snakepit_status: map(),
+          native_modules: list()
         }
   def health_check do
     %{
