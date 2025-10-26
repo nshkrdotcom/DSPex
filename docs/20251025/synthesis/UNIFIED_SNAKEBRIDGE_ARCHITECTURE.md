@@ -1,4 +1,4 @@
-# The Unified PyBridge Architecture
+# The Unified SnakeBridge Architecture
 ## A Synthesis of Configuration-Driven Python Integration Approaches
 
 **Date**: 2025-10-25
@@ -29,10 +29,10 @@
 
 This document synthesizes two parallel design approaches for Python-Elixir integration:
 
-1. **PyBridge** (Metaprogramming-First): Compile-time code generation with Elixir-native configs
+1. **SnakeBridge** (Metaprogramming-First): Compile-time code generation with Elixir-native configs
 2. **Snakepit Integration Fabric** (Runtime-First): Manifest-driven introspection with gRPC extensions
 
-The **Unified PyBridge Architecture** combines the best of both, adding significant innovations:
+The **Unified SnakeBridge Architecture** combines the best of both, adding significant innovations:
 
 ### Core Innovations
 
@@ -55,17 +55,17 @@ The **Unified PyBridge Architecture** combines the best of both, adding signific
 # Single config, multiple modes:
 
 # Development: Hot-reload, instant feedback
-config :pybridge, mode: :dev, compilation: :runtime
+config :snakebridge, mode: :dev, compilation: :runtime
 
 # Production: Pre-compiled, optimized, type-safe
-config :pybridge, mode: :prod, compilation: :compile_time
+config :snakebridge, mode: :prod, compilation: :compile_time
 ```
 
 ---
 
 ## 2. Comparative Analysis of Approaches
 
-### 2.1 PyBridge (Original)
+### 2.1 SnakeBridge (Original)
 
 **Philosophy**: Elixir metaprogramming for compile-time safety and developer ergonomics.
 
@@ -110,11 +110,11 @@ config :pybridge, mode: :prod, compilation: :compile_time
 **The unified architecture combines**:
 
 1. **SIF's gRPC protocols** for runtime discovery
-2. **PyBridge's metaprogramming** for code generation
+2. **SnakeBridge's metaprogramming** for code generation
 3. **SIF's caching strategy** for performance
-4. **PyBridge's type system** for safety
+4. **SnakeBridge's type system** for safety
 5. **SIF's telemetry** for observability
-6. **PyBridge's DX focus** for adoption
+6. **SnakeBridge's DX focus** for adoption
 
 **Plus new innovations** that neither approach fully explored.
 
@@ -180,7 +180,7 @@ config :pybridge, mode: :prod, compilation: :compile_time
 
 ```elixir
 # Layer 1: Runtime Protocol
-defprotocol PyBridge.Runtime.Executor do
+defprotocol SnakeBridge.Runtime.Executor do
   @doc "Execute a remote operation"
   @spec execute(t(), session_id(), operation(), args(), opts()) ::
     {:ok, result()} | {:error, term()}
@@ -193,15 +193,15 @@ defprotocol PyBridge.Runtime.Executor do
 end
 
 # Layer 2: Discovery Protocol
-defprotocol PyBridge.Discovery.Introspector do
+defprotocol SnakeBridge.Discovery.Introspector do
   @doc "Discover library schema"
   @spec discover(t(), module_path(), opts()) ::
-    {:ok, PyBridge.Schema.Descriptor.t()} | {:error, term()}
+    {:ok, SnakeBridge.Schema.Descriptor.t()} | {:error, term()}
   def discover(introspector, module_path, opts)
 end
 
 # Layer 3: Schema Protocol
-defprotocol PyBridge.Schema.Validator do
+defprotocol SnakeBridge.Schema.Validator do
   @doc "Validate configuration against discovered schema"
   @spec validate(t(), config(), schema()) ::
     :ok | {:error, [error()]}
@@ -209,7 +209,7 @@ defprotocol PyBridge.Schema.Validator do
 end
 
 # Layer 4: Generation Protocol
-defprotocol PyBridge.Generator.Emitter do
+defprotocol SnakeBridge.Generator.Emitter do
   @doc "Emit code AST from descriptor"
   @spec emit(t(), descriptor(), opts()) :: Macro.t()
   def emit(emitter, descriptor, opts)
@@ -234,7 +234,7 @@ end
 
 ```elixir
 # config/config.exs
-config :pybridge,
+config :snakebridge,
   compilation_strategy: :auto  # or :compile_time, :runtime
 
 # Auto behavior:
@@ -245,21 +245,21 @@ config :pybridge,
 **Implementation**:
 
 ```elixir
-defmodule PyBridge.Generator do
+defmodule SnakeBridge.Generator do
   defmacro __using__(opts) do
-    if PyBridge.Config.compile_time?() do
+    if SnakeBridge.Config.compile_time?() do
       # Traditional macro expansion
       quote do
-        @before_compile PyBridge.Generator
+        @before_compile SnakeBridge.Generator
         # Generates modules at compile time
       end
     else
       # Runtime generation
       quote do
-        @on_load :__pybridge_load__
+        @on_load :__snakebridge_load__
 
-        def __pybridge_load__ do
-          PyBridge.Runtime.Generator.load_integration(
+        def __snakebridge_load__ do
+          SnakeBridge.Runtime.Generator.load_integration(
             __MODULE__,
             unquote(opts)
           )
@@ -333,7 +333,7 @@ end
 **Solution**: **Content-addressed storage with incremental diffs.**
 
 ```elixir
-defmodule PyBridge.Cache.Schema do
+defmodule SnakeBridge.Cache.Schema do
   @moduledoc """
   Git-like schema versioning with diffing support.
   """
@@ -347,7 +347,7 @@ defmodule PyBridge.Cache.Schema do
     hash = :crypto.hash(:sha256, :erlang.term_to_binary(schema))
     key = {integration_id, hash}
 
-    :ets.insert(:pybridge_schemas, {key, schema, timestamp()})
+    :ets.insert(:snakebridge_schemas, {key, schema, timestamp()})
     {:ok, Base.encode16(hash, case: :lower)}
   end
 
@@ -363,7 +363,7 @@ defmodule PyBridge.Cache.Schema do
     old_schema = fetch!(old_hash)
     new_schema = fetch!(new_hash)
 
-    PyBridge.Schema.Differ.diff(old_schema, new_schema)
+    SnakeBridge.Schema.Differ.diff(old_schema, new_schema)
   end
 
   @doc """
@@ -373,13 +373,13 @@ defmodule PyBridge.Cache.Schema do
     for change <- diff do
       case change do
         {:added, path, descriptor} ->
-          PyBridge.Generator.emit_module(descriptor)
+          SnakeBridge.Generator.emit_module(descriptor)
 
         {:modified, path, _old, new} ->
-          PyBridge.Generator.recompile_module(new)
+          SnakeBridge.Generator.recompile_module(new)
 
         {:removed, path, _descriptor} ->
-          PyBridge.Generator.purge_module(path)
+          SnakeBridge.Generator.purge_module(path)
       end
     end
   end
@@ -389,7 +389,7 @@ end
 **Cache Architecture**:
 
 ```
-priv/pybridge/cache/
+priv/snakebridge/cache/
 ├── schemas/
 │   ├── dspy/
 │   │   ├── abc123.schema.etf       # Content-addressed schema
@@ -417,7 +417,7 @@ priv/pybridge/cache/
 **Solution**: **Formal type mapping with inference and validation.**
 
 ```elixir
-defmodule PyBridge.TypeSystem.Mapper do
+defmodule SnakeBridge.TypeSystem.Mapper do
   @moduledoc """
   Maps between Python type system and Elixir typespecs.
   """
@@ -535,7 +535,7 @@ import typing
 import inspect
 
 def extract_type_annotation(annotation):
-    """Convert Python type annotation to PyBridge type descriptor."""
+    """Convert Python type annotation to SnakeBridge type descriptor."""
 
     if annotation == int:
         return {"type": "int"}
@@ -573,7 +573,7 @@ def extract_type_annotation(annotation):
 **Solution**: **Generate test scaffolds from introspection schemas.**
 
 ```elixir
-defmodule PyBridge.Testing.Generator do
+defmodule SnakeBridge.Testing.Generator do
   @doc """
   Generate test suite from descriptor.
   """
@@ -664,7 +664,7 @@ end
 
 **Problem**: Writing configs is error-prone without tooling.
 
-**Solution**: **Language Server Protocol support for `.pybridge` configs.**
+**Solution**: **Language Server Protocol support for `.snakebridge` configs.**
 
 **Features**:
 1. **Autocomplete** from cached schemas
@@ -674,9 +674,9 @@ end
 5. **Code actions** suggest fixes
 
 ```elixir
-defmodule PyBridge.LSP.Server do
+defmodule SnakeBridge.LSP.Server do
   @moduledoc """
-  LSP server for PyBridge configuration files.
+  LSP server for SnakeBridge configuration files.
   """
 
   use GenLSP
@@ -691,10 +691,10 @@ defmodule PyBridge.LSP.Server do
     suggestions = case context do
       {:python_path, partial} ->
         # Query introspection cache
-        PyBridge.Cache.suggest_classes(partial)
+        SnakeBridge.Cache.suggest_classes(partial)
 
       {:method_name, class_path, partial} ->
-        PyBridge.Cache.suggest_methods(class_path, partial)
+        SnakeBridge.Cache.suggest_methods(class_path, partial)
 
       _ -> []
     end
@@ -710,10 +710,10 @@ defmodule PyBridge.LSP.Server do
 
     documentation = case context do
       {:class, python_path} ->
-        PyBridge.Cache.get_class_doc(python_path)
+        SnakeBridge.Cache.get_class_doc(python_path)
 
       {:method, class_path, method_name} ->
-        PyBridge.Cache.get_method_doc(class_path, method_name)
+        SnakeBridge.Cache.get_method_doc(class_path, method_name)
 
       _ -> nil
     end
@@ -726,18 +726,18 @@ end
 **VSCode Extension**:
 
 ```typescript
-// pybridge-vscode/src/extension.ts
+// snakebridge-vscode/src/extension.ts
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 
 export function activate(context: vscode.ExtensionContext) {
-  const serverModule = context.asAbsolutePath('priv/lsp/pybridge_lsp');
+  const serverModule = context.asAbsolutePath('priv/lsp/snakebridge_lsp');
 
   const client = new LanguageClient(
-    'pybridge',
-    'PyBridge Language Server',
+    'snakebridge',
+    'SnakeBridge Language Server',
     { command: serverModule },
-    { documentSelector: [{ scheme: 'file', pattern: '**/*.pybridge' }] }
+    { documentSelector: [{ scheme: 'file', pattern: '**/*.snakebridge' }] }
   );
 
   client.start();
@@ -757,13 +757,13 @@ export function activate(context: vscode.ExtensionContext) {
 ### 5.1 Complete Module Structure
 
 ```
-pybridge/
+snakebridge/
 ├── mix.exs
 ├── config/
 │   └── config.exs
 ├── lib/
-│   ├── pybridge.ex                           # Public API
-│   ├── pybridge/
+│   ├── snakebridge.ex                           # Public API
+│   ├── snakebridge/
 │   │   ├── application.ex                    # OTP app supervisor
 │   │   │
 │   │   ├── config/
@@ -823,15 +823,15 @@ pybridge/
 │   │   │
 │   │   └── mix/
 │   │       └── tasks/
-│   │           ├── discover.ex               # mix pybridge.discover
-│   │           ├── validate.ex               # mix pybridge.validate
-│   │           ├── generate.ex               # mix pybridge.generate
-│   │           ├── diff.ex                   # mix pybridge.diff
-│   │           └── clean.ex                  # mix pybridge.clean
+│   │           ├── discover.ex               # mix snakebridge.discover
+│   │           ├── validate.ex               # mix snakebridge.validate
+│   │           ├── generate.ex               # mix snakebridge.generate
+│   │           ├── diff.ex                   # mix snakebridge.diff
+│   │           └── clean.ex                  # mix snakebridge.clean
 │   │
 │   └── priv/
 │       ├── python/
-│       │   ├── pybridge_agent.py             # Introspection agent
+│       │   ├── snakebridge_agent.py             # Introspection agent
 │       │   ├── type_extractor.py             # Type annotation parser
 │       │   └── descriptor_cache.py           # Python-side caching
 │       ├── templates/
@@ -839,10 +839,10 @@ pybridge/
 │       │   ├── function.eex                  # Function template
 │       │   └── test.eex                      # Test template
 │       └── lsp/
-│           └── pybridge_lsp                  # LSP executable
+│           └── snakebridge_lsp                  # LSP executable
 │
 └── test/
-    ├── pybridge/
+    ├── snakebridge/
     │   ├── config_test.exs
     │   ├── discovery_test.exs
     │   ├── generator_test.exs
@@ -856,12 +856,12 @@ pybridge/
 ```mermaid
 sequenceDiagram
     participant App as Elixir App
-    participant PB as PyBridge
+    participant PB as SnakeBridge
     participant Cache as Cache Layer
     participant Snake as Snakepit
     participant Python as Python Worker
 
-    App->>PB: Start PyBridge.Application
+    App->>PB: Start SnakeBridge.Application
     PB->>Cache: Initialize ETS tables
     PB->>PB: Load configurations
 
@@ -902,7 +902,7 @@ sequenceDiagram
     User->>Gen: DSPex.Predict.create(signature)
     Gen->>RT: execute(session_id, :create, args)
 
-    RT->>Telem: emit [:pybridge, :call, :start]
+    RT->>Telem: emit [:snakebridge, :call, :start]
     RT->>Ser: encode_args(args)
     Ser-->>RT: encoded_args
 
@@ -914,7 +914,7 @@ sequenceDiagram
     RT->>Ser: decode_result(raw_result)
     Ser-->>RT: decoded_result
 
-    RT->>Telem: emit [:pybridge, :call, :stop], %{duration: ...}
+    RT->>Telem: emit [:snakebridge, :call, :stop], %{duration: ...}
     RT-->>Gen: {:ok, instance_ref}
     Gen-->>User: {:ok, instance_ref}
 ```
@@ -926,12 +926,12 @@ sequenceDiagram
 ### 6.1 gRPC DescribeLibrary Protocol
 
 ```protobuf
-// pybridge.proto
+// snakebridge.proto
 
 syntax = "proto3";
-package pybridge.v1;
+package snakebridge.v1;
 
-service PyBridgeService {
+service SnakeBridgeService {
   // Discover library schema
   rpc DescribeLibrary(DescribeLibraryRequest) returns (DescribeLibraryResponse);
 
@@ -1050,7 +1050,7 @@ message ExecuteToolChunk {
 ### 6.2 Python Introspection Agent
 
 ```python
-# priv/python/pybridge_agent.py
+# priv/python/snakebridge_agent.py
 
 import inspect
 import typing
@@ -1100,8 +1100,8 @@ class ClassDescriptor:
     properties: List[Dict[str, Any]]
     base_classes: List[str]
 
-class PyBridgeAgent:
-    def __init__(self, cache_dir=".pybridge_cache"):
+class SnakeBridgeAgent:
+    def __init__(self, cache_dir=".snakebridge_cache"):
         self.cache_dir = cache_dir
         os.makedirs(cache_dir, exist_ok=True)
 
@@ -1281,7 +1281,7 @@ class PyBridgeAgent:
 ### 7.1 Type Inference Engine
 
 ```elixir
-defmodule PyBridge.TypeSystem.Inference do
+defmodule SnakeBridge.TypeSystem.Inference do
   @moduledoc """
   Infers Elixir typespecs from Python type annotations with confidence scoring.
   """
@@ -1345,7 +1345,7 @@ end
 ### 7.2 Runtime Type Validation
 
 ```elixir
-defmodule PyBridge.TypeSystem.Validator do
+defmodule SnakeBridge.TypeSystem.Validator do
   @moduledoc """
   Runtime type validation with helpful error messages.
   """
@@ -1419,7 +1419,7 @@ end
 ### 8.1 Batch Operations
 
 ```elixir
-defmodule PyBridge.Runtime.Batch do
+defmodule SnakeBridge.Runtime.Batch do
   @moduledoc """
   Batch multiple operations into a single Python round-trip.
   """
@@ -1429,7 +1429,7 @@ defmodule PyBridge.Runtime.Batch do
 
   ## Example
 
-      PyBridge.Runtime.Batch.execute([
+      SnakeBridge.Runtime.Batch.execute([
         {:create, DSPex.Predict, %{signature: "q -> a"}},
         {:call, pred_ref, :execute, %{question: "test"}},
         {:create, DSPex.ChainOfThought, %{signature: "q -> r, a"}}
@@ -1442,7 +1442,7 @@ defmodule PyBridge.Runtime.Batch do
       # ]
   """
   def execute(operations, opts \\ []) do
-    session_id = Keyword.get(opts, :session_id) || PyBridge.Session.checkout()
+    session_id = Keyword.get(opts, :session_id) || SnakeBridge.Session.checkout()
 
     # Build batch request
     batch_request = %{
@@ -1459,7 +1459,7 @@ defmodule PyBridge.Runtime.Batch do
         List.duplicate({:error, reason}, length(operations))
     end
   after
-    PyBridge.Session.release(session_id)
+    SnakeBridge.Session.release(session_id)
   end
 
   defp encode_operation({:create, module, args}) do
@@ -1485,7 +1485,7 @@ end
 ### 8.2 Lazy Loading & Prefetching
 
 ```elixir
-defmodule PyBridge.Runtime.Lazy do
+defmodule SnakeBridge.Runtime.Lazy do
   @moduledoc """
   Lazy loading of Python modules with prefetching hints.
   """
@@ -1498,7 +1498,7 @@ defmodule PyBridge.Runtime.Lazy do
 
   def init(_opts) do
     # Track loaded modules
-    :ets.new(:pybridge_loaded_modules, [:set, :public, :named_table])
+    :ets.new(:snakebridge_loaded_modules, [:set, :public, :named_table])
 
     # Track prefetch queue
     state = %{
@@ -1513,7 +1513,7 @@ defmodule PyBridge.Runtime.Lazy do
   Load module lazily on first use.
   """
   def ensure_loaded(module_path) do
-    case :ets.lookup(:pybridge_loaded_modules, module_path) do
+    case :ets.lookup(:snakebridge_loaded_modules, module_path) do
       [{^module_path, _}] ->
         :ok
 
@@ -1532,7 +1532,7 @@ defmodule PyBridge.Runtime.Lazy do
   def handle_call({:load, module_path}, _from, state) do
     case do_load(module_path) do
       :ok ->
-        :ets.insert(:pybridge_loaded_modules, {module_path, true})
+        :ets.insert(:snakebridge_loaded_modules, {module_path, true})
         {:reply, :ok, state}
 
       {:error, reason} ->
@@ -1575,7 +1575,7 @@ end
 ### 8.3 Connection Pooling Strategy
 
 ```elixir
-defmodule PyBridge.Session.Pool do
+defmodule SnakeBridge.Session.Pool do
   @moduledoc """
   Intelligent session pooling with affinity and load balancing.
   """
@@ -1613,7 +1613,7 @@ defmodule PyBridge.Session.Pool do
 
   defp max_pool_size(_integration_id) do
     # Could be per-integration
-    Application.get_env(:pybridge, :pool_size, 10)
+    Application.get_env(:snakebridge, :pool_size, 10)
   end
 end
 ```
@@ -1631,16 +1631,16 @@ defmodule Mix.Tasks.Pybridge.Discover do
   @shortdoc "Discover Python library schema and generate config"
 
   @moduledoc """
-  Introspect a Python library and generate PyBridge configuration.
+  Introspect a Python library and generate SnakeBridge configuration.
 
   ## Usage
 
-      mix pybridge.discover dspy --output config/pybridge/dspy.exs
-      mix pybridge.discover langchain --depth 3
+      mix snakebridge.discover dspy --output config/snakebridge/dspy.exs
+      mix snakebridge.discover langchain --depth 3
 
   ## Options
 
-    * `--output`, `-o` - Output file path (default: config/pybridge/<module>.exs)
+    * `--output`, `-o` - Output file path (default: config/snakebridge/<module>.exs)
     * `--depth`, `-d` - Discovery depth for submodules (default: 2)
     * `--format`, `-f` - Output format: elixir, json, yaml (default: elixir)
     * `--cache` - Use cached introspection if available
@@ -1659,8 +1659,8 @@ defmodule Mix.Tasks.Pybridge.Discover do
     Mix.Task.run("app.start")
 
     # Perform introspection
-    result = PyBridge.Discovery.Introspector.discover(
-      PyBridge.Discovery.PythonIntrospector.new(),
+    result = SnakeBridge.Discovery.Introspector.discover(
+      SnakeBridge.Discovery.PythonIntrospector.new(),
       module_path,
       depth: Keyword.get(opts, :depth, 2),
       use_cache: Keyword.get(opts, :cache, false)
@@ -1668,10 +1668,10 @@ defmodule Mix.Tasks.Pybridge.Discover do
 
     case result do
       {:ok, descriptor} ->
-        output_path = Keyword.get(opts, :output, "config/pybridge/#{module_path}.exs")
+        output_path = Keyword.get(opts, :output, "config/snakebridge/#{module_path}.exs")
         format = Keyword.get(opts, :format, "elixir")
 
-        formatted = PyBridge.Config.Formatter.format(descriptor, format)
+        formatted = SnakeBridge.Config.Formatter.format(descriptor, format)
         File.write!(output_path, formatted)
 
         Mix.shell().info("✓ Generated config: #{output_path}")
@@ -1688,15 +1688,15 @@ end
 defmodule Mix.Tasks.Pybridge.Validate do
   use Mix.Task
 
-  @shortdoc "Validate PyBridge configurations"
+  @shortdoc "Validate SnakeBridge configurations"
 
   def run(args) do
-    Mix.shell().info("Validating PyBridge configurations...")
+    Mix.shell().info("Validating SnakeBridge configurations...")
 
-    configs = PyBridge.Config.Loader.load_all()
+    configs = SnakeBridge.Config.Loader.load_all()
 
     results = for {integration_id, config} <- configs do
-      case PyBridge.Config.Validator.validate(config) do
+      case SnakeBridge.Config.Validator.validate(config) do
         :ok ->
           Mix.shell().info("  ✓ #{integration_id}")
           {:ok, integration_id}
@@ -1729,16 +1729,16 @@ defmodule Mix.Tasks.Pybridge.Diff do
   def run([integration_id | _]) do
     Mix.Task.run("app.start")
 
-    cached_hash = PyBridge.Cache.get_current_hash(integration_id)
+    cached_hash = SnakeBridge.Cache.get_current_hash(integration_id)
 
     Mix.shell().info("Re-introspecting #{integration_id}...")
-    {:ok, new_descriptor} = PyBridge.Discovery.Introspector.discover_integration(integration_id)
-    new_hash = PyBridge.Cache.store(integration_id, new_descriptor)
+    {:ok, new_descriptor} = SnakeBridge.Discovery.Introspector.discover_integration(integration_id)
+    new_hash = SnakeBridge.Cache.store(integration_id, new_descriptor)
 
     if cached_hash == new_hash do
       Mix.shell().info("No changes detected!")
     else
-      diff = PyBridge.Schema.Differ.diff(cached_hash, new_hash)
+      diff = SnakeBridge.Schema.Differ.diff(cached_hash, new_hash)
 
       Mix.shell().info("\nChanges detected:\n")
       print_diff(diff)
@@ -1771,14 +1771,14 @@ defmodule Mix.Tasks.Pybridge.Generate do
     Mix.Task.run("app.start")
 
     integrations = case args do
-      [] -> PyBridge.Config.Loader.list_integrations()
+      [] -> SnakeBridge.Config.Loader.list_integrations()
       ids -> ids
     end
 
     for integration_id <- integrations do
       Mix.shell().info("Generating #{integration_id}...")
 
-      {:ok, modules} = PyBridge.Generator.generate_integration(integration_id)
+      {:ok, modules} = SnakeBridge.Generator.generate_integration(integration_id)
 
       for module <- modules do
         Mix.shell().info("  ✓ #{inspect(module)}")
@@ -1790,16 +1790,16 @@ end
 defmodule Mix.Tasks.Pybridge.Clean do
   use Mix.Task
 
-  @shortdoc "Clean PyBridge caches and generated code"
+  @shortdoc "Clean SnakeBridge caches and generated code"
 
   def run(args) do
-    Mix.shell().info("Cleaning PyBridge caches...")
+    Mix.shell().info("Cleaning SnakeBridge caches...")
 
     # Clear ETS
-    PyBridge.Cache.clear_all()
+    SnakeBridge.Cache.clear_all()
 
     # Remove generated files
-    File.rm_rf!("priv/pybridge/cache")
+    File.rm_rf!("priv/snakebridge/cache")
 
     Mix.shell().info("✓ Caches cleared")
   end
@@ -1809,13 +1809,13 @@ end
 ### 9.2 IEx Helpers
 
 ```elixir
-defmodule PyBridge.IEx do
+defmodule SnakeBridge.IEx do
   @moduledoc """
-  IEx helpers for working with PyBridge.
+  IEx helpers for working with SnakeBridge.
   """
 
   def pyb_info(integration_id) do
-    descriptor = PyBridge.Schema.Registry.fetch!(integration_id)
+    descriptor = SnakeBridge.Schema.Registry.fetch!(integration_id)
 
     IO.puts("""
 
@@ -1832,16 +1832,16 @@ defmodule PyBridge.IEx do
   end
 
   def pyb_modules(integration_id) do
-    descriptor = PyBridge.Schema.Registry.fetch!(integration_id)
+    descriptor = SnakeBridge.Schema.Registry.fetch!(integration_id)
     Enum.map(descriptor.classes, & &1.elixir_module)
   end
 
   def pyb_methods(module) when is_atom(module) do
-    module.__pybridge_methods__()
+    module.__snakebridge_methods__()
   end
 
   def pyb_doc(module, method) when is_atom(module) and is_atom(method) do
-    descriptor = module.__pybridge_descriptor__()
+    descriptor = module.__snakebridge_descriptor__()
     method_desc = Enum.find(descriptor.methods, & &1.elixir_name == method)
 
     IO.puts("""
@@ -1868,7 +1868,7 @@ defmodule PyBridge.IEx do
 end
 
 # Auto-import in .iex.exs
-# import PyBridge.IEx
+# import SnakeBridge.IEx
 ```
 
 ---
@@ -1877,27 +1877,27 @@ end
 
 ### 10.1 The Verdict: Standalone Library
 
-After deep analysis, **PyBridge MUST be a standalone Hex package**, NOT part of Snakepit core.
+After deep analysis, **SnakeBridge MUST be a standalone Hex package**, NOT part of Snakepit core.
 
 **Reasons**:
 
 1. **Separation of Concerns**:
    - Snakepit = Low-level Python orchestration (pooling, sessions, gRPC)
-   - PyBridge = High-level integration framework (discovery, generation, DX)
+   - SnakeBridge = High-level integration framework (discovery, generation, DX)
 
 2. **Release Independence**:
-   - PyBridge can iterate rapidly on DX features
+   - SnakeBridge can iterate rapidly on DX features
    - Snakepit remains stable, focused substrate
    - Version compatibility via `{:snakepit, "~> 0.6"}`
 
 3. **Dependency Management**:
-   - PyBridge needs Ecto, Jason, Protox, Telemetry
+   - SnakeBridge needs Ecto, Jason, Protox, Telemetry
    - Snakepit stays lean (just gRPC + pooling)
-   - Users can opt-out of PyBridge overhead
+   - Users can opt-out of SnakeBridge overhead
 
 4. **Community Ecosystem**:
    - Clear API boundary encourages extensions
-   - Third-party integrations can depend on PyBridge
+   - Third-party integrations can depend on SnakeBridge
    - Snakepit can stay focused on runtime
 
 5. **Testing & Quality**:
@@ -1914,7 +1914,7 @@ Snakepit DOES need these additions (minimal surface):
 
 defmodule Snakepit.Integration do
   @moduledoc """
-  Behaviour for integration frameworks (like PyBridge).
+  Behaviour for integration frameworks (like SnakeBridge).
 
   Snakepit provides hooks for registration and introspection.
   """
@@ -1945,7 +1945,7 @@ defmodule Snakepit.GRPC.BridgeServer do
 end
 ```
 
-**This is ~200 LOC** added to Snakepit. Everything else lives in PyBridge.
+**This is ~200 LOC** added to Snakepit. Everything else lives in SnakeBridge.
 
 ### 10.3 Dependency Graph
 
@@ -1957,7 +1957,7 @@ end
          │ depends on
          ▼
 ┌─────────────────┐      ┌─────────────────┐
-│    PyBridge     │──────▶│   Snakepit      │
+│    SnakeBridge     │──────▶│   Snakepit      │
 │  (Integration)  │ uses │  (Orchestration)│
 └─────────────────┘      └─────────────────┘
          │                        │
@@ -1975,10 +1975,10 @@ end
 
 ### Phase 1: Foundation (Weeks 1-3)
 
-**Goal**: Core PyBridge infrastructure + basic DSPy integration
+**Goal**: Core SnakeBridge infrastructure + basic DSPy integration
 
 **Deliverables**:
-- [ ] PyBridge project scaffold (`mix new pybridge`)
+- [ ] SnakeBridge project scaffold (`mix new snakebridge`)
 - [ ] Config schema (Ecto) with validation
 - [ ] Basic generator macro (compile-time only)
 - [ ] Runtime executor (wrapping Snakepit)
@@ -2001,7 +2001,7 @@ end
 - [ ] Mix tasks (discover, validate, diff, clean)
 - [ ] DSPy full config (all 40+ classes)
 
-**Success Criteria**: `mix pybridge.discover dspy` works end-to-end
+**Success Criteria**: `mix snakebridge.discover dspy` works end-to-end
 
 ### Phase 3: Type System (Weeks 6-7)
 
@@ -2063,7 +2063,7 @@ end
 
 ### 12.1 The Unified Vision
 
-**PyBridge represents a synthesis of two powerful ideas**:
+**SnakeBridge represents a synthesis of two powerful ideas**:
 
 1. **Elixir metaprogramming** for compile-time safety and developer ergonomics
 2. **Runtime introspection** for flexibility and production reliability
@@ -2101,7 +2101,7 @@ end
 
 1. **Approve this design** (with iterations)
 2. **Update Snakepit** with gRPC extensions (~200 LOC)
-3. **Scaffold PyBridge** library
+3. **Scaffold SnakeBridge** library
 4. **Implement Phase 1** (foundation)
 5. **Migrate DSPex** as proof-of-concept
 
@@ -2114,7 +2114,7 @@ end
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                                                          │
-│  BUILD PYBRIDGE AS A STANDALONE HEX LIBRARY              │
+│  BUILD SNAKEBRIDGE AS A STANDALONE HEX LIBRARY              │
 │                                                          │
 │  Extend Snakepit minimally for gRPC protocol support    │
 │  Implement hybrid compilation model (compile + runtime) │

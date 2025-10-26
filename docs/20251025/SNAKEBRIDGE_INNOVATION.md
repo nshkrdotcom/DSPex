@@ -1,4 +1,4 @@
-# PyBridge: Configuration-Driven Python Library Integration for Elixir
+# SnakeBridge: Configuration-Driven Python Library Integration for Elixir
 
 **Innovation Date**: 2025-10-25
 **Status**: Design Document
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-**PyBridge** is a metaprogramming-driven framework that enables **zero-code Python library integration into Elixir through declarative configuration**. Instead of manually writing wrappers for each Python library (DSPy, LangChain, Transformers, PyTorch, etc.), developers provide a configuration schema that describes the Python API, and PyBridge automatically generates:
+**SnakeBridge** is a metaprogramming-driven framework that enables **zero-code Python library integration into Elixir through declarative configuration**. Instead of manually writing wrappers for each Python library (DSPy, LangChain, Transformers, PyTorch, etc.), developers provide a configuration schema that describes the Python API, and SnakeBridge automatically generates:
 
 1. **Type-safe Elixir modules** with full documentation
 2. **gRPC/streaming-ready communication** via Snakepit
@@ -45,14 +45,14 @@ This doesn't scale when you want to integrate **20+ major ML libraries** (PyTorc
 What if instead of writing code, you just declared:
 
 ```elixir
-# config/pybridge/dspy.exs
-%PyBridge.Config{
+# config/snakebridge/dspy.exs
+%SnakeBridge.Config{
   python_module: "dspy",
   version: "2.5.0",
 
   introspection: %{
     enabled: true,
-    cache_path: "priv/pybridge/schemas/dspy.json",
+    cache_path: "priv/snakebridge/schemas/dspy.json",
     submodules: ["teleprompt", "evaluate", "retrieve"]
   },
 
@@ -99,7 +99,7 @@ What if instead of writing code, you just declared:
 }
 ```
 
-And PyBridge **automatically generates** at compile time:
+And SnakeBridge **automatically generates** at compile time:
 
 ```elixir
 defmodule DSPex.Predict do
@@ -119,9 +119,9 @@ defmodule DSPex.Predict do
       {:ok, %{answer: "..."}}
   """
 
-  use PyBridge.Generator
+  use SnakeBridge.Generator
 
-  @type t :: PyBridge.InstanceRef.t()
+  @type t :: SnakeBridge.InstanceRef.t()
 
   @spec create(String.t(), keyword()) :: {:ok, t()} | {:error, term()}
   def create(signature, opts \\ []) do
@@ -141,10 +141,10 @@ end
 
 ### Layer 1: Configuration Schema (Declarative)
 
-PyBridge configurations are Elixir schemas that describe:
+SnakeBridge configurations are Elixir schemas that describe:
 
 ```elixir
-defmodule PyBridge.Config do
+defmodule SnakeBridge.Config do
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -211,10 +211,10 @@ end
 
 ### Layer 2: Introspection Engine (Automated Discovery)
 
-PyBridge can **automatically discover** Python APIs using reflection:
+SnakeBridge can **automatically discover** Python APIs using reflection:
 
 ```elixir
-defmodule PyBridge.Introspection do
+defmodule SnakeBridge.Introspection do
   @moduledoc """
   Introspects Python modules to generate configuration automatically.
   """
@@ -224,11 +224,11 @@ defmodule PyBridge.Introspection do
 
   ## Example
 
-      iex> {:ok, config} = PyBridge.Introspection.discover("dspy")
-      iex> File.write!("config/pybridge/dspy.exs", config)
+      iex> {:ok, config} = SnakeBridge.Introspection.discover("dspy")
+      iex> File.write!("config/snakebridge/dspy.exs", config)
   """
   def discover(module_path, opts \\ []) do
-    session_id = Keyword.get(opts, :session_id, PyBridge.Utils.ID.generate())
+    session_id = Keyword.get(opts, :session_id, SnakeBridge.Utils.ID.generate())
     depth = Keyword.get(opts, :depth, 2)
 
     # Use Snakepit to introspect the Python module
@@ -299,7 +299,7 @@ defmodule PyBridge.Introspection do
   end
 
   defp generate_config_from_schema(module_path, schema, _opts) do
-    # Convert Python schema to PyBridge config format
+    # Convert Python schema to SnakeBridge config format
     classes =
       for {class_name, class_info} <- schema["classes"] do
         %{
@@ -321,12 +321,12 @@ defmodule PyBridge.Introspection do
         }
       end
 
-    %PyBridge.Config{
+    %SnakeBridge.Config{
       python_module: module_path,
       version: "auto-discovered",
       introspection: %{
         enabled: true,
-        cache_path: "priv/pybridge/schemas/#{module_path}.json"
+        cache_path: "priv/snakebridge/schemas/#{module_path}.json"
       },
       classes: classes,
       functions: []
@@ -347,40 +347,40 @@ end
 
 ### Layer 3: Code Generation Engine (Compile-Time Metaprogramming)
 
-The heart of PyBridge: **macro-based code generation** at compile time:
+The heart of SnakeBridge: **macro-based code generation** at compile time:
 
 ```elixir
-defmodule PyBridge.Generator do
+defmodule SnakeBridge.Generator do
   @moduledoc """
   Compile-time code generation for Python library wrappers.
 
   This module uses Elixir macros to generate complete wrapper modules
-  from PyBridge configurations.
+  from SnakeBridge configurations.
   """
 
   defmacro __using__(opts) do
     config_module = Keyword.get(opts, :config)
 
     quote do
-      import PyBridge.Generator
-      Module.register_attribute(__MODULE__, :pybridge_config, persist: true)
+      import SnakeBridge.Generator
+      Module.register_attribute(__MODULE__, :snakebridge_config, persist: true)
 
-      @before_compile PyBridge.Generator
+      @before_compile SnakeBridge.Generator
 
       if unquote(config_module) do
-        @pybridge_config unquote(config_module).config()
+        @snakebridge_config unquote(config_module).config()
       end
     end
   end
 
   defmacro __before_compile__(env) do
-    config = Module.get_attribute(env.module, :pybridge_config)
+    config = Module.get_attribute(env.module, :snakebridge_config)
 
     if config do
       generate_wrapper_module(config, env)
     else
       quote do
-        def __pybridge_config__, do: nil
+        def __snakebridge_config__, do: nil
       end
     end
   end
@@ -400,7 +400,7 @@ defmodule PyBridge.Generator do
       unquote_splicing(class_modules)
       unquote_splicing(function_modules)
 
-      def __pybridge_config__, do: unquote(Macro.escape(config))
+      def __snakebridge_config__, do: unquote(Macro.escape(config))
     end
   end
 
@@ -424,7 +424,7 @@ defmodule PyBridge.Generator do
       defmodule unquote(module_name) do
         @moduledoc unquote(moduledoc)
 
-        alias PyBridge.InstanceRef
+        alias SnakeBridge.InstanceRef
 
         @type t :: InstanceRef.t()
         @python_path unquote(python_path)
@@ -462,12 +462,12 @@ defmodule PyBridge.Generator do
       def create(args \\ %{}, opts \\ []) do
         session_id =
           if unquote(session_aware) do
-            Keyword.get(opts, :session_id) || PyBridge.Session.generate_id()
+            Keyword.get(opts, :session_id) || SnakeBridge.Session.generate_id()
           else
             nil
           end
 
-        PyBridge.Runtime.create_instance(
+        SnakeBridge.Runtime.create_instance(
           unquote(python_path),
           args,
           session_id,
@@ -491,14 +491,14 @@ defmodule PyBridge.Generator do
       @spec unquote(elixir_name)(t(), map(), keyword()) :: {:ok, term()} | {:error, term()}
       def unquote(elixir_name)(instance_ref, args \\ %{}, opts \\ []) do
         if unquote(streaming) do
-          PyBridge.Runtime.call_method_streaming(
+          SnakeBridge.Runtime.call_method_streaming(
             instance_ref,
             unquote(method_name),
             args,
             opts
           )
         else
-          PyBridge.Runtime.call_method(
+          SnakeBridge.Runtime.call_method(
             instance_ref,
             unquote(method_name),
             args,
@@ -513,7 +513,7 @@ defmodule PyBridge.Generator do
     """
     Elixir wrapper for #{class_config.python_path}.
 
-    This module was automatically generated by PyBridge from configuration.
+    This module was automatically generated by SnakeBridge from configuration.
 
     **Python Module**: `#{parent_config.python_module}`
     **Version**: #{parent_config.version}
@@ -543,11 +543,11 @@ Once configured, adding a new Python library requires **zero Elixir code**:
 
 ```bash
 # Discover and generate config
-mix pybridge.discover langchain --output config/pybridge/langchain.exs
+mix snakebridge.discover langchain --output config/snakebridge/langchain.exs
 
 # Add to your application
 # config/config.exs
-config :pybridge, :libraries, [
+config :snakebridge, :libraries, [
   DSPy: DSPyConfig,
   LangChain: LangChainConfig,
   Transformers: TransformersConfig
@@ -560,7 +560,7 @@ config :pybridge, :libraries, [
 
 ### 2. **Type Safety Through Introspection**
 
-PyBridge uses Python's type hints to generate Elixir typespecs:
+SnakeBridge uses Python's type hints to generate Elixir typespecs:
 
 ```python
 # Python
@@ -580,7 +580,7 @@ def predict(signature, inputs, opts \\ [])
 Export Elixir functions to Python automatically:
 
 ```elixir
-# config/pybridge/dspy.exs
+# config/snakebridge/dspy.exs
 bidirectional_tools: %{
   enabled: true,
   export_to_python: [
@@ -619,7 +619,7 @@ Auto-generates:
 
 ```elixir
 def stream(instance_ref, args, opts \\ []) do
-  PyBridge.Runtime.call_method_streaming(instance_ref, "stream_completion", args, opts)
+  SnakeBridge.Runtime.call_method_streaming(instance_ref, "stream_completion", args, opts)
 end
 
 # Usage:
@@ -631,11 +631,11 @@ end
 
 ### 5. **Smart Caching and Session Management**
 
-PyBridge leverages Snakepit's session pooling:
+SnakeBridge leverages Snakepit's session pooling:
 
 ```elixir
 # Reuse sessions for performance
-session_id = PyBridge.Session.checkout(:dspy_pool)
+session_id = SnakeBridge.Session.checkout(:dspy_pool)
 
 {:ok, pred1} = DSPex.Predict.create(sig1, session_id: session_id)
 {:ok, pred2} = DSPex.ChainOfThought.create(sig2, session_id: session_id)
@@ -648,7 +648,7 @@ session_id = PyBridge.Session.checkout(:dspy_pool)
 Configurations are processed at compile time, generating optimized code:
 
 ```elixir
-# At compile time, PyBridge:
+# At compile time, SnakeBridge:
 # 1. Validates configuration schema
 # 2. Caches introspection results
 # 3. Generates optimized modules with inlined constants
@@ -663,18 +663,18 @@ Configurations are processed at compile time, generating optimized code:
 ### Configuration File
 
 ```elixir
-# config/pybridge/dspy.exs
+# config/snakebridge/dspy.exs
 defmodule DSPyConfig do
-  use PyBridge.Config
+  use SnakeBridge.Config
 
   def config do
-    %PyBridge.Config{
+    %SnakeBridge.Config{
       python_module: "dspy",
       version: "2.5.0",
 
       introspection: %{
         enabled: true,
-        cache_path: "priv/pybridge/schemas/dspy.json",
+        cache_path: "priv/snakebridge/schemas/dspy.json",
         submodules: ["teleprompt", "evaluate", "retrieve", "primitives"]
       },
 
@@ -891,7 +891,7 @@ DSPex.configure(
 │         └─────────────────────┼───────────────────┘         │
 │                               │                             │
 │                    ┌──────────▼──────────┐                  │
-│                    │   PyBridge Runtime  │                  │
+│                    │   SnakeBridge Runtime  │                  │
 │                    │  - Session Manager  │                  │
 │                    │  - Type Converter   │                  │
 │                    │  - Error Handler    │                  │
@@ -919,7 +919,7 @@ DSPex.configure(
 
 ```
 ┌──────────────────────┐
-│  PyBridge Config     │
+│  SnakeBridge Config     │
 │  (dspy.exs)          │
 └──────────┬───────────┘
            │
@@ -959,7 +959,7 @@ DSPex.configure(
 
 ## Comparison: Before vs. After
 
-### Before PyBridge (Manual Wrappers)
+### Before SnakeBridge (Manual Wrappers)
 
 **To integrate DSPy Predict:**
 
@@ -1003,12 +1003,12 @@ end
 **Time to integrate 20 classes**: ~10 hours
 **Maintenance burden**: High (every Python API change requires manual updates)
 
-### After PyBridge (Configuration)
+### After SnakeBridge (Configuration)
 
 **To integrate DSPy Predict:**
 
 ```elixir
-# config/pybridge/dspy.exs
+# config/snakebridge/dspy.exs
 classes: [
   %{
     python_path: "dspy.Predict",
@@ -1034,20 +1034,20 @@ classes: [
 **Goal**: Configuration-driven code generation for basic class/method wrapping
 
 **Components**:
-1. `PyBridge.Config` schema definition
-2. `PyBridge.Generator` macro system
-3. `PyBridge.Runtime` for instance management
+1. `SnakeBridge.Config` schema definition
+2. `SnakeBridge.Generator` macro system
+3. `SnakeBridge.Runtime` for instance management
 4. Basic introspection via Snakepit
 5. DSPy integration as proof-of-concept
 
 **Deliverables**:
-- [ ] `lib/pybridge/config.ex` - Config schema with Ecto
-- [ ] `lib/pybridge/generator.ex` - Macro-based code generation
-- [ ] `lib/pybridge/runtime.ex` - Instance lifecycle management
-- [ ] `lib/pybridge/introspection.ex` - Python module discovery
-- [ ] `lib/pybridge/session.ex` - Session pooling wrapper
-- [ ] `config/pybridge/dspy.exs` - DSPy configuration
-- [ ] Full DSPex rewrite using PyBridge
+- [ ] `lib/snakebridge/config.ex` - Config schema with Ecto
+- [ ] `lib/snakebridge/generator.ex` - Macro-based code generation
+- [ ] `lib/snakebridge/runtime.ex` - Instance lifecycle management
+- [ ] `lib/snakebridge/introspection.ex` - Python module discovery
+- [ ] `lib/snakebridge/session.ex` - Session pooling wrapper
+- [ ] `config/snakebridge/dspy.exs` - DSPy configuration
+- [ ] Full DSPex rewrite using SnakeBridge
 - [ ] Documentation and examples
 
 **Timeline**: 2-3 weeks
@@ -1061,14 +1061,14 @@ classes: [
 2. Bidirectional tool registry
 3. Type inference from Python annotations
 4. ExDoc integration for generated modules
-5. Mix tasks (`mix pybridge.discover`, `mix pybridge.generate`)
+5. Mix tasks (`mix snakebridge.discover`, `mix snakebridge.generate`)
 
 **Deliverables**:
 - [ ] Streaming API with GenStage/Flow integration
-- [ ] `PyBridge.Tools` for Elixir → Python function export
+- [ ] `SnakeBridge.Tools` for Elixir → Python function export
 - [ ] Type mapper (Python types → Elixir typespecs)
 - [ ] Auto-generated `@doc` from Python docstrings
-- [ ] `mix pybridge.discover <module>` task
+- [ ] `mix snakebridge.discover <module>` task
 - [ ] LangChain integration as second example
 
 **Timeline**: 2-3 weeks
@@ -1087,7 +1087,7 @@ classes: [
 **Deliverables**:
 - [ ] Schema caching system (ETS + DETS)
 - [ ] File watcher for Python code changes
-- [ ] Telemetry events for all PyBridge operations
+- [ ] Telemetry events for all SnakeBridge operations
 - [ ] Configurable retry/circuit breaker
 - [ ] Nx tensor serialization support
 - [ ] Transformers (Hugging Face) integration
@@ -1097,10 +1097,10 @@ classes: [
 
 ### Phase 4: Ecosystem & Community
 
-**Goal**: Make PyBridge the standard for Python-Elixir integration
+**Goal**: Make SnakeBridge the standard for Python-Elixir integration
 
 **Components**:
-1. Public release as `pybridge` Hex package
+1. Public release as `snakebridge` Hex package
 2. Pre-built configs for top 20 ML libraries
 3. Documentation site with examples
 4. Blog posts and tutorials
@@ -1156,33 +1156,33 @@ Based on research, here are the priority targets:
 
 ### 1. Configuration Loading
 
-At compile time, PyBridge loads configurations:
+At compile time, SnakeBridge loads configurations:
 
 ```elixir
 # In your mix.exs
 def application do
   [
-    extra_applications: [:pybridge],
+    extra_applications: [:snakebridge],
     mod: {MyApp.Application, []}
   ]
 end
 
 # config/config.exs
-config :pybridge, :libraries, [
+config :snakebridge, :libraries, [
   {DSPex, DSPyConfig},
   {LangChainEx, LangChainConfig}
 ]
 ```
 
-PyBridge's application callback:
+SnakeBridge's application callback:
 
 ```elixir
-defmodule PyBridge.Application do
+defmodule SnakeBridge.Application do
   use Application
 
   def start(_type, _args) do
     # Load all configured libraries
-    libraries = Application.get_env(:pybridge, :libraries, [])
+    libraries = Application.get_env(:snakebridge, :libraries, [])
 
     # Start Snakepit with Python worker pool
     children = [
@@ -1192,15 +1192,15 @@ defmodule PyBridge.Application do
         python_modules: extract_python_modules(libraries)
       ]},
 
-      {PyBridge.Session.Manager, []},
-      {PyBridge.Cache, []}
+      {SnakeBridge.Session.Manager, []},
+      {SnakeBridge.Cache, []}
     ]
 
     # Generate modules at runtime (dev mode) or use compiled (prod)
     if Mix.env() == :dev do
       for {_elixir_module, config_module} <- libraries do
         config = config_module.config()
-        PyBridge.Generator.generate_and_load(config)
+        SnakeBridge.Generator.generate_and_load(config)
       end
     end
 
@@ -1211,13 +1211,13 @@ end
 
 ### 2. Introspection Workflow
 
-When you run `mix pybridge.discover dspy`:
+When you run `mix snakebridge.discover dspy`:
 
 ```elixir
 defmodule Mix.Tasks.Pybridge.Discover do
   use Mix.Task
 
-  @shortdoc "Discover and generate PyBridge config for a Python module"
+  @shortdoc "Discover and generate SnakeBridge config for a Python module"
 
   def run([module_path | args]) do
     opts = parse_args(args)
@@ -1226,11 +1226,11 @@ defmodule Mix.Tasks.Pybridge.Discover do
     {:ok, _} = Snakepit.start_link([pool_size: 1])
 
     # Discover schema
-    {:ok, config} = PyBridge.Introspection.discover(module_path, opts)
+    {:ok, config} = SnakeBridge.Introspection.discover(module_path, opts)
 
     # Generate config file
-    output_path = Keyword.get(opts, :output, "config/pybridge/#{module_path}.exs")
-    config_code = PyBridge.ConfigFormatter.to_elixir_code(config)
+    output_path = Keyword.get(opts, :output, "config/snakebridge/#{module_path}.exs")
+    config_code = SnakeBridge.ConfigFormatter.to_elixir_code(config)
 
     File.write!(output_path, config_code)
 
@@ -1243,7 +1243,7 @@ end
 The introspection result is cached:
 
 ```elixir
-# priv/pybridge/schemas/dspy.json
+# priv/snakebridge/schemas/dspy.json
 {
   "module": "dspy",
   "version": "2.5.0",
@@ -1272,7 +1272,7 @@ The `__before_compile__` hook does the heavy lifting:
 
 ```elixir
 defmacro __before_compile__(env) do
-  config = Module.get_attribute(env.module, :pybridge_config)
+  config = Module.get_attribute(env.module, :snakebridge_config)
 
   # Generate all wrapper modules
   quote do
@@ -1284,7 +1284,7 @@ defmacro __before_compile__(env) do
     )
 
     # Module registry for reflection
-    def __pybridge_modules__ do
+    def __snakebridge_modules__ do
       unquote(Enum.map(config.classes, & &1.elixir_module))
     end
   end
@@ -1320,9 +1320,9 @@ When you call `DSPex.Predict.create("question -> answer")`:
 ```
 1. Elixir: DSPex.Predict.create/2 (generated)
            ↓
-2. Elixir: PyBridge.Runtime.create_instance/4
+2. Elixir: SnakeBridge.Runtime.create_instance/4
            ↓
-3. Elixir: PyBridge.Session.checkout(:dspy_pool)
+3. Elixir: SnakeBridge.Session.checkout(:dspy_pool)
            ↓
 4. Elixir: Snakepit.execute_in_session(session_id, "call_dspy", %{...})
            ↓
@@ -1346,10 +1346,10 @@ When you call `DSPex.Predict.create("question -> answer")`:
 
 ### 5. Type Conversion
 
-PyBridge automatically converts between Elixir and Python types:
+SnakeBridge automatically converts between Elixir and Python types:
 
 ```elixir
-defmodule PyBridge.TypeConverter do
+defmodule SnakeBridge.TypeConverter do
   @doc """
   Convert Elixir data to Python-compatible JSON.
   """
@@ -1416,14 +1416,14 @@ end
 
 Based on Snakepit's current performance:
 
-| Operation | Manual Wrapper | PyBridge | Overhead |
+| Operation | Manual Wrapper | SnakeBridge | Overhead |
 |-----------|---------------|----------|----------|
 | Instance creation | 5ms | 5.2ms | +4% |
 | Method call (simple) | 2ms | 2.1ms | +5% |
 | Method call (streaming) | 50ms (total) | 51ms | +2% |
 | Session reuse | 1ms | 1ms | 0% |
 
-**Conclusion**: PyBridge overhead is negligible (~2-5%) thanks to compile-time generation.
+**Conclusion**: SnakeBridge overhead is negligible (~2-5%) thanks to compile-time generation.
 
 ### Optimization Strategies
 
@@ -1439,7 +1439,7 @@ Based on Snakepit's current performance:
 
 ### Sandboxing
 
-PyBridge inherits Snakepit's security model:
+SnakeBridge inherits Snakepit's security model:
 
 - Each Python worker runs in isolated process
 - Configurable timeouts prevent runaway code
@@ -1451,7 +1451,7 @@ PyBridge inherits Snakepit's security model:
 All configs are validated at compile time:
 
 ```elixir
-defmodule PyBridge.ConfigValidator do
+defmodule SnakeBridge.ConfigValidator do
   def validate!(config) do
     # Ensure no naming conflicts
     check_unique_elixir_modules!(config.classes)
@@ -1472,7 +1472,7 @@ end
 
 ### Type Safety
 
-PyBridge generates typespecs from Python annotations:
+SnakeBridge generates typespecs from Python annotations:
 
 ```python
 # Python
@@ -1495,7 +1495,7 @@ Dialyzer catches type errors at compile time.
 
 ### vs. ErlPort
 
-| Feature | PyBridge | ErlPort |
+| Feature | SnakeBridge | ErlPort |
 |---------|----------|---------|
 | Communication | gRPC (streaming) | Erlang ports |
 | Code generation | Yes (metaprogramming) | No (manual) |
@@ -1507,7 +1507,7 @@ Dialyzer catches type errors at compile time.
 
 ### vs. Porcelain
 
-| Feature | PyBridge | Porcelain |
+| Feature | SnakeBridge | Porcelain |
 |---------|----------|-----------|
 | Target | Python libraries | CLI programs |
 | Type safety | Yes | No |
@@ -1516,7 +1516,7 @@ Dialyzer catches type errors at compile time.
 
 ### vs. Manual Wrappers
 
-| Feature | PyBridge | Manual |
+| Feature | SnakeBridge | Manual |
 |---------|----------|--------|
 | Development time | Minutes | Hours/Days |
 | Maintenance | Automatic | Manual |
@@ -1544,7 +1544,7 @@ tensor = Nx.tensor([[1, 2], [3, 4]])
 Compile Python to WASM for in-process execution:
 
 ```elixir
-config :pybridge, :backend, :wasm
+config :snakebridge, :backend, :wasm
 # No separate Python process needed!
 ```
 
@@ -1553,7 +1553,7 @@ config :pybridge, :backend, :wasm
 Run Python workers on separate nodes:
 
 ```elixir
-config :pybridge, :workers, [
+config :snakebridge, :workers, [
   gpu_node_1: [host: "gpu-1.cluster", gpus: [0, 1]],
   gpu_node_2: [host: "gpu-2.cluster", gpus: [0, 1]]
 ]
@@ -1575,7 +1575,7 @@ end
 
 ## Conclusion
 
-**PyBridge** represents a fundamental shift in how Elixir integrates with Python:
+**SnakeBridge** represents a fundamental shift in how Elixir integrates with Python:
 
 ### The Innovation
 
@@ -1601,7 +1601,7 @@ end
 4. **Release to community** and gather feedback
 5. **Expand to top 20 libraries** through community contributions
 
-**PyBridge is not just a tool—it's a bridge between two powerful ecosystems, enabling Elixir developers to leverage the entire Python ML/AI world without sacrificing the reliability, concurrency, and elegance of the BEAM.**
+**SnakeBridge is not just a tool—it's a bridge between two powerful ecosystems, enabling Elixir developers to leverage the entire Python ML/AI world without sacrificing the reliability, concurrency, and elegance of the BEAM.**
 
 ---
 
@@ -1610,7 +1610,7 @@ end
 ### Full Schema Definition
 
 ```elixir
-defmodule PyBridge.Config do
+defmodule SnakeBridge.Config do
   use Ecto.Schema
 
   @primary_key false

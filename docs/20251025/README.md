@@ -1,13 +1,13 @@
-# PyBridge Innovation - Documentation Index
+# SnakeBridge Innovation - Documentation Index
 
 **Date**: 2025-10-25
 **Status**: ⚡ **SYNTHESIS COMPLETE** ⚡
 
-This directory contains the complete design documentation for **PyBridge**, a revolutionary configuration-driven framework for integrating Python libraries into Elixir with zero manual code.
+This directory contains the complete design documentation for **SnakeBridge**, a revolutionary configuration-driven framework for integrating Python libraries into Elixir with zero manual code.
 
 ## 🎯 Start Here
 
-**New readers**: Start with [synthesis/UNIFIED_PYBRIDGE_ARCHITECTURE.md](./synthesis/UNIFIED_PYBRIDGE_ARCHITECTURE.md) - this is the definitive, production-ready specification that synthesizes all approaches.
+**New readers**: Start with [synthesis/UNIFIED_SNAKEBRIDGE_ARCHITECTURE.md](./synthesis/UNIFIED_SNAKEBRIDGE_ARCHITECTURE.md) - this is the definitive, production-ready specification that synthesizes all approaches.
 
 **Quick overview**: Read this README for a high-level summary.
 
@@ -18,14 +18,14 @@ This directory contains the complete design documentation for **PyBridge**, a re
 ```
 docs/20251025/
 ├── README.md (this file)                              # Overview
-├── PYBRIDGE_INNOVATION.md                             # Original design (metaprogramming-first)
-├── DSPY_PYBRIDGE_CONFIG_EXAMPLE.exs                   # Complete DSPy config example
+├── SNAKEBRIDGE_INNOVATION.md                             # Original design (metaprogramming-first)
+├── DSPY_SNAKEBRIDGE_CONFIG_EXAMPLE.exs                   # Complete DSPy config example
 ├── snakepit_config_driven_python_integration_blueprint.md  # Codex's design (runtime-first)
 ├── technical/
-│   └── pybridge_architecture_deep_dive.md             # Codex's deep dive
+│   └── snakebridge_architecture_deep_dive.md             # Codex's deep dive
 └── synthesis/                                         # ⭐ THE UNIFIED DESIGN ⭐
     ├── README.md                                      # Synthesis overview
-    └── UNIFIED_PYBRIDGE_ARCHITECTURE.md               # Complete specification
+    └── UNIFIED_SNAKEBRIDGE_ARCHITECTURE.md               # Complete specification
 ```
 
 ---
@@ -34,7 +34,7 @@ docs/20251025/
 
 ### ⭐ Primary: Unified Synthesis
 
-**[synthesis/UNIFIED_PYBRIDGE_ARCHITECTURE.md](./synthesis/UNIFIED_PYBRIDGE_ARCHITECTURE.md)**
+**[synthesis/UNIFIED_SNAKEBRIDGE_ARCHITECTURE.md](./synthesis/UNIFIED_SNAKEBRIDGE_ARCHITECTURE.md)**
 
 **The definitive technical specification** combining the best of all approaches.
 
@@ -59,7 +59,7 @@ docs/20251025/
 
 These documents represent the parallel design tracks that were synthesized:
 
-#### 1. [PYBRIDGE_INNOVATION.md](./PYBRIDGE_INNOVATION.md)
+#### 1. [SNAKEBRIDGE_INNOVATION.md](./SNAKEBRIDGE_INNOVATION.md)
 
 **The Core Innovation Document**
 
@@ -69,10 +69,10 @@ A comprehensive design specification covering:
 - **The Innovation**: Configuration-driven metaprogramming approach
 - **Architecture**: Three-layer system (Config → Introspection → Generation)
 - **Implementation**: Detailed code examples and runtime flow
-- **DSPy Example**: How PyBridge would simplify DSPex
+- **DSPy Example**: How SnakeBridge would simplify DSPex
 - **Roadmap**: 4-phase implementation plan (MVP → Production)
 - **Top 20 Libraries**: Priority integration targets (DSPy, LangChain, Transformers, PyTorch, etc.)
-- **Comparisons**: PyBridge vs. ErlPort, Porcelain, manual wrappers
+- **Comparisons**: SnakeBridge vs. ErlPort, Porcelain, manual wrappers
 
 **Key Takeaways**:
 - Replace ~2000 lines of wrapper code with ~200 lines of config
@@ -94,7 +94,7 @@ A manifest-driven design emphasizing:
 
 **Contribution**: Strong runtime architecture, clear protocols, observability focus
 
-#### 3. [technical/pybridge_architecture_deep_dive.md](./technical/pybridge_architecture_deep_dive.md)
+#### 3. [technical/snakebridge_architecture_deep_dive.md](./technical/snakebridge_architecture_deep_dive.md)
 
 **Codex's Deep Technical Analysis**
 
@@ -111,7 +111,7 @@ Extended technical details covering:
 
 ### Configuration Examples
 
-#### [DSPY_PYBRIDGE_CONFIG_EXAMPLE.exs](./DSPY_PYBRIDGE_CONFIG_EXAMPLE.exs)
+#### [DSPY_SNAKEBRIDGE_CONFIG_EXAMPLE.exs](./DSPY_SNAKEBRIDGE_CONFIG_EXAMPLE.exs)
 
 **Complete DSPy Configuration Reference**
 
@@ -128,7 +128,7 @@ A production-ready configuration file demonstrating:
 **Usage Example**:
 
 ```elixir
-# After PyBridge processes this config, all these modules work:
+# After SnakeBridge processes this config, all these modules work:
 
 {:ok, pred} = DSPex.Predict.create("question -> answer")
 {:ok, result} = DSPex.Predict.call(pred, %{question: "What is DSPy?"})
@@ -146,9 +146,9 @@ All without writing any wrapper code!
 
 ## The Synthesis: What Makes It Special
 
-The **Unified PyBridge Architecture** goes beyond either original approach by combining:
+The **Unified SnakeBridge Architecture** goes beyond either original approach by combining:
 
-### From Original PyBridge ✅
+### From Original SnakeBridge ✅
 - Compile-time code generation
 - Type safety via Dialyzer
 - Elixir-native configs
@@ -208,7 +208,7 @@ The **Unified PyBridge Architecture** goes beyond either original approach by co
 
 ---
 
-## Quick Start: Understanding PyBridge
+## Quick Start: Understanding SnakeBridge
 
 ### The Current Problem
 
@@ -232,12 +232,12 @@ end
 
 **For 20 classes**: ~2000+ lines of repetitive boilerplate.
 
-### The PyBridge Solution
+### The SnakeBridge Solution
 
 Replace it with configuration:
 
 ```elixir
-# config/pybridge/dspy.exs
+# config/snakebridge/dspy.exs
 classes: [
   %{
     python_path: "dspy.Predict",
@@ -250,7 +250,7 @@ classes: [
 ]
 ```
 
-PyBridge **automatically generates** the entire module at compile time:
+SnakeBridge **automatically generates** the entire module at compile time:
 - Type-safe constructors
 - Method wrappers with streaming support
 - Error handling and retries
@@ -267,14 +267,14 @@ PyBridge **automatically generates** the entire module at compile time:
 
 ```bash
 # Discover a Python library
-$ mix pybridge.discover langchain --output config/pybridge/langchain.exs
+$ mix snakebridge.discover langchain --output config/snakebridge/langchain.exs
 
 # Review the generated config
-$ cat config/pybridge/langchain.exs
+$ cat config/snakebridge/langchain.exs
 
 # Add to your app
 # config/config.exs
-config :pybridge, :libraries, [LangChainEx: LangChainConfig]
+config :snakebridge, :libraries, [LangChainEx: LangChainConfig]
 
 # Use it immediately!
 {:ok, chain} = LangChain.LLMChain.create(%{...})
@@ -282,7 +282,7 @@ config :pybridge, :libraries, [LangChainEx: LangChainConfig]
 
 ### 2. Compile-Time Safety
 
-PyBridge validates configurations and generates typespecs:
+SnakeBridge validates configurations and generates typespecs:
 
 ```elixir
 # Python type hints
@@ -344,7 +344,7 @@ for {:chunk, data} <- stream, do: IO.write(data)
 - DSPy integration proof-of-concept
 - Session management via Snakepit
 
-**Deliverable**: Replace current DSPex with PyBridge-generated code
+**Deliverable**: Replace current DSPex with SnakeBridge-generated code
 
 ### Phase 2: Advanced Features (2-3 weeks)
 
@@ -352,7 +352,7 @@ for {:chunk, data} <- stream, do: IO.write(data)
 - Bidirectional tool registry
 - Type inference from Python annotations
 - ExDoc integration
-- Mix tasks (`mix pybridge.discover`)
+- Mix tasks (`mix snakebridge.discover`)
 
 **Deliverable**: LangChain integration as second example
 
@@ -382,7 +382,7 @@ for {:chunk, data} <- stream, do: IO.write(data)
 
 ### Development Time Comparison
 
-| Task | Manual Wrappers | PyBridge | Speedup |
+| Task | Manual Wrappers | SnakeBridge | Speedup |
 |------|----------------|----------|---------|
 | Integrate 1 class | 30 min | 2 min | **15x** |
 | Integrate 20 classes | 10 hours | 20 min | **30x** |
@@ -412,9 +412,9 @@ for {:chunk, data} <- stream, do: IO.write(data)
 
 ### For DSPex
 
-1. **Review** the configuration in `DSPY_PYBRIDGE_CONFIG_EXAMPLE.exs`
-2. **Plan** PyBridge MVP implementation (Phase 1)
-3. **Refactor** DSPex to use PyBridge once MVP is ready
+1. **Review** the configuration in `DSPY_SNAKEBRIDGE_CONFIG_EXAMPLE.exs`
+2. **Plan** SnakeBridge MVP implementation (Phase 1)
+3. **Refactor** DSPex to use SnakeBridge once MVP is ready
 4. **Measure** reduction in code and maintenance burden
 
 ### For Snakepit
@@ -426,7 +426,7 @@ for {:chunk, data} <- stream, do: IO.write(data)
 
 ### For the Ecosystem
 
-1. **Prototype** PyBridge core (2-3 weeks)
+1. **Prototype** SnakeBridge core (2-3 weeks)
 2. **Validate** with DSPy integration
 3. **Expand** to LangChain as second target
 4. **Open source** and gather community feedback
@@ -444,16 +444,16 @@ for {:chunk, data} <- stream, do: IO.write(data)
 - ✅ Python introspection gives us schema discovery
 - ✅ gRPC supports bidirectional streaming
 
-PyBridge is "just" the glue layer that connects these pieces with a clean configuration interface.
+SnakeBridge is "just" the glue layer that connects these pieces with a clean configuration interface.
 
 ### What's the MVP?
 
 **Minimal viable product**:
 
-1. `PyBridge.Config` schema (Ecto)
-2. `PyBridge.Generator` macros (compile-time)
+1. `SnakeBridge.Config` schema (Ecto)
+2. `SnakeBridge.Generator` macros (compile-time)
 3. Basic introspection (Python `inspect` module)
-4. Runtime wrapper (`PyBridge.Runtime`)
+4. Runtime wrapper (`SnakeBridge.Runtime`)
 5. One complete integration (DSPy)
 
 **Estimated effort**: 2-3 weeks full-time, or 4-6 weeks part-time.
@@ -481,17 +481,17 @@ PyBridge is "just" the glue layer that connects these pieces with a clean config
 
 ## Conclusion
 
-**PyBridge is the missing piece for Elixir-Python integration.**
+**SnakeBridge is the missing piece for Elixir-Python integration.**
 
 Instead of fighting the impedance mismatch between ecosystems, we embrace **configuration as code** and let Elixir's metaprogramming do the heavy lifting.
 
 **The dream**: Import any Python ML library in minutes, not days.
 
-**The reality**: With PyBridge, that dream becomes feasible.
+**The reality**: With SnakeBridge, that dream becomes feasible.
 
 ---
 
-**Ready to build it?** Start with the [innovation document](./PYBRIDGE_INNOVATION.md) and [DSPy config example](./DSPY_PYBRIDGE_CONFIG_EXAMPLE.exs).
+**Ready to build it?** Start with the [innovation document](./SNAKEBRIDGE_INNOVATION.md) and [DSPy config example](./DSPY_SNAKEBRIDGE_CONFIG_EXAMPLE.exs).
 
 **Questions?** Open an issue or start a discussion.
 
