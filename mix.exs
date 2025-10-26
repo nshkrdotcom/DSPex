@@ -41,7 +41,7 @@ defmodule DSPex.MixProject do
   defp deps do
     [
       # Core dependencies
-      {:snakepit, "~> 0.4.3"},
+      {:snakepit, "~> 0.6.3"},
       #      {:snakepit,
       #       git: "https://github.com/nshkrdotcom/snakepit.git",
       #       branch: "feature/unified-grpc-bridge-stage2"},
