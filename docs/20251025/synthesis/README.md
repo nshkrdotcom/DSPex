@@ -1,8 +1,8 @@
-# PyBridge Synthesis Documentation
+# SnakeBridge Synthesis Documentation
 
 **The Unified Architecture: Best of All Worlds**
 
-This directory contains the comprehensive synthesis of parallel PyBridge design approaches, culminating in a production-ready architecture that combines:
+This directory contains the comprehensive synthesis of parallel SnakeBridge design approaches, culminating in a production-ready architecture that combines:
 
 - **Compile-time safety** (from metaprogramming-first approach)
 - **Runtime flexibility** (from introspection-first approach)
@@ -12,9 +12,9 @@ This directory contains the comprehensive synthesis of parallel PyBridge design 
 
 ## Document Overview
 
-### [UNIFIED_PYBRIDGE_ARCHITECTURE.md](./UNIFIED_PYBRIDGE_ARCHITECTURE.md)
+### [UNIFIED_SNAKEBRIDGE_ARCHITECTURE.md](./UNIFIED_SNAKEBRIDGE_ARCHITECTURE.md)
 
-**The definitive technical specification** for PyBridge.
+**The definitive technical specification** for SnakeBridge.
 
 **Sections**:
 
@@ -47,7 +47,7 @@ This directory contains the comprehensive synthesis of parallel PyBridge design 
 
 ### What We Kept from Each Approach
 
-**From PyBridge (Original)**:
+**From SnakeBridge (Original)**:
 - ✅ Elixir-native configuration format (.exs files)
 - ✅ Compile-time code generation via macros
 - ✅ Type safety through Dialyzer integration
@@ -95,7 +95,7 @@ This directory contains the comprehensive synthesis of parallel PyBridge design 
    - **Instant test coverage**
 
 6. **LSP Integration**
-   - Language server for .pybridge configs
+   - Language server for .snakebridge configs
    - Autocomplete from cached schemas
    - Hover shows Python docstrings
    - **Professional config authoring**
@@ -129,7 +129,7 @@ This directory contains the comprehensive synthesis of parallel PyBridge design 
 **Why**:
 - Rich metaprogramming support
 - Type-safe config validation
-- `mix pybridge.discover` for bootstrapping
+- `mix snakebridge.discover` for bootstrapping
 - Elixir ecosystem familiarity
 
 **NOT** YAML/JSON manifests (too rigid).
@@ -207,7 +207,7 @@ This directory contains the comprehensive synthesis of parallel PyBridge design 
 
 ### Development Speed
 
-| Task | Manual | PyBridge | Speedup |
+| Task | Manual | SnakeBridge | Speedup |
 |------|--------|----------|---------|
 | Integrate 1 class | 30 min | 2 min | **15x** |
 | Integrate 20 classes | 10 hours | 20 min | **30x** |
@@ -244,7 +244,7 @@ This directory contains the comprehensive synthesis of parallel PyBridge design 
 2. **Discuss** key architectural decisions
 3. **Approve** (or iterate on) the design
 4. **Update Snakepit** with gRPC extensions
-5. **Scaffold PyBridge** project
+5. **Scaffold SnakeBridge** project
 6. **Implement Phase 1** (foundation)
 7. **Migrate DSPex** as proof-of-concept
 
@@ -253,16 +253,16 @@ This directory contains the comprehensive synthesis of parallel PyBridge design 
 ## Related Documents
 
 ### Parent Directory
-- [../PYBRIDGE_INNOVATION.md](../PYBRIDGE_INNOVATION.md) - Original metaprogramming-first approach
-- [../DSPY_PYBRIDGE_CONFIG_EXAMPLE.exs](../DSPY_PYBRIDGE_CONFIG_EXAMPLE.exs) - Complete DSPy config
+- [../SNAKEBRIDGE_INNOVATION.md](../SNAKEBRIDGE_INNOVATION.md) - Original metaprogramming-first approach
+- [../DSPY_SNAKEBRIDGE_CONFIG_EXAMPLE.exs](../DSPY_SNAKEBRIDGE_CONFIG_EXAMPLE.exs) - Complete DSPy config
 - [../README.md](../README.md) - Overview and quick start
 
 ### Technical Specifications (Codex)
-- [../technical/pybridge_architecture_deep_dive.md](../technical/pybridge_architecture_deep_dive.md)
+- [../technical/snakebridge_architecture_deep_dive.md](../technical/snakebridge_architecture_deep_dive.md)
 - [../snakepit_config_driven_python_integration_blueprint.md](../snakepit_config_driven_python_integration_blueprint.md)
 
 ### This Directory
-- [UNIFIED_PYBRIDGE_ARCHITECTURE.md](./UNIFIED_PYBRIDGE_ARCHITECTURE.md) - **The definitive spec**
+- [UNIFIED_SNAKEBRIDGE_ARCHITECTURE.md](./UNIFIED_SNAKEBRIDGE_ARCHITECTURE.md) - **The definitive spec**
 
 ---
 

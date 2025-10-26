@@ -1,14 +1,14 @@
-# PyBridge: Executive Summary
+# SnakeBridge: Executive Summary
 
 **For stakeholders, decision-makers, and time-constrained reviewers**
 
 ---
 
-## What Is PyBridge?
+## What Is SnakeBridge?
 
-**PyBridge** is a configuration-driven framework that enables **zero-code Python library integration into Elixir**.
+**SnakeBridge** is a configuration-driven framework that enables **zero-code Python library integration into Elixir**.
 
-Instead of manually writing 2000+ lines of wrapper code for each Python library (DSPy, LangChain, PyTorch, etc.), developers write a ~200-line **declarative configuration**, and PyBridge **automatically generates**:
+Instead of manually writing 2000+ lines of wrapper code for each Python library (DSPy, LangChain, PyTorch, etc.), developers write a ~200-line **declarative configuration**, and SnakeBridge **automatically generates**:
 
 - ✅ Type-safe Elixir modules
 - ✅ Complete documentation
@@ -38,14 +38,14 @@ Instead of manually writing 2000+ lines of wrapper code for each Python library 
 
 ## The Solution
 
-**PyBridge enables**:
+**SnakeBridge enables**:
 
 ```elixir
 # 1. Discover Python library schema
-$ mix pybridge.discover dspy --output config/pybridge/dspy.exs
+$ mix snakebridge.discover dspy --output config/snakebridge/dspy.exs
 
 # 2. Review/customize the generated config (200 lines)
-# config/pybridge/dspy.exs contains all class/method metadata
+# config/snakebridge/dspy.exs contains all class/method metadata
 
 # 3. Use the auto-generated modules
 {:ok, pred} = DSPex.Predict.create("question -> answer")
@@ -100,7 +100,7 @@ $ mix pybridge.discover dspy --output config/pybridge/dspy.exs
 
 ### Code Reduction
 
-| Component | Manual | PyBridge | Savings |
+| Component | Manual | SnakeBridge | Savings |
 |-----------|--------|----------|---------|
 | Wrapper code | 2000 LOC | 200 LOC config | **90%** |
 | Documentation | 500 LOC | Auto-generated | **100%** |
@@ -108,7 +108,7 @@ $ mix pybridge.discover dspy --output config/pybridge/dspy.exs
 
 ### Development Speed
 
-| Task | Manual | PyBridge | Speedup |
+| Task | Manual | SnakeBridge | Speedup |
 |------|--------|----------|---------|
 | Integrate 1 class | 30 min | 2 min | **15x** |
 | Integrate 20 classes | 10 hours | 20 min | **30x** |
@@ -163,16 +163,16 @@ Each layer defines **formal protocols/behaviours**, enabling:
 
 ## Packaging Decision
 
-**PyBridge will be a standalone Hex library**, NOT part of Snakepit core.
+**SnakeBridge will be a standalone Hex library**, NOT part of Snakepit core.
 
 ### Why Standalone?
 
 1. **Separation of Concerns**
    - Snakepit = Low-level Python orchestration
-   - PyBridge = High-level integration framework
+   - SnakeBridge = High-level integration framework
 
 2. **Independent Releases**
-   - PyBridge can iterate on DX features
+   - SnakeBridge can iterate on DX features
    - Snakepit remains stable substrate
    - Clear versioning
 
@@ -194,14 +194,14 @@ Snakepit needs **minimal additions** (~200 LOC):
 - Streaming RPC implementation
 - Integration hook registration
 
-**That's it.** Everything else lives in PyBridge.
+**That's it.** Everything else lives in SnakeBridge.
 
 ---
 
 ## Implementation Plan
 
 ### Phase 1: Foundation (Weeks 1-3)
-- Core PyBridge infrastructure
+- Core SnakeBridge infrastructure
 - Basic code generation
 - DSPy integration (5 classes)
 
@@ -334,7 +334,7 @@ All major risks have clear mitigation strategies.
 - **Ecosystem**: Enable 20+ ML library integrations
 - **Competitive advantage**: Unique in Elixir ecosystem
 
-**Break-even**: After integrating **2-3 libraries**, PyBridge pays for itself.
+**Break-even**: After integrating **2-3 libraries**, SnakeBridge pays for itself.
 
 ---
 
@@ -344,7 +344,7 @@ All major risks have clear mitigation strategies.
 
 1. ✅ **Approve** the unified architecture
 2. ✅ **Update Snakepit** with gRPC extensions (~1 week)
-3. ✅ **Scaffold PyBridge** project (~1 week)
+3. ✅ **Scaffold SnakeBridge** project (~1 week)
 4. ✅ **Implement Phase 1** - Foundation (3 weeks)
 
 ### For Strategic Planning
@@ -365,7 +365,7 @@ All major risks have clear mitigation strategies.
 
 ## Conclusion
 
-**PyBridge represents a fundamental shift** in how Elixir integrates with Python:
+**SnakeBridge represents a fundamental shift** in how Elixir integrates with Python:
 
 ### Instead of
 - ❌ Manual wrappers (2000+ LOC)
@@ -387,7 +387,7 @@ All major risks have clear mitigation strategies.
 
 ## Next Steps
 
-1. **Review** [synthesis/UNIFIED_PYBRIDGE_ARCHITECTURE.md](./synthesis/UNIFIED_PYBRIDGE_ARCHITECTURE.md) for full technical details
+1. **Review** [synthesis/UNIFIED_SNAKEBRIDGE_ARCHITECTURE.md](./synthesis/UNIFIED_SNAKEBRIDGE_ARCHITECTURE.md) for full technical details
 2. **Discuss** key decisions with team
 3. **Approve** architecture (or iterate)
 4. **Begin Phase 1** implementation

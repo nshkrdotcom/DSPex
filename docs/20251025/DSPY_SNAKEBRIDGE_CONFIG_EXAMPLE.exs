@@ -23,10 +23,10 @@ defmodule DSPyConfig do
       {:ok, result} = DSPex.Predict.call(pred, %{question: "What is DSPy?"})
   """
 
-  use PyBridge.Config
+  use SnakeBridge.Config
 
   def config do
-    %PyBridge.Config{
+    %SnakeBridge.Config{
       # === Core Metadata ===
       python_module: "dspy",
       version: "2.5.0",
