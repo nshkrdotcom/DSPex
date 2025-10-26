@@ -166,6 +166,9 @@ snakepit/
 snakepit_dspy/
 snakepit_grpc_bridge/
 
+# SnakeBridge development project
+snakebridge/
+
 # Cloned gemini_ex repository
 gemini_ex/
 
