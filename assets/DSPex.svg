@@ -1,0 +1,256 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <!-- Main gradient for hexagon - deep purple to magenta AI aesthetic -->
+    <linearGradient id="hexGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a0a2e"/>
+      <stop offset="35%" stop-color="#2d1b4e"/>
+      <stop offset="65%" stop-color="#462066"/>
+      <stop offset="100%" stop-color="#5a2d82"/>
+    </linearGradient>
+    
+    <!-- Accent gradient for inner elements - Elixir purple -->
+    <linearGradient id="accentGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#9b59b6"/>
+      <stop offset="50%" stop-color="#8e44ad"/>
+      <stop offset="100%" stop-color="#a569bd"/>
+    </linearGradient>
+    
+    <!-- Python gold/blue gradient -->
+    <linearGradient id="pythonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3776ab"/>
+      <stop offset="50%" stop-color="#4b8bbe"/>
+      <stop offset="100%" stop-color="#ffd43b"/>
+    </linearGradient>
+    
+    <!-- Glow effect gradient -->
+    <radialGradient id="glowGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#b388ff" stop-opacity="0.4"/>
+      <stop offset="70%" stop-color="#7c4dff" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#651fff" stop-opacity="0"/>
+    </radialGradient>
+    
+    <!-- Neural network node gradient -->
+    <radialGradient id="nodeGradient" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#e1bee7"/>
+      <stop offset="100%" stop-color="#9c27b0"/>
+    </radialGradient>
+    
+    <!-- Bridge beam gradient -->
+    <linearGradient id="beamGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4fc3f7" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#4fc3f7" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#4fc3f7" stop-opacity="0"/>
+    </linearGradient>
+    
+    <!-- Hexagon stroke gradient -->
+    <linearGradient id="strokeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ba68c8"/>
+      <stop offset="50%" stop-color="#9c27b0"/>
+      <stop offset="100%" stop-color="#7b1fa2"/>
+    </linearGradient>
+    
+    <!-- Inner hexagon glass effect -->
+    <linearGradient id="glassGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.15"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.1"/>
+    </linearGradient>
+    
+    <!-- Data flow particle gradient -->
+    <linearGradient id="particleGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00e5ff"/>
+      <stop offset="100%" stop-color="#651fff"/>
+    </linearGradient>
+    
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#1a0a2e" flood-opacity="0.4"/>
+    </filter>
+    
+    <!-- Soft blur for background elements -->
+    <filter id="softBlur">
+      <feGaussianBlur stdDeviation="1.5"/>
+    </filter>
+    
+    <!-- Crisp glow for nodes -->
+    <filter id="nodeGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Pattern for circuit-like details -->
+    <pattern id="circuitPattern" patternUnits="userSpaceOnUse" width="20" height="20">
+      <circle cx="10" cy="10" r="0.5" fill="#7c4dff" opacity="0.3"/>
+    </pattern>
+    
+    <!-- Hexagon clip path - centered at 100,100 with R=94 -->
+    <clipPath id="hexClip">
+      <polygon points="100,6 181.4,53 181.4,147 100,194 18.6,147 18.6,53"/>
+    </clipPath>
+  </defs>
+  
+  <!-- Background glow -->
+  <circle cx="100" cy="100" r="80" fill="url(#glowGradient)" filter="url(#softBlur)"/>
+  
+  <!-- Main hexagon - centered at (100,100), R=94, tight padding ~6px top/bottom -->
+  <polygon 
+    points="100,6 181.4,53 181.4,147 100,194 18.6,147 18.6,53"
+    fill="url(#hexGradient)"
+    stroke="url(#strokeGradient)"
+    stroke-width="2.5"
+    filter="url(#shadow)"/>
+  
+  <!-- Inner hexagon glass overlay -->
+  <polygon 
+    points="100,18 170,58 170,142 100,182 30,142 30,58"
+    fill="url(#glassGradient)"
+    stroke="#9c27b0"
+    stroke-width="0.5"
+    stroke-opacity="0.3"/>
+  
+  <!-- Circuit pattern layer (subtle) -->
+  <g clip-path="url(#hexClip)" opacity="0.15">
+    <rect x="0" y="0" width="200" height="200" fill="url(#circuitPattern)"/>
+  </g>
+  
+  <!-- Neural Network / DSP Flow Visualization -->
+  <g clip-path="url(#hexClip)">
+    
+    <!-- Connection lines (data flow paths) -->
+    <g stroke="#7c4dff" stroke-width="1" stroke-opacity="0.4" fill="none">
+      <!-- Left side connections -->
+      <path d="M 45,78 Q 70,83 82,100"/>
+      <path d="M 45,100 L 82,100"/>
+      <path d="M 45,122 Q 70,117 82,100"/>
+      
+      <!-- Right side connections -->
+      <path d="M 155,78 Q 130,83 118,100"/>
+      <path d="M 155,100 L 118,100"/>
+      <path d="M 155,122 Q 130,117 118,100"/>
+      
+      <!-- Central vertical spine -->
+      <path d="M 100,50 L 100,150"/>
+      
+      <!-- Cross connections -->
+      <path d="M 82,100 L 118,100"/>
+      <path d="M 70,65 Q 100,58 130,65"/>
+      <path d="M 70,135 Q 100,142 130,135"/>
+    </g>
+    
+    <!-- Animated data flow particles -->
+    <g fill="url(#particleGradient)" opacity="0.8">
+      <circle cx="55" cy="82" r="2">
+        <animate attributeName="cx" values="45;82;45" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="cy" values="78;100;78" dur="3s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.8;0.4;0.8" dur="3s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="145" cy="82" r="2">
+        <animate attributeName="cx" values="155;118;155" dur="3s" repeatCount="indefinite" begin="0.5s"/>
+        <animate attributeName="cy" values="78;100;78" dur="3s" repeatCount="indefinite" begin="0.5s"/>
+      </circle>
+      <circle cx="100" cy="60" r="1.5">
+        <animate attributeName="cy" values="50;100;150;100;50" dur="4s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+    
+    <!-- Input layer nodes (left) - representing Python/DSPy -->
+    <g filter="url(#nodeGlow)">
+      <circle cx="45" cy="78" r="6" fill="url(#pythonGradient)" stroke="#ffd43b" stroke-width="1"/>
+      <circle cx="45" cy="100" r="7" fill="url(#pythonGradient)" stroke="#ffd43b" stroke-width="1"/>
+      <circle cx="45" cy="122" r="6" fill="url(#pythonGradient)" stroke="#ffd43b" stroke-width="1"/>
+      <!-- Python snake detail on center node -->
+      <path d="M 42,97 Q 45,99 48,97 Q 45,101 42,99 Q 45,103 48,101" 
+            stroke="#1a0a2e" stroke-width="1" fill="none" stroke-linecap="round"/>
+    </g>
+    
+    <!-- Hidden layer nodes (center) - Bridge transformation -->
+    <g filter="url(#nodeGlow)">
+      <circle cx="82" cy="100" r="9" fill="url(#nodeGradient)" stroke="#e1bee7" stroke-width="1.5"/>
+      <circle cx="118" cy="100" r="9" fill="url(#nodeGradient)" stroke="#e1bee7" stroke-width="1.5"/>
+      
+      <!-- Bridge symbol between center nodes -->
+      <path d="M 89,100 L 111,100" stroke="url(#beamGradient)" stroke-width="3" stroke-linecap="round"/>
+      <path d="M 92,96 L 92,104 M 108,96 L 108,104" stroke="#4fc3f7" stroke-width="1.5" opacity="0.8"/>
+      
+      <!-- Gear/processing detail on center nodes -->
+      <circle cx="82" cy="100" r="4" fill="none" stroke="#fff" stroke-width="0.5" opacity="0.5"/>
+      <circle cx="118" cy="100" r="4" fill="none" stroke="#fff" stroke-width="0.5" opacity="0.5"/>
+    </g>
+    
+    <!-- Output layer nodes (right) - representing Elixir -->
+    <g filter="url(#nodeGlow)">
+      <circle cx="155" cy="78" r="6" fill="url(#accentGradient)" stroke="#ce93d8" stroke-width="1"/>
+      <circle cx="155" cy="100" r="7" fill="url(#accentGradient)" stroke="#ce93d8" stroke-width="1"/>
+      <circle cx="155" cy="122" r="6" fill="url(#accentGradient)" stroke="#ce93d8" stroke-width="1"/>
+      <!-- Elixir drop detail on center node -->
+      <path d="M 155,97 Q 158,100 155,103 Q 152,100 155,97" 
+            fill="#fff" opacity="0.6"/>
+    </g>
+    
+    <!-- Top and bottom accent nodes -->
+    <g filter="url(#nodeGlow)">
+      <circle cx="70" cy="65" r="4" fill="#7c4dff" stroke="#b388ff" stroke-width="0.75"/>
+      <circle cx="130" cy="65" r="4" fill="#7c4dff" stroke="#b388ff" stroke-width="0.75"/>
+      <circle cx="100" cy="55" r="5" fill="#651fff" stroke="#b388ff" stroke-width="1"/>
+      
+      <circle cx="70" cy="135" r="4" fill="#7c4dff" stroke="#b388ff" stroke-width="0.75"/>
+      <circle cx="130" cy="135" r="4" fill="#7c4dff" stroke="#b388ff" stroke-width="0.75"/>
+      <circle cx="100" cy="145" r="5" fill="#651fff" stroke="#b388ff" stroke-width="1"/>
+    </g>
+    
+    <!-- Central focal point - the DSP core -->
+    <g transform="translate(100, 100)">
+      <!-- Outer ring -->
+      <circle r="14" fill="none" stroke="url(#accentGradient)" stroke-width="1.5" opacity="0.6">
+        <animate attributeName="r" values="14;16;14" dur="2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite"/>
+      </circle>
+      
+      <!-- Inner processing core -->
+      <circle r="10" fill="url(#nodeGradient)" stroke="#fff" stroke-width="0.5"/>
+      
+      <!-- D symbol (for DSP) -->
+      <text x="0" y="4" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#fff">D</text>
+    </g>
+    
+  </g>
+  
+  <!-- Hexagon corner accents -->
+  <g fill="none" stroke="#ba68c8" stroke-width="1.5" stroke-linecap="round" opacity="0.7">
+    <!-- Top corner -->
+    <path d="M 100,6 L 100,18"/>
+    <path d="M 93,10 L 100,6 L 107,10"/>
+    
+    <!-- Top-right corner -->
+    <path d="M 181.4,53 L 171,59"/>
+    <circle cx="178" cy="55" r="2" fill="#ba68c8"/>
+    
+    <!-- Bottom-right corner -->
+    <path d="M 181.4,147 L 171,141"/>
+    <circle cx="178" cy="145" r="2" fill="#ba68c8"/>
+    
+    <!-- Bottom corner -->
+    <path d="M 100,194 L 100,182"/>
+    <path d="M 93,190 L 100,194 L 107,190"/>
+    
+    <!-- Bottom-left corner -->
+    <path d="M 18.6,147 L 29,141"/>
+    <circle cx="22" cy="145" r="2" fill="#ba68c8"/>
+    
+    <!-- Top-left corner -->
+    <path d="M 18.6,53 L 29,59"/>
+    <circle cx="22" cy="55" r="2" fill="#ba68c8"/>
+  </g>
+  
+  <!-- Subtle edge highlights -->
+  <polygon 
+    points="100,6 181.4,53 181.4,147 100,194 18.6,147 18.6,53"
+    fill="none"
+    stroke="#fff"
+    stroke-width="0.5"
+    stroke-opacity="0.1"/>
+  
+</svg>

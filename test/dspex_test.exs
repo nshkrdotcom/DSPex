@@ -1,74 +1,100 @@
 defmodule DSPexTest do
   use ExUnit.Case
-
   doctest DSPex
 
-  describe "signature/1" do
-    test "parses simple signatures" do
-      assert {:ok, sig} = DSPex.signature("question -> answer")
-      assert sig.inputs == [%{name: :question, type: :string, description: nil}]
-      assert sig.outputs == [%{name: :answer, type: :string, description: nil}]
+  describe "module structure" do
+    test "DSPex module is loaded" do
+      assert Code.ensure_loaded?(DSPex)
     end
 
-    test "handles map-based signatures" do
-      spec = %{
-        inputs: [%{name: :text, type: :string}],
-        outputs: [%{name: :summary, type: :string}]
-      }
-
-      assert {:ok, sig} = DSPex.signature(spec)
-      assert length(sig.inputs) == 1
-      assert length(sig.outputs) == 1
+    test "exports run/1" do
+      assert function_exported?(DSPex, :run, 1)
     end
-  end
 
-  describe "compile_signature/1" do
-    test "compiles signatures for performance" do
-      assert {:ok, compiled} = DSPex.compile_signature("input: str -> output: str")
-      assert is_map(compiled)
-      assert Map.has_key?(compiled, :validator)
+    test "exports lm/1 and lm/2" do
+      assert function_exported?(DSPex, :lm, 1)
+      assert function_exported?(DSPex, :lm, 2)
     end
-  end
 
-  describe "validate/2" do
-    test "validates data against signatures" do
-      {:ok, sig} = DSPex.signature("name: str, age: int -> greeting: str")
-
-      assert :ok = DSPex.validate(%{name: "Alice", age: 30}, sig)
-      assert {:error, errors} = DSPex.validate(%{name: "Alice"}, sig)
-      assert is_list(errors)
+    test "exports configure/0 and configure/1" do
+      assert function_exported?(DSPex, :configure, 0)
+      assert function_exported?(DSPex, :configure, 1)
     end
-  end
 
-  describe "render_template/2" do
-    test "renders templates with context" do
-      template = "Hello <%= @name %>!"
-      result = DSPex.render_template(template, %{name: "World"})
-      assert result == "Hello World!"
+    test "exports predict/1 and predict/2" do
+      assert function_exported?(DSPex, :predict, 1)
+      assert function_exported?(DSPex, :predict, 2)
     end
-  end
 
-  describe "pipeline/1" do
-    test "creates pipeline structure" do
-      steps = [
-        {:native, DSPex.Native.Template, template: "test"}
-      ]
+    test "exports chain_of_thought/1 and chain_of_thought/2" do
+      assert function_exported?(DSPex, :chain_of_thought, 1)
+      assert function_exported?(DSPex, :chain_of_thought, 2)
+    end
 
-      pipeline = DSPex.pipeline(steps)
+    test "exports call/2, call/3, call/4" do
+      assert function_exported?(DSPex, :call, 2)
+      assert function_exported?(DSPex, :call, 3)
+      assert function_exported?(DSPex, :call, 4)
+    end
 
-      assert %DSPex.Pipeline{} = pipeline
-      assert pipeline.steps == steps
+    test "exports method/2, method/3, method/4" do
+      assert function_exported?(DSPex, :method, 2)
+      assert function_exported?(DSPex, :method, 3)
+      assert function_exported?(DSPex, :method, 4)
+    end
+
+    test "exports attr/2" do
+      assert function_exported?(DSPex, :attr, 2)
     end
   end
 
-  describe "health_check/0" do
-    test "returns system status" do
-      status = DSPex.health_check()
+  describe "timeout helpers" do
+    test "with_timeout/2 adds __runtime__ option" do
+      opts = DSPex.with_timeout([], timeout: 5000)
+      assert opts == [__runtime__: [timeout: 5000]]
+    end
 
-      assert status.status == :ok
-      assert status.version == "0.1.0"
-      assert is_map(status.snakepit_status)
-      assert is_list(status.native_modules)
+    test "with_timeout/2 merges with existing options" do
+      opts = DSPex.with_timeout([question: "test"], timeout_profile: :batch_job)
+      assert Keyword.get(opts, :question) == "test"
+      assert Keyword.get(opts, :__runtime__) == [timeout_profile: :batch_job]
+    end
+
+    test "with_timeout/2 merges with existing __runtime__" do
+      opts = DSPex.with_timeout([__runtime__: [foo: :bar]], timeout: 1000)
+      assert opts == [__runtime__: [foo: :bar, timeout: 1000]]
+    end
+
+    test "timeout_profile/1 returns correct format" do
+      assert DSPex.timeout_profile(:default) == [__runtime__: [timeout_profile: :default]]
+      assert DSPex.timeout_profile(:streaming) == [__runtime__: [timeout_profile: :streaming]]
+
+      assert DSPex.timeout_profile(:ml_inference) == [
+               __runtime__: [timeout_profile: :ml_inference]
+             ]
+
+      assert DSPex.timeout_profile(:batch_job) == [__runtime__: [timeout_profile: :batch_job]]
+    end
+
+    test "timeout_ms/1 returns correct format" do
+      assert DSPex.timeout_ms(5000) == [__runtime__: [timeout: 5000]]
+      assert DSPex.timeout_ms(120_000) == [__runtime__: [timeout: 120_000]]
+    end
+
+    test "timeout_ms/1 requires positive integer" do
+      assert_raise FunctionClauseError, fn ->
+        DSPex.timeout_ms(0)
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DSPex.timeout_ms(-100)
+      end
+    end
+
+    test "timeout_profile/1 only accepts valid profiles" do
+      assert_raise FunctionClauseError, fn ->
+        DSPex.timeout_profile(:invalid)
+      end
     end
   end
 end

@@ -1,6 +1,4 @@
 import Config
 
-# Runtime configuration (for releases)
-if config_env() == :prod do
-  # Production runtime configuration
-end
+# Auto-configure snakepit for snakebridge (replaces 30 lines of boilerplate)
+SnakeBridge.ConfigHelper.configure_snakepit!()

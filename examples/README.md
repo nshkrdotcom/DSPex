@@ -1,260 +1,350 @@
 # DSPex Examples
 
-A comprehensive collection of examples demonstrating the power of DSPex - the native Elixir implementation of DSPy concepts with seamless Python DSPy integration.
+This directory contains comprehensive examples demonstrating DSPex capabilities. All examples require an OpenAI API key set via `OPENAI_API_KEY` environment variable.
 
-## 🎯 Quick Start
-
-```bash
-# Set your Gemini API key (get one at https://makersuite.google.com/app/apikey)
-export GEMINI_API_KEY="your-api-key-here"
-
-# Run any example
-elixir examples/dspex_native_showcase.exs
-```
-
-## 📚 Example Categories
-
-### 1. Native DSPex Features
-
-#### **[dspex_native_showcase.exs](./dspex_native_showcase.exs)** ⭐ Start Here
-The best introduction to DSPex's native Elixir capabilities.
-
-**Features demonstrated:**
-- Signature parsing with complex types (`list[str]`, `float`, etc.)
-- Template compilation with EEx
-- Output validation against signatures
-- End-to-end workflow with Gemini LLM
-
-```elixir
-# Parse a signature
-{:ok, signature} = Native.Signature.parse("question -> answer: str, confidence: float")
-
-# Compile a template
-{:ok, template} = Native.Template.compile("Question: <%= @question %>\nAnswer:")
-
-# Validate outputs
-:ok = Native.Validator.validate_output(%{"answer" => "Paris", "confidence" => 0.95}, signature)
-```
-
-#### **[advanced_signature_example.exs](./advanced_signature_example.exs)**
-Real-world business scenarios using native features.
-
-**Use cases covered:**
-- Document Intelligence Pipeline
-- Customer Support Assistant
-- Financial Risk Assessment
-- Product Recommendation Engine
-
-### 2. Python DSPy Integration
-
-#### **[dspy_working_demo.exs](./dspy_working_demo.exs)** ⭐ Essential
-A clean, working example of Python DSPy integration through Snakepit.
-
-**What it shows:**
-- Enhanced bridge configuration
-- DSPy module creation (Predict, ChainOfThought)
-- Making predictions with real responses
-- Proper result extraction
-
-```elixir
-# Configure DSPy with Gemini
-Snakepit.execute("configure_lm", %{
-  "provider" => "google",
-  "api_key" => api_key,
-  "model" => "gemini-2.0-flash-exp"
-})
-
-# Create and use DSPy modules
-Snakepit.execute("call", %{
-  "target" => "dspy.ChainOfThought",
-  "args" => ["question -> reasoning, answer"],
-  "store_as" => "cot_predictor"
-})
-```
-
-#### **[dspy_python_integration.exs](./dspy_python_integration.exs)**
-Comprehensive Python environment testing and DSPy integration.
-
-**Includes:**
-- Python environment verification
-- DSPy availability checking
-- Module creation patterns
-- Error handling strategies
-
-### 3. Comprehensive Examples
-
-#### **[comprehensive_dspy_gemini.exs](./comprehensive_dspy_gemini.exs)** ⭐ Showcase
-The ultimate demonstration combining native DSPex and Python DSPy.
-
-**Three-part structure:**
-1. **Native Features** - Signatures, templates, validation
-2. **Python DSPy** - Predict, ChainOfThought with Gemini
-3. **Mixed Pipeline** - Combining native speed with Python power
-
-### 4. LLM Adapter Examples
-
-#### **[qa_with_gemini_ex.exs](./qa_with_gemini_ex.exs)**
-Direct Gemini adapter usage for Q&A tasks.
-
-**Shows:**
-- Gemini adapter configuration
-- Structured output handling
-- Error management
-
-#### **[qa_with_instructor_lite.exs](./qa_with_instructor_lite.exs)**
-InstructorLite adapter for structured outputs.
-
-**Note:** InstructorLite has compatibility issues with Gemini. Better to use direct Gemini adapter or mock for testing.
-
-## 🏗️ Project Structure
-
-### Standalone Mix Projects
-These are complete Elixir applications demonstrating DSPex in larger contexts:
-
-- **[simple_dspy_example/](./simple_dspy_example/)** - Minimal DSPy integration
-- **[concurrent_pool_example/](./concurrent_pool_example/)** - Concurrent processing patterns
-- **[signature_example/](./signature_example/)** - Advanced signature patterns
-- **[pool_example/](./pool_example/)** - Pool management examples
-
-## 🚀 Running Examples
-
-### Prerequisites
-
-1. **Elixir 1.15+** and **Erlang/OTP 25+**
-2. **Python 3.8+** (for DSPy integration)
-3. **DSPy** installed: `pip install dspy-ai`
-4. **Gemini API key** from [Google AI Studio](https://makersuite.google.com/app/apikey)
-
-### Basic Usage
+## Prerequisites
 
 ```bash
-# Native features only (no API key needed with mock)
-elixir examples/dspex_native_showcase.exs
+# Install dependencies and set up Python environment
+mix deps.get
+mix snakebridge.setup
 
-# With Gemini API
-export GEMINI_API_KEY="your-key"
-elixir examples/comprehensive_dspy_gemini.exs
-
-# Python DSPy integration
-pip install dspy-ai
-elixir examples/dspy_working_demo.exs
+# Set your API key
+export OPENAI_API_KEY="your-key-here"
 ```
 
-## 💡 Key Concepts
+## Running Examples
 
-### Signatures
-Define input/output contracts for LLM interactions:
-```elixir
-"question: str -> answer: str"
-"document: str -> summary: str, keywords: list[str], sentiment: str"
-```
+Run any example individually:
 
-### Templates
-EEx-based prompt templates with variable interpolation:
-```elixir
-template = """
-Context: <%= @context %>
-Question: <%= @question %>
-Answer:
-"""
-```
-
-### Validation
-Type-safe output validation against signatures:
-```elixir
-# Validates types, required fields, and structure
-Native.Validator.validate_output(output, signature)
-```
-
-## 🔧 Configuration
-
-### Mock Mode (for testing)
-```elixir
-{:ok, client} = LLM.Client.new([
-  adapter: :mock,
-  mock_responses: %{"answer" => "Paris"}
-])
-```
-
-### Gemini Mode
-```elixir
-{:ok, client} = LLM.Client.new([
-  adapter: :gemini,
-  api_key: System.get_env("GEMINI_API_KEY"),
-  model: "gemini-2.0-flash-exp"
-])
-```
-
-### Enhanced Python Bridge
-```elixir
-Application.put_env(:snakepit, :pooling_enabled, true)
-Application.put_env(:snakepit, :adapter_module, Snakepit.Adapters.EnhancedPython)
-```
-
-## 📖 Learning Path
-
-1. **Start with native features**: Run `dspex_native_showcase.exs` to understand signatures, templates, and validation
-2. **Try Python integration**: Run `dspy_working_demo.exs` to see DSPy modules in action
-3. **Explore business scenarios**: Check `advanced_signature_example.exs` for real-world patterns
-4. **See it all together**: Run `comprehensive_dspy_gemini.exs` for the full experience
-
-## 🤝 Common Patterns
-
-### Error Handling
-```elixir
-case LLM.Client.generate(client, prompt) do
-  {:ok, response} -> 
-    # Handle response
-  {:error, reason} -> 
-    # Graceful fallback
-end
-```
-
-### Mixed Execution
-```elixir
-# Use native for speed
-{:ok, signature} = Native.Signature.parse(sig_str)
-
-# Use Python for complex reasoning
-{:ok, result} = Snakepit.execute("call", %{
-  "target" => "stored.cot_predictor.__call__",
-  "kwargs" => %{"question" => question}
-})
-
-# Validate with native
-:ok = Native.Validator.validate_output(output, signature)
-```
-
-## 🐛 Troubleshooting
-
-### "DSPy not available"
 ```bash
-pip install dspy-ai
+mix run examples/basic.exs
 ```
 
-### "No process" errors
-Ensure Snakepit is properly configured:
-```elixir
-Application.ensure_all_started(:snakepit)
+Or run all examples with the test script:
+
+```bash
+./examples/run_all.sh
 ```
-
-### Mock responses for testing
-Set adapter to `:mock` when API keys aren't available.
-
-## 📝 Notes
-
-- Examples use Gemini 2.0 Flash (`gemini-2.0-flash-exp`) by default
-- Native features are always available (no external dependencies)
-- Python integration requires `dspy-ai` package
-- Most examples support both mock and real LLM modes
-
-## 🎉 Next Steps
-
-1. Experiment with different signatures and templates
-2. Try combining multiple DSPy modules in pipelines
-3. Build your own business-specific examples
-4. Contribute improvements back to the project!
 
 ---
 
-Happy prompting with DSPex! 🚀
+## Core Examples
+
+### Basic Q&A (`basic.exs`)
+
+The foundational DSPex example showing core concepts:
+- Creating and configuring a language model
+- Using `DSPex.predict!/1` with a simple signature
+- Running inference with `DSPex.method!/4`
+
+```elixir
+predict = DSPex.predict!("question -> answer")
+result = DSPex.method!(predict, "forward", [], question: "What is the capital of Hawaii?")
+answer = DSPex.attr!(result, "answer")
+```
+
+**Run:** `mix run examples/basic.exs`
+
+---
+
+### Chain of Thought (`chain_of_thought.exs`)
+
+Shows step-by-step reasoning with visible intermediate steps:
+- Uses `DSPex.chain_of_thought!/1` for reasoning tasks
+- Exposes `reasoning` attribute alongside the answer
+- Ideal for math, logic, and multi-step problems
+
+```elixir
+cot = DSPex.chain_of_thought!("question -> answer")
+result = DSPex.method!(cot, "forward", [], question: "What is 15% of 80?")
+reasoning = DSPex.attr!(result, "reasoning")  # Shows step-by-step thinking
+answer = DSPex.attr!(result, "answer")
+```
+
+**Run:** `mix run examples/chain_of_thought.exs`
+
+---
+
+### Q&A with Context (`qa_with_context.exs`)
+
+Context-aware question answering with multiple input fields:
+- Demonstrates multi-input signatures (`context, question -> answer`)
+- Useful for RAG (Retrieval-Augmented Generation) patterns
+- Shows how to pass additional grounding context
+
+```elixir
+qa = DSPex.predict!("context, question -> answer")
+result = DSPex.method!(qa, "forward", [], context: context, question: question)
+```
+
+**Run:** `mix run examples/qa_with_context.exs`
+
+---
+
+## Signature Patterns
+
+### Multi-Field Signatures (`multi_field.exs`)
+
+Multiple inputs and outputs in a single signature:
+- Shows rich input/output schemas (`title, content -> category, keywords, tone`)
+- Demonstrates extracting multiple output fields
+
+```elixir
+analyzer = DSPex.predict!("title, content -> category, keywords, tone")
+result = DSPex.method!(analyzer, "forward", [], title: title, content: content)
+category = DSPex.attr!(result, "category")
+keywords = DSPex.attr!(result, "keywords")
+tone = DSPex.attr!(result, "tone")
+```
+
+**Run:** `mix run examples/multi_field.exs`
+
+---
+
+### Custom Signature with Instructions (`custom_signature.exs`)
+
+Create signatures with custom system instructions:
+- Uses `dspy.Signature` directly for fine-grained control
+- Adds custom instructions via `with_instructions/1` method
+- Creates predictor from custom signature object
+
+```elixir
+sig = DSPex.call!("dspy", "Signature", ["question -> answer"])
+sig = DSPex.method!(sig, "with_instructions", [
+  "You are a helpful assistant that answers questions concisely in one sentence."
+])
+predict = DSPex.call!("dspy", "Predict", [sig])
+```
+
+**Run:** `mix run examples/custom_signature.exs`
+
+---
+
+## Use Case Examples
+
+### Classification (`classification.exs`)
+
+Sentiment analysis and text classification:
+- Simple `text -> sentiment` signature
+- Batch processing multiple inputs
+
+```elixir
+classifier = DSPex.predict!("text -> sentiment")
+result = DSPex.method!(classifier, "forward", [], text: "I love this product!")
+sentiment = DSPex.attr!(result, "sentiment")
+```
+
+**Run:** `mix run examples/classification.exs`
+
+---
+
+### Entity Extraction (`entity_extraction.exs`)
+
+Extract named entities from text:
+- Multi-output signature for different entity types
+- Extracts people, organizations, and locations
+
+```elixir
+extractor = DSPex.predict!("text -> people, organizations, locations")
+result = DSPex.method!(extractor, "forward", [], text: text)
+people = DSPex.attr!(result, "people")
+orgs = DSPex.attr!(result, "organizations")
+locations = DSPex.attr!(result, "locations")
+```
+
+**Run:** `mix run examples/entity_extraction.exs`
+
+---
+
+### Summarization (`summarization.exs`)
+
+Text summarization with simple signature:
+- Demonstrates `text -> summary` pattern
+- Works with longer text inputs
+
+```elixir
+summarizer = DSPex.predict!("text -> summary")
+result = DSPex.method!(summarizer, "forward", [], text: long_text)
+summary = DSPex.attr!(result, "summary")
+```
+
+**Run:** `mix run examples/summarization.exs`
+
+---
+
+### Translation (`translation.exs`)
+
+Multi-language translation:
+- Two-input signature with target language parameter
+- Demonstrates translation to Spanish, French, Japanese
+
+```elixir
+translator = DSPex.predict!("text, target_language -> translation")
+result = DSPex.method!(translator, "forward", [], 
+  text: "Hello, how are you?", 
+  target_language: "Spanish"
+)
+translation = DSPex.attr!(result, "translation")
+```
+
+**Run:** `mix run examples/translation.exs`
+
+---
+
+### Code Generation (`code_gen.exs`)
+
+Generate code with chain-of-thought reasoning:
+- Uses ChainOfThought for step-by-step code generation
+- Multi-language support (Python, Elixir, etc.)
+
+```elixir
+coder = DSPex.chain_of_thought!("task, language -> code")
+result = DSPex.method!(coder, "forward", [], 
+  task: "Write a function to check if a number is prime", 
+  language: "Python"
+)
+reasoning = DSPex.attr!(result, "reasoning")
+code = DSPex.attr!(result, "code")
+```
+
+**Run:** `mix run examples/code_gen.exs`
+
+---
+
+### Math Reasoning (`math_reasoning.exs`)
+
+Solve math problems with step-by-step reasoning:
+- ChainOfThought module for mathematical problems
+- Shows working for algebra, geometry, and arithmetic
+
+```elixir
+solver = DSPex.chain_of_thought!("problem -> answer")
+result = DSPex.method!(solver, "forward", [], 
+  problem: "If 3x + 7 = 22, what is x?"
+)
+reasoning = DSPex.attr!(result, "reasoning")
+answer = DSPex.attr!(result, "answer")
+```
+
+**Run:** `mix run examples/math_reasoning.exs`
+
+---
+
+## Advanced Examples
+
+### Direct LM Calls (`direct_lm_call.exs`)
+
+Bypass DSPy modules and call the LM directly:
+- Uses `__call__` method on the language model
+- Works with raw message format
+- Returns list of completions
+
+```elixir
+lm = DSPex.lm!("openai/gpt-4o-mini", temperature: 0.9)
+messages = [%{"role" => "user", "content" => "Tell me a joke about programming."}]
+completions = DSPex.method!(lm, "__call__", [], messages: messages)
+response = Enum.at(completions, 0)
+```
+
+**Run:** `mix run examples/direct_lm_call.exs`
+
+---
+
+### Timeout Configuration (`timeout_test.exs`)
+
+Comprehensive timeout configuration examples:
+- Default ML inference timeout (10 minutes)
+- Per-call timeout overrides with exact milliseconds
+- Per-call timeout with profiles (`:default`, `:streaming`, `:ml_inference`, `:batch_job`)
+- Helper functions: `DSPex.with_timeout/2`, `DSPex.timeout_profile/1`, `DSPex.timeout_ms/1`
+
+```elixir
+# Exact timeout in milliseconds
+result = DSPex.method!(predict, "forward", [],
+  question: "Complex query...",
+  __runtime__: [timeout: 120_000]  # 2 minutes
+)
+
+# Using a timeout profile
+result = DSPex.method!(predict, "forward", [],
+  question: "Long computation...",
+  __runtime__: [timeout_profile: :batch_job]  # 1 hour
+)
+
+# Using helper functions
+opts = DSPex.with_timeout([question: "test"], timeout: 60_000)
+result = DSPex.method!(predict, "forward", [], opts)
+```
+
+**Timeout Profiles:**
+| Profile | Duration | Use Case |
+|---------|----------|----------|
+| `:default` | 2 min | Standard Python calls |
+| `:streaming` | 30 min | Streaming responses |
+| `:ml_inference` | 10 min | LLM inference (DSPex default) |
+| `:batch_job` | 1 hour | Long-running batch operations |
+
+**Run:** `mix run examples/timeout_test.exs`
+
+---
+
+## Running All Examples
+
+The `run_all.sh` script runs all examples sequentially with:
+- Colorized output
+- Per-example timing
+- Pass/fail summary
+- Automatic timeout handling (configurable via `DSPEX_RUN_TIMEOUT_SECONDS`)
+
+```bash
+# Run with default 120s timeout per example
+./examples/run_all.sh
+
+# Run with custom timeout (300s per example)
+DSPEX_RUN_TIMEOUT_SECONDS=300 ./examples/run_all.sh
+
+# Disable timeout
+DSPEX_RUN_TIMEOUT_SECONDS=0 ./examples/run_all.sh
+```
+
+## Example Index
+
+| Example | Module | Description |
+|---------|--------|-------------|
+| `basic.exs` | Predict | Simple Q&A prediction |
+| `chain_of_thought.exs` | ChainOfThought | Reasoning with visible steps |
+| `qa_with_context.exs` | Predict | Context-aware Q&A |
+| `multi_field.exs` | Predict | Multiple inputs/outputs |
+| `custom_signature.exs` | Predict | Signatures with instructions |
+| `classification.exs` | Predict | Sentiment analysis |
+| `entity_extraction.exs` | Predict | Extract people, orgs, locations |
+| `summarization.exs` | Predict | Text summarization |
+| `translation.exs` | Predict | Multi-language translation |
+| `code_gen.exs` | ChainOfThought | Code generation with reasoning |
+| `math_reasoning.exs` | ChainOfThought | Math problem solving |
+| `direct_lm_call.exs` | Direct LM | Raw LM interaction |
+| `timeout_test.exs` | Various | Timeout configuration demo |
+
+## Troubleshooting
+
+### Missing API Key
+```
+Error: OPENAI_API_KEY not set
+```
+Set your API key: `export OPENAI_API_KEY="your-key"`
+
+### Python/DSPy Not Installed
+```
+Error: Module dspy not found
+```
+Run: `mix snakebridge.setup`
+
+### Timeout Errors
+For complex queries, increase the timeout:
+```elixir
+DSPex.method!(predict, "forward", [],
+  question: "...",
+  __runtime__: [timeout_profile: :batch_job]
+)
+```

@@ -34,11 +34,6 @@ jobs:
       with:
         python-version: '3.12'
 
-    - name: Install Python dependencies
-      run: |
-        pip install -r priv/python/requirements.txt
-        cd priv/python && pip install -e .
-
     - name: Restore dependencies cache
       uses: actions/cache@v4
       with:
