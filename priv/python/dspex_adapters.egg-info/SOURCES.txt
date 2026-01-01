@@ -1,9 +1,0 @@
-setup.py
-dspex_adapters/__init__.py
-dspex_adapters/dspy_grpc.py
-dspex_adapters/dspy_variable_integration.py
-dspex_adapters.egg-info/PKG-INFO
-dspex_adapters.egg-info/SOURCES.txt
-dspex_adapters.egg-info/dependency_links.txt
-dspex_adapters.egg-info/requires.txt
-dspex_adapters.egg-info/top_level.txt

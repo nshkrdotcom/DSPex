@@ -1,51 +1,17 @@
 import Config
 
-# Configure default LLM adapter
-config :dspex, :llm,
-  default_adapter: :instructor_lite,
-  default_provider: :gemini,
-  default_model: "gemini/gemini-2.5-flash-lite",
-  adapters: [
-    instructor_lite: [
-      default_provider: :gemini,
-      providers: [
-        gemini: [
-          api_key: {:system, "GEMINI_API_KEY"},
-          model: "gemini/gemini-2.5-flash-lite"
-        ],
-        openai: [
-          api_key: {:system, "OPENAI_API_KEY"}
-        ],
-        anthropic: [
-          api_key: {:system, "ANTHROPIC_API_KEY"}
-        ]
-      ]
-    ],
-    gemini: [
-      auth_strategy: :gemini,
-      api_key: {:system, "GEMINI_API_KEY"},
-      model: "gemini/gemini-2.5-flash-lite"
-    ],
-    http: [
-      timeout: 60_000,
-      pool_size: 10
-    ],
-    python: [
-      pool: :llm_pool,
-      script: "llm_bridge.py"
-    ]
+config :snakebridge,
+  verbose: false,
+  runtime: [
+    library_profiles: %{"dspy" => :ml_inference}
   ]
 
-# Configure Snakepit with gRPC adapter
-config :snakepit,
-  pools: [
-    default: [
-      size: 1,
-      max_overflow: 0,
-      adapter: Snakepit.Adapters.GRPCPython,
-      adapter_args: ["--adapter", "dspex_adapters.dspy_grpc.DSPyGRPCHandler"]
-    ]
-  ]
+# Track current Mix environment for runtime diagnostics
+config :snakepit, environment: config_env()
 
-# Import environment specific config
+config :logger,
+  level: :warning
+
+# Snakepit is configured in runtime.exs using SnakeBridge.ConfigHelper
+
 import_config "#{config_env()}.exs"

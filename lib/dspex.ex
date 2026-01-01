@@ -1,214 +1,289 @@
 defmodule DSPex do
   @moduledoc """
-  DSPex provides a unified interface for DSPy functionality in Elixir.
+  DSPex - DSPy for Elixir via SnakeBridge.
 
-  This is the main entry point for all DSPex operations. Implementation details
-  are hidden - operations are automatically routed to native Elixir or Python
-  implementations based on availability and performance characteristics.
+  Minimal wrapper that provides transparent access to DSPy through SnakeBridge's
+  Universal FFI. No code generation needed - just call Python directly.
 
-  ## Basic Usage
+  ## Quick Start
 
-      # Parse a signature
-      {:ok, signature} = DSPex.signature("question: str -> answer: str")
-      
-      # Execute a prediction
-      {:ok, result} = DSPex.predict(signature, %{question: "What is DSPy?"})
-      
-      # Use chain of thought
-      {:ok, cot_result} = DSPex.chain_of_thought(signature, %{question: "Explain quantum computing"})
-      
-  ## Pipelines
+      DSPex.run(fn ->
+        # Configure LM
+        lm = DSPex.lm!("openai/gpt-4o-mini")
+        DSPex.configure!(lm: lm)
 
-      pipeline = DSPex.pipeline([
-        {:native, DSPex.Native.Signature, spec: "query -> keywords: list[str]"},
-        {:python, "dspy.ChainOfThought", signature: "keywords -> summary"},
-        {:native, DSPex.Native.Template, template: "Summary: <%= @summary %>"}
-      ])
-      
-      {:ok, result} = DSPex.run_pipeline(pipeline, %{query: "machine learning"})
+        # Create predictor and run
+        predict = DSPex.call!("dspy", "Predict", ["question -> answer"])
+        result = DSPex.method!(predict, "forward", [], question: "What is 2+2?")
+
+        # Get the answer
+        answer = DSPex.attr!(result, "answer")
+        IO.puts("Answer: \#{answer}")
+      end)
+
+  ## Timeout Configuration
+
+  DSPex leverages SnakeBridge 0.7.7+'s timeout architecture for LLM workloads.
+  By default, all DSPy calls use the `:ml_inference` profile (10 minute timeout).
+
+  ### Timeout Profiles
+
+  | Profile         | Timeout  | Use Case                              |
+  |-----------------|----------|---------------------------------------|
+  | `:default`      | 2 min    | Standard Python calls                 |
+  | `:streaming`    | 30 min   | Streaming responses                   |
+  | `:ml_inference` | 10 min   | LLM inference (DSPex default)         |
+  | `:batch_job`    | 1 hour   | Long-running batch operations         |
+
+  ### Per-Call Timeout Override
+
+  Override timeout for individual calls using `__runtime__` option:
+
+      # Use a different profile
+      DSPex.method!(predict, "forward", [],
+        question: "Complex question",
+        __runtime__: [timeout_profile: :batch_job]
+      )
+
+      # Set exact timeout in milliseconds
+      DSPex.method!(predict, "forward", [],
+        question: "Quick question",
+        __runtime__: [timeout: 30_000]  # 30 seconds
+      )
+
+  ### Global Configuration
+
+  Configure timeouts in `config/config.exs`:
+
+      config :snakebridge,
+        runtime: [
+          library_profiles: %{"dspy" => :ml_inference},
+          # Or set global default:
+          # timeout_profile: :ml_inference
+        ]
+
+  ## Architecture
+
+  DSPex uses SnakeBridge's Universal FFI to call DSPy directly:
+
+      Elixir (DSPex.call/4)
+          ↓
+      SnakeBridge.call/4
+          ↓
+      Snakepit gRPC
+          ↓
+      Python DSPy
+          ↓
+      LLM Providers
+
+  All Python lifecycle is managed automatically by Snakepit.
   """
 
-  alias DSPex.Pipeline
-
-  # Type aliases for cleaner specs
-  @type signature :: DSPex.Native.Signature.t()
-  @type signature_compiled :: %{
-          signature: DSPex.Native.Signature.t(),
-          validator: (map() -> {:ok, map()} | {:error, term()}),
-          serializer: (map() -> {binary(), map()}),
-          compiled_at: DateTime.t()
-        }
-
-  # Signatures - always native for performance
-
   @doc """
-  Parse a DSPy signature specification.
+  Run DSPex code with automatic Python lifecycle management.
 
-  Signatures define the input and output schema for ML operations.
+  Wraps your code in `Snakepit.run_as_script/2` which:
+  - Starts the Python process pool
+  - Runs your code
+  - Cleans up on exit
 
-  ## Examples
-
-      # Simple signature
-      DSPex.signature("question -> answer")
-      
-      # With types
-      DSPex.signature("question: str -> answer: str, confidence: float")
-      
-      # With descriptions
-      DSPex.signature("question: str 'User query' -> answer: str 'Generated response'")
-  """
-  @spec signature(String.t() | map()) :: {:ok, signature()} | {:error, term()}
-  defdelegate signature(spec), to: DSPex.Native.Signature, as: :parse
-
-  @doc """
-  Compile a signature for optimized repeated use.
-  """
-  @spec compile_signature(binary()) :: {:ok, signature_compiled()} | {:error, term()}
-  defdelegate compile_signature(spec), to: DSPex.Native.Signature, as: :compile
-
-  # Module operations - routed to appropriate implementation
-
-  @doc """
-  Basic prediction using a signature.
-
-  ## Options
-
-    * `:temperature` - LLM temperature (0.0-2.0)
-    * `:max_tokens` - Maximum tokens to generate
-    * `:model` - Specific model to use
-    * `:stream` - Enable streaming responses
-  """
-  @spec predict(signature(), map(), keyword()) :: {:ok, map()} | {:error, term()}
-  def predict(signature, inputs, opts \\ []) do
-    DSPex.Modules.Predict.predict(signature, inputs, opts)
-  end
-
-  @doc """
-  Chain of Thought reasoning.
-
-  Generates step-by-step reasoning before the final answer.
-  """
-  @spec chain_of_thought(signature(), map(), keyword()) :: {:ok, map()} | {:error, term()}
-  def chain_of_thought(signature, inputs, opts \\ []) do
-    DSPex.Modules.ChainOfThought.think(signature, inputs, opts)
-  end
-
-  @doc """
-  ReAct pattern - Reasoning + Acting with tools.
-
-  Note: Currently not implemented - requires bidirectional tool support.
+  Pass `halt: true` in opts if you need to force the BEAM to exit
+  (for example, when running inside wrapper scripts).
 
   ## Example
 
-      tools = [
-        %{name: "search", description: "Search the web", function: &search/1},
-        %{name: "calculate", description: "Perform calculations", function: &calc/1}
-      ]
-
-      DSPex.react(signature, inputs, tools)
+      DSPex.run(fn ->
+        lm = DSPex.lm!("openai/gpt-4o-mini")
+        DSPex.configure!(lm: lm)
+        # ... your DSPy code
+      end)
   """
-  @spec react(signature(), map(), list(map()), keyword()) :: {:error, :not_implemented}
-  def react(signature, inputs, tools, opts \\ []) do
-    DSPex.Modules.ReAct.reason_and_act(signature, inputs, tools, opts)
+  def run(fun, opts \\ []) when is_function(fun, 0) do
+    Snakepit.run_as_script(fun, opts)
   end
 
-  # Pipeline operations
+  # ---------------------------------------------------------------------------
+  # DSPy-specific helpers
+  # ---------------------------------------------------------------------------
 
   @doc """
-  Create a pipeline of operations.
-
-  Pipelines can mix native and Python implementations seamlessly.
-  """
-  @spec pipeline(list(Pipeline.step())) :: Pipeline.t()
-  defdelegate pipeline(steps), to: Pipeline, as: :new
-
-  @doc """
-  Execute a pipeline with given input.
-
-  ## Options
-
-    * `:timeout` - Overall pipeline timeout (default: 30000ms)
-    * `:continue_on_error` - Continue execution on step failure
-    * `:stream` - Enable streaming for supported steps
-  """
-  @spec run_pipeline(Pipeline.t(), map(), keyword()) :: {:ok, term()} | {:error, term()}
-  defdelegate run_pipeline(pipeline, input, opts \\ []), to: Pipeline, as: :run
-
-  # LLM operations
-
-  @doc """
-  Create a new LLM client for direct model interactions.
+  Create a DSPy language model.
 
   ## Examples
 
-      # Using InstructorLite
-      {:ok, client} = DSPex.lm_client(
-        adapter: :instructor_lite,
-        provider: :openai,
-        api_key: System.get_env("OPENAI_API_KEY")
-      )
-      
-      # Using HTTP adapter
-      {:ok, client} = DSPex.lm_client(
-        adapter: :http,
-        provider: :anthropic,
-        api_key: System.get_env("ANTHROPIC_API_KEY")
-      )
+      {:ok, lm} = DSPex.lm("openai/gpt-4o-mini")
+      {:ok, lm} = DSPex.lm("anthropic/claude-3-sonnet-20240229", temperature: 0.7)
   """
-  @spec lm_client(keyword()) :: {:ok, map()} | {:error, term()}
-  defdelegate lm_client(opts), to: DSPex.LLM.Client, as: :new
-
-  @doc """
-  Generate text using an LLM client.
-  """
-  @spec lm_generate(
-          %{:adapter_module => atom(), any() => any()},
-          binary() | list(map()),
-          Keyword.t()
-        ) :: {:error, any()} | {:ok, map()}
-  defdelegate lm_generate(client, prompt, opts \\ []), to: DSPex.LLM.Client, as: :generate
-
-  # Utility functions
-
-  @doc """
-  Validate data against a signature.
-  """
-  @spec validate(map(), signature()) :: :ok | {:error, list(String.t())}
-  defdelegate validate(data, signature), to: DSPex.Native.Validator
-
-  @doc """
-  Render a template with context.
-  """
-  @spec render_template(String.t(), map()) :: String.t()
-  defdelegate render_template(template, context), to: DSPex.Native.Template, as: :render
-
-  @doc """
-  Check system health and status.
-  """
-  @spec health_check() :: %{
-          status: :ok,
-          version: String.t(),
-          snakepit_status: map(),
-          native_modules: list()
-        }
-  def health_check do
-    %{
-      status: :ok,
-      version: "0.1.0",
-      snakepit_status: snakepit_status(),
-      native_modules: DSPex.Native.Registry.list()
-    }
+  def lm(model, opts \\ []) do
+    SnakeBridge.call("dspy", "LM", [model], opts)
   end
 
-  defp snakepit_status do
-    case Snakepit.get_stats() do
-      stats when is_map(stats) ->
-        Map.put(stats, :status, :running)
+  @doc "Bang version of lm/2 - raises on error."
+  def lm!(model, opts \\ []) do
+    SnakeBridge.call!("dspy", "LM", [model], opts)
+  end
 
-      _ ->
-        %{status: :not_available}
+  @doc """
+  Configure DSPy global settings.
+
+  ## Examples
+
+      :ok = DSPex.configure(lm: lm)
+      :ok = DSPex.configure(lm: lm, rm: retriever)
+  """
+  def configure(opts \\ []) do
+    case SnakeBridge.call("dspy", "configure", [], opts) do
+      {:ok, _} -> :ok
+      error -> error
     end
-  catch
-    _, _ -> %{status: :error}
   end
+
+  @doc "Bang version of configure/1 - raises on error."
+  def configure!(opts \\ []) do
+    SnakeBridge.call!("dspy", "configure", [], opts)
+    :ok
+  end
+
+  @doc """
+  Create a Predict module.
+
+  ## Examples
+
+      {:ok, predict} = DSPex.predict("question -> answer")
+      {:ok, predict} = DSPex.predict("context, question -> answer")
+  """
+  def predict(signature, opts \\ []) do
+    SnakeBridge.call("dspy", "Predict", [signature], opts)
+  end
+
+  @doc "Bang version of predict/2."
+  def predict!(signature, opts \\ []) do
+    SnakeBridge.call!("dspy", "Predict", [signature], opts)
+  end
+
+  @doc """
+  Create a ChainOfThought module.
+
+  ## Examples
+
+      {:ok, cot} = DSPex.chain_of_thought("question -> answer")
+  """
+  def chain_of_thought(signature, opts \\ []) do
+    SnakeBridge.call("dspy", "ChainOfThought", [signature], opts)
+  end
+
+  @doc "Bang version of chain_of_thought/2."
+  def chain_of_thought!(signature, opts \\ []) do
+    SnakeBridge.call!("dspy", "ChainOfThought", [signature], opts)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Timeout helpers
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Add timeout configuration to options.
+
+  This is a convenience helper for adding `__runtime__` timeout options.
+
+  ## Options
+
+    * `:timeout` - Exact timeout in milliseconds
+    * `:timeout_profile` - Use a predefined profile (`:default`, `:streaming`, `:ml_inference`, `:batch_job`)
+
+  ## Examples
+
+      # Set exact timeout
+      opts = DSPex.with_timeout([], timeout: 60_000)  # 1 minute
+      DSPex.method!(predict, "forward", [], Keyword.merge(opts, question: "..."))
+
+      # Use batch profile for long operations
+      opts = DSPex.with_timeout([question: "complex"], timeout_profile: :batch_job)
+      DSPex.method!(predict, "forward", [], opts)
+
+      # Inline usage
+      DSPex.method!(predict, "forward", [],
+        DSPex.with_timeout([question: "test"], timeout: 30_000)
+      )
+  """
+  def with_timeout(opts, timeout_opts) when is_list(opts) and is_list(timeout_opts) do
+    runtime = Keyword.get(opts, :__runtime__, [])
+    new_runtime = Keyword.merge(runtime, timeout_opts)
+    Keyword.put(opts, :__runtime__, new_runtime)
+  end
+
+  @doc """
+  Timeout profile atoms for use with `__runtime__` option.
+
+  Returns a keyword list ready to merge into call options.
+
+  ## Examples
+
+      DSPex.method!(predict, "forward", [],
+        Keyword.merge([question: "test"], DSPex.timeout_profile(:batch_job))
+      )
+  """
+  def timeout_profile(profile)
+      when profile in [:default, :streaming, :ml_inference, :batch_job] do
+    [__runtime__: [timeout_profile: profile]]
+  end
+
+  @doc """
+  Create a timeout option for exact milliseconds.
+
+  Returns a keyword list ready to merge into call options.
+
+  ## Examples
+
+      DSPex.method!(predict, "forward", [],
+        Keyword.merge([question: "test"], DSPex.timeout_ms(120_000))
+      )
+  """
+  def timeout_ms(milliseconds) when is_integer(milliseconds) and milliseconds > 0 do
+    [__runtime__: [timeout: milliseconds]]
+  end
+
+  # ---------------------------------------------------------------------------
+  # Universal FFI pass-through (convenience re-exports)
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Call any DSPy function or class.
+
+  ## Examples
+
+      {:ok, result} = DSPex.call("dspy", "Predict", ["question -> answer"])
+      {:ok, result} = DSPex.call("dspy.teleprompt", "BootstrapFewShot", [], metric: metric)
+  """
+  defdelegate call(module, function, args \\ [], opts \\ []), to: SnakeBridge
+
+  @doc "Bang version - raises on error, returns value directly."
+  defdelegate call!(module, function, args \\ [], opts \\ []), to: SnakeBridge
+
+  @doc "Get a module attribute."
+  defdelegate get(module, attr), to: SnakeBridge
+
+  @doc "Bang version of get/2."
+  defdelegate get!(module, attr), to: SnakeBridge
+
+  @doc "Call a method on a Python object reference."
+  defdelegate method(ref, method, args \\ [], opts \\ []), to: SnakeBridge
+
+  @doc "Bang version of method/4."
+  defdelegate method!(ref, method, args \\ [], opts \\ []), to: SnakeBridge
+
+  @doc "Get an attribute from a Python object reference."
+  defdelegate attr(ref, attribute), to: SnakeBridge
+
+  @doc "Bang version of attr/2."
+  defdelegate attr!(ref, attribute), to: SnakeBridge
+
+  @doc "Set an attribute on a Python object reference."
+  defdelegate set_attr(ref, attribute, value), to: SnakeBridge
+
+  @doc "Check if a value is a Python object reference."
+  defdelegate ref?(value), to: SnakeBridge
+
+  @doc "Encode binary data as Python bytes."
+  defdelegate bytes(data), to: SnakeBridge
 end
