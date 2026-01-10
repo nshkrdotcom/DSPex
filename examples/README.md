@@ -82,6 +82,46 @@ result = DSPex.method!(qa, "forward", [], context: context, question: question)
 
 ---
 
+### Multi-hop QA (`multi_hop_qa.exs`)
+
+Answer questions that require multiple steps:
+- Breaks the question into two hops
+- Feeds hop 1 output into hop 2 context
+- Demonstrates explicit chaining of predictions
+
+```elixir
+hop1 = DSPex.predict!("question -> answer")
+hop2 = DSPex.predict!("context, question -> answer")
+
+hop1_result = DSPex.method!(hop1, "forward", [], question: "Which state is the University of Michigan located in?")
+state = DSPex.attr!(hop1_result, "answer")
+
+context = "The University of Michigan is located in #{state}."
+hop2_result = DSPex.method!(hop2, "forward", [], context: context, question: "What is the capital of #{state}?")
+```
+
+**Run:** `mix run examples/multi_hop_qa.exs`
+
+---
+
+### RAG (`rag.exs`)
+
+Retrieval-augmented generation with a simple Elixir retriever:
+- Selects top documents with naive keyword matching
+- Feeds retrieved context into a DSPy predictor
+- Highlights the retrieval + generation pattern
+
+```elixir
+top_docs = SimpleRetriever.retrieve(docs, question, 2)
+context = top_docs |> Enum.map(& &1.text) |> Enum.join("\n\n")
+rag = DSPex.predict!("context, question -> answer")
+result = DSPex.method!(rag, "forward", [], context: context, question: question)
+```
+
+**Run:** `mix run examples/rag.exs`
+
+---
+
 ## Signature Patterns
 
 ### Multi-Field Signatures (`multi_field.exs`)
@@ -233,6 +273,38 @@ answer = DSPex.attr!(result, "answer")
 
 ## Advanced Examples
 
+### Custom Module (`custom_module.exs`)
+
+Compose multiple predictors into a custom Elixir module:
+- Extracts keywords first
+- Feeds keywords into a second predictor
+- Shows how to build a reusable pipeline
+
+```elixir
+qa = CustomQA.new()
+{keywords, answer} = CustomQA.forward(qa, question)
+```
+
+**Run:** `mix run examples/custom_module.exs`
+
+---
+
+### Optimization (`optimization.exs`)
+
+Optimize a student module with `BootstrapFewShot`:
+- Builds a tiny training set with `dspy.Example`
+- Compiles a predictor with few-shot bootstrapping
+- Demonstrates the optimizer workflow
+
+```elixir
+optimizer = DSPex.call!("dspy", "BootstrapFewShot", [])
+optimized = DSPex.method!(optimizer, "compile", [student], trainset: trainset)
+```
+
+**Run:** `mix run examples/optimization.exs`
+
+---
+
 ### Direct LM Calls (`direct_lm_call.exs`)
 
 Bypass DSPy modules and call the LM directly:
@@ -315,6 +387,8 @@ DSPEX_RUN_TIMEOUT_SECONDS=0 ./examples/run_all.sh
 | `basic.exs` | Predict | Simple Q&A prediction |
 | `chain_of_thought.exs` | ChainOfThought | Reasoning with visible steps |
 | `qa_with_context.exs` | Predict | Context-aware Q&A |
+| `multi_hop_qa.exs` | Predict | Multi-hop question answering |
+| `rag.exs` | Predict | Retrieval-augmented generation |
 | `multi_field.exs` | Predict | Multiple inputs/outputs |
 | `custom_signature.exs` | Predict | Signatures with instructions |
 | `classification.exs` | Predict | Sentiment analysis |
@@ -323,6 +397,8 @@ DSPEX_RUN_TIMEOUT_SECONDS=0 ./examples/run_all.sh
 | `translation.exs` | Predict | Multi-language translation |
 | `code_gen.exs` | ChainOfThought | Code generation with reasoning |
 | `math_reasoning.exs` | ChainOfThought | Math problem solving |
+| `custom_module.exs` | Pipeline | Custom module composition |
+| `optimization.exs` | Optimizer | BootstrapFewShot optimization |
 | `direct_lm_call.exs` | Direct LM | Raw LM interaction |
 | `timeout_test.exs` | Various | Timeout configuration demo |
 

@@ -138,13 +138,15 @@ response = DSPex.method!(lm, "forward", [messages])
 
 ## Examples
 
-DSPex includes 13 comprehensive examples demonstrating various use cases:
+DSPex includes 17 comprehensive examples demonstrating various use cases:
 
 | Example | Description | Run Command |
 |---------|-------------|-------------|
 | `basic.exs` | Simple Q&A prediction | `mix run examples/basic.exs` |
 | `chain_of_thought.exs` | Reasoning with visible steps | `mix run examples/chain_of_thought.exs` |
 | `qa_with_context.exs` | Context-aware Q&A | `mix run examples/qa_with_context.exs` |
+| `multi_hop_qa.exs` | Multi-hop question answering | `mix run examples/multi_hop_qa.exs` |
+| `rag.exs` | Retrieval-augmented generation | `mix run examples/rag.exs` |
 | `custom_signature.exs` | Signatures with instructions | `mix run examples/custom_signature.exs` |
 | `multi_field.exs` | Multiple inputs/outputs | `mix run examples/multi_field.exs` |
 | `classification.exs` | Sentiment analysis | `mix run examples/classification.exs` |
@@ -153,6 +155,8 @@ DSPex includes 13 comprehensive examples demonstrating various use cases:
 | `math_reasoning.exs` | Complex math problem solving | `mix run examples/math_reasoning.exs` |
 | `summarization.exs` | Text summarization | `mix run examples/summarization.exs` |
 | `translation.exs` | Multi-language translation | `mix run examples/translation.exs` |
+| `custom_module.exs` | Custom module composition | `mix run examples/custom_module.exs` |
+| `optimization.exs` | BootstrapFewShot optimization | `mix run examples/optimization.exs` |
 | `direct_lm_call.exs` | Direct LM interaction | `mix run examples/direct_lm_call.exs` |
 | `timeout_test.exs` | Timeout configuration demo | `mix run examples/timeout_test.exs` |
 

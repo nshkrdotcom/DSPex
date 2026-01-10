@@ -150,8 +150,12 @@ main() {
         "examples/entity_extraction.exs"
         "examples/math_reasoning.exs"
         "examples/qa_with_context.exs"
+        "examples/multi_hop_qa.exs"
+        "examples/rag.exs"
         "examples/code_gen.exs"
         "examples/custom_signature.exs"
+        "examples/custom_module.exs"
+        "examples/optimization.exs"
         "examples/direct_lm_call.exs"
     )
 

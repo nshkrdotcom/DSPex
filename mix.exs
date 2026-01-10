@@ -40,8 +40,8 @@ defmodule DSPex.MixProject do
 
   defp deps do
     [
-      # SnakeBridge - Python bridge for DSPy
-      {:snakebridge, "~> 0.8.0"},
+      # SnakeBridge - Python bridge for DSPy (local path for development)
+      {:snakebridge, path: "../snakebridge"},
 
       # JSON encoding
       {:jason, "~> 1.4"},
@@ -55,7 +55,8 @@ defmodule DSPex.MixProject do
 
   defp python_deps do
     [
-      {:dspy, "2.6.5", submodules: true}
+      # generate: :all enables full API surface generation
+      {:dspy, "2.6.5", generate: :all, submodules: true}
     ]
   end
 

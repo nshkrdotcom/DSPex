@@ -30,7 +30,7 @@
     "python_platform": "x86_64-pc-linux-gnu",
     "python_runtime_hash": "1319c137ea5d30f1d7599943cb0e72666648c20a94cf5932dd095364d07dafeb",
     "python_version": "3.12.3",
-    "snakebridge_version": "0.8.0"
+    "snakebridge_version": "0.8.1"
   },
   "libraries": {
     "dspy": {
@@ -45,5 +45,5 @@
       "hash": null
     }
   },
-  "version": "0.8.0"
+  "version": "0.8.1"
 }
