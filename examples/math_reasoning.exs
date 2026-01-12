@@ -1,12 +1,12 @@
 # Math Reasoning Example
 #
-# Run with: mix run examples/math_reasoning.exs
+# Run with: mix run --no-start examples/math_reasoning.exs
 
 DSPex.run(fn ->
   IO.puts("DSPex Math Reasoning Example")
   IO.puts("==============================\n")
 
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
 
   # Chain of thought for math problems

@@ -1,15 +1,15 @@
 # Chain of Thought Example
 #
-# Run with: mix run examples/chain_of_thought.exs
+# Run with: mix run --no-start examples/chain_of_thought.exs
 #
-# Requires: OPENAI_API_KEY environment variable
+# Requires: GEMINI_API_KEY environment variable
 
 DSPex.run(fn ->
   IO.puts("DSPex Chain of Thought Example")
   IO.puts("===============================\n")
 
   # Setup
-  lm = DSPex.lm!("openai/gpt-4o-mini", temperature: 0.7)
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest", temperature: 0.7)
   DSPex.configure!(lm: lm)
 
   # Create ChainOfThought predictor

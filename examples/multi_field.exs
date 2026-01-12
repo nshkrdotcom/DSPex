@@ -1,12 +1,12 @@
 # Multi-Field Signature Example
 #
-# Run with: mix run examples/multi_field.exs
+# Run with: mix run --no-start examples/multi_field.exs
 
 DSPex.run(fn ->
   IO.puts("DSPex Multi-Field Signature Example")
   IO.puts("=====================================\n")
 
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
 
   # Multiple inputs and outputs

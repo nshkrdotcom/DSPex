@@ -1,15 +1,15 @@
 # Timeout Configuration Examples
 #
-# Demonstrates SnakeBridge 0.7.7+ timeout architecture with DSPex
+# Demonstrates SnakeBridge 0.10+ timeout architecture with DSPex
 #
-# Run with: mix run examples/timeout_test.exs
+# Run with: mix run --no-start examples/timeout_test.exs
 
 DSPex.run(fn ->
   IO.puts("DSPex Timeout Configuration Examples")
   IO.puts("=====================================\n")
 
   # Setup
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
   predict = DSPex.predict!("question -> answer")
 

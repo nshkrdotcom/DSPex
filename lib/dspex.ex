@@ -9,7 +9,7 @@ defmodule DSPex do
 
       DSPex.run(fn ->
         # Configure LM
-        lm = DSPex.lm!("openai/gpt-4o-mini")
+        lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
         DSPex.configure!(lm: lm)
 
         # Create predictor and run
@@ -90,16 +90,41 @@ defmodule DSPex do
   Pass `halt: true` in opts if you need to force the BEAM to exit
   (for example, when running inside wrapper scripts).
 
+  DSPex restarts Snakepit by default so it owns the runtime and can close
+  persistent resources (like DETS) cleanly. Pass `restart: false` to reuse an
+  already-started Snakepit instance.
+
   ## Example
 
       DSPex.run(fn ->
-        lm = DSPex.lm!("openai/gpt-4o-mini")
+        lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
         DSPex.configure!(lm: lm)
         # ... your DSPy code
       end)
   """
   def run(fun, opts \\ []) when is_function(fun, 0) do
-    Snakepit.run_as_script(fun, opts)
+    opts = Keyword.put_new(opts, :restart, true)
+
+    Snakepit.run_as_script(
+      fn ->
+        ensure_snakebridge_started!()
+        fun.()
+      end,
+      opts
+    )
+  end
+
+  defp ensure_snakebridge_started! do
+    case Application.ensure_all_started(:snakebridge) do
+      {:ok, _started} ->
+        :ok
+
+      {:error, {:snakebridge, reason}} ->
+        raise "Failed to start snakebridge: #{inspect(reason)}"
+
+      {:error, reason} ->
+        raise "Failed to start snakebridge: #{inspect(reason)}"
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -111,7 +136,7 @@ defmodule DSPex do
 
   ## Examples
 
-      {:ok, lm} = DSPex.lm("openai/gpt-4o-mini")
+      {:ok, lm} = DSPex.lm("gemini/gemini-flash-lite-latest")
       {:ok, lm} = DSPex.lm("anthropic/claude-3-sonnet-20240229", temperature: 0.7)
   """
   def lm(model, opts \\ []) do
@@ -273,13 +298,13 @@ defmodule DSPex do
   defdelegate method!(ref, method, args \\ [], opts \\ []), to: SnakeBridge
 
   @doc "Get an attribute from a Python object reference."
-  defdelegate attr(ref, attribute), to: SnakeBridge
+  defdelegate attr(ref, attribute, opts \\ []), to: SnakeBridge
 
-  @doc "Bang version of attr/2."
-  defdelegate attr!(ref, attribute), to: SnakeBridge
+  @doc "Bang version of attr/3."
+  defdelegate attr!(ref, attribute, opts \\ []), to: SnakeBridge
 
   @doc "Set an attribute on a Python object reference."
-  defdelegate set_attr(ref, attribute, value), to: SnakeBridge
+  defdelegate set_attr(ref, attribute, value, opts \\ []), to: SnakeBridge
 
   @doc "Check if a value is a Python object reference."
   defdelegate ref?(value), to: SnakeBridge

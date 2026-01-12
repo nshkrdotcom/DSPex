@@ -1,6 +1,6 @@
 # DSPex Examples
 
-This directory contains comprehensive examples demonstrating DSPex capabilities. All examples require an OpenAI API key set via `OPENAI_API_KEY` environment variable.
+This directory contains comprehensive examples demonstrating DSPex capabilities. All examples require a Gemini API key set via `GEMINI_API_KEY` environment variable.
 
 ## Prerequisites
 
@@ -10,7 +10,7 @@ mix deps.get
 mix snakebridge.setup
 
 # Set your API key
-export OPENAI_API_KEY="your-key-here"
+export GEMINI_API_KEY="your-key-here"
 ```
 
 ## Running Examples
@@ -18,8 +18,11 @@ export OPENAI_API_KEY="your-key-here"
 Run any example individually:
 
 ```bash
-mix run examples/basic.exs
+mix run --no-start examples/basic.exs
 ```
+
+`--no-start` ensures DSPex owns the Snakepit lifecycle and closes the process
+registry DETS cleanly (avoids repair warnings after unclean exits).
 
 Or run all examples with the test script:
 
@@ -44,7 +47,7 @@ result = DSPex.method!(predict, "forward", [], question: "What is the capital of
 answer = DSPex.attr!(result, "answer")
 ```
 
-**Run:** `mix run examples/basic.exs`
+**Run:** `mix run --no-start examples/basic.exs`
 
 ---
 
@@ -62,7 +65,7 @@ reasoning = DSPex.attr!(result, "reasoning")  # Shows step-by-step thinking
 answer = DSPex.attr!(result, "answer")
 ```
 
-**Run:** `mix run examples/chain_of_thought.exs`
+**Run:** `mix run --no-start examples/chain_of_thought.exs`
 
 ---
 
@@ -78,7 +81,7 @@ qa = DSPex.predict!("context, question -> answer")
 result = DSPex.method!(qa, "forward", [], context: context, question: question)
 ```
 
-**Run:** `mix run examples/qa_with_context.exs`
+**Run:** `mix run --no-start examples/qa_with_context.exs`
 
 ---
 
@@ -100,7 +103,7 @@ context = "The University of Michigan is located in #{state}."
 hop2_result = DSPex.method!(hop2, "forward", [], context: context, question: "What is the capital of #{state}?")
 ```
 
-**Run:** `mix run examples/multi_hop_qa.exs`
+**Run:** `mix run --no-start examples/multi_hop_qa.exs`
 
 ---
 
@@ -118,7 +121,7 @@ rag = DSPex.predict!("context, question -> answer")
 result = DSPex.method!(rag, "forward", [], context: context, question: question)
 ```
 
-**Run:** `mix run examples/rag.exs`
+**Run:** `mix run --no-start examples/rag.exs`
 
 ---
 
@@ -138,26 +141,28 @@ keywords = DSPex.attr!(result, "keywords")
 tone = DSPex.attr!(result, "tone")
 ```
 
-**Run:** `mix run examples/multi_field.exs`
+**Run:** `mix run --no-start examples/multi_field.exs`
 
 ---
 
 ### Custom Signature with Instructions (`custom_signature.exs`)
 
 Create signatures with custom system instructions:
-- Uses `dspy.Signature` directly for fine-grained control
-- Adds custom instructions via `with_instructions/1` method
+- Uses `Dspy.make_signature/2` for wrapper-backed signature creation
+- Adds custom instructions at creation time
 - Creates predictor from custom signature object
 
 ```elixir
-sig = DSPex.call!("dspy", "Signature", ["question -> answer"])
-sig = DSPex.method!(sig, "with_instructions", [
-  "You are a helpful assistant that answers questions concisely in one sentence."
-])
-predict = DSPex.call!("dspy", "Predict", [sig])
+{:ok, sig} =
+  Dspy.make_signature(
+    "question -> answer",
+    "You are a helpful assistant that answers questions concisely in one sentence."
+  )
+
+predict = DSPex.predict!(sig)
 ```
 
-**Run:** `mix run examples/custom_signature.exs`
+**Run:** `mix run --no-start examples/custom_signature.exs`
 
 ---
 
@@ -175,7 +180,7 @@ result = DSPex.method!(classifier, "forward", [], text: "I love this product!")
 sentiment = DSPex.attr!(result, "sentiment")
 ```
 
-**Run:** `mix run examples/classification.exs`
+**Run:** `mix run --no-start examples/classification.exs`
 
 ---
 
@@ -193,7 +198,7 @@ orgs = DSPex.attr!(result, "organizations")
 locations = DSPex.attr!(result, "locations")
 ```
 
-**Run:** `mix run examples/entity_extraction.exs`
+**Run:** `mix run --no-start examples/entity_extraction.exs`
 
 ---
 
@@ -209,7 +214,7 @@ result = DSPex.method!(summarizer, "forward", [], text: long_text)
 summary = DSPex.attr!(result, "summary")
 ```
 
-**Run:** `mix run examples/summarization.exs`
+**Run:** `mix run --no-start examples/summarization.exs`
 
 ---
 
@@ -228,7 +233,7 @@ result = DSPex.method!(translator, "forward", [],
 translation = DSPex.attr!(result, "translation")
 ```
 
-**Run:** `mix run examples/translation.exs`
+**Run:** `mix run --no-start examples/translation.exs`
 
 ---
 
@@ -248,7 +253,7 @@ reasoning = DSPex.attr!(result, "reasoning")
 code = DSPex.attr!(result, "code")
 ```
 
-**Run:** `mix run examples/code_gen.exs`
+**Run:** `mix run --no-start examples/code_gen.exs`
 
 ---
 
@@ -267,7 +272,7 @@ reasoning = DSPex.attr!(result, "reasoning")
 answer = DSPex.attr!(result, "answer")
 ```
 
-**Run:** `mix run examples/math_reasoning.exs`
+**Run:** `mix run --no-start examples/math_reasoning.exs`
 
 ---
 
@@ -285,23 +290,61 @@ qa = CustomQA.new()
 {keywords, answer} = CustomQA.forward(qa, question)
 ```
 
-**Run:** `mix run examples/custom_module.exs`
+**Run:** `mix run --no-start examples/custom_module.exs`
 
 ---
 
 ### Optimization (`optimization.exs`)
 
 Optimize a student module with `BootstrapFewShot`:
-- Builds a tiny training set with `dspy.Example`
+- Builds a tiny training set with `Dspy.Example`
 - Compiles a predictor with few-shot bootstrapping
 - Demonstrates the optimizer workflow
 
 ```elixir
-optimizer = DSPex.call!("dspy", "BootstrapFewShot", [])
-optimized = DSPex.method!(optimizer, "compile", [student], trainset: trainset)
+{:ok, optimizer} = Dspy.BootstrapFewShot.new([])
+{:ok, optimized} = Dspy.BootstrapFewShot.compile(optimizer, student, trainset: trainset)
 ```
 
-**Run:** `mix run examples/optimization.exs`
+**Run:** `mix run --no-start examples/optimization.exs`
+
+---
+
+### Flagship Multi-Pool + GEPA (`flagship_multi_pool_gepa.exs`)
+
+End-to-end demo that exercises the full SnakeBridge + Snakepit stack:
+- Two strict-affinity DSPy pools (triage + GEPA optimizer)
+- A hint-affinity analytics pool using numpy
+- GEPA prompt optimization with `max_metric_calls=3`
+- Prompt history inspection (via LM history + graceful serialization)
+
+```bash
+mix run --no-start examples/flagship_multi_pool_gepa.exs
+```
+
+**Run:** `mix run --no-start examples/flagship_multi_pool_gepa.exs`
+
+Guide: `guides/flagship_multi_pool_gepa.md`
+
+---
+
+### Flagship Multi-Pool + RLM (`flagship_multi_pool_rlm.exs`)
+
+End-to-end demo showcasing Recursive Language Models with multi-pool routing:
+- Two strict-affinity DSPy pools (triage + RLM)
+- A hint-affinity analytics pool using numpy
+- RLM analysis over a long context buffer
+- Prompt history inspection (via LM history)
+
+**Note:** RLM uses `PythonInterpreter`, which requires Deno.
+
+```bash
+mix run --no-start examples/flagship_multi_pool_rlm.exs
+```
+
+**Run:** `mix run --no-start examples/flagship_multi_pool_rlm.exs`
+
+Guide: `guides/flagship_multi_pool_rlm.md`
 
 ---
 
@@ -313,13 +356,13 @@ Bypass DSPy modules and call the LM directly:
 - Returns list of completions
 
 ```elixir
-lm = DSPex.lm!("openai/gpt-4o-mini", temperature: 0.9)
+lm = DSPex.lm!("gemini/gemini-flash-lite-latest", temperature: 0.9)
 messages = [%{"role" => "user", "content" => "Tell me a joke about programming."}]
 completions = DSPex.method!(lm, "__call__", [], messages: messages)
 response = Enum.at(completions, 0)
 ```
 
-**Run:** `mix run examples/direct_lm_call.exs`
+**Run:** `mix run --no-start examples/direct_lm_call.exs`
 
 ---
 
@@ -357,7 +400,7 @@ result = DSPex.method!(predict, "forward", [], opts)
 | `:ml_inference` | 10 min | LLM inference (DSPex default) |
 | `:batch_job` | 1 hour | Long-running batch operations |
 
-**Run:** `mix run examples/timeout_test.exs`
+**Run:** `mix run --no-start examples/timeout_test.exs`
 
 ---
 
@@ -399,6 +442,8 @@ DSPEX_RUN_TIMEOUT_SECONDS=0 ./examples/run_all.sh
 | `math_reasoning.exs` | ChainOfThought | Math problem solving |
 | `custom_module.exs` | Pipeline | Custom module composition |
 | `optimization.exs` | Optimizer | BootstrapFewShot optimization |
+| `flagship_multi_pool_gepa.exs` | Flagship | Multi-pool GEPA + numpy analytics |
+| `flagship_multi_pool_rlm.exs` | Flagship | Multi-pool RLM + numpy analytics |
 | `direct_lm_call.exs` | Direct LM | Raw LM interaction |
 | `timeout_test.exs` | Various | Timeout configuration demo |
 
@@ -406,9 +451,9 @@ DSPEX_RUN_TIMEOUT_SECONDS=0 ./examples/run_all.sh
 
 ### Missing API Key
 ```
-Error: OPENAI_API_KEY not set
+Error: GEMINI_API_KEY not set
 ```
-Set your API key: `export OPENAI_API_KEY="your-key"`
+Set your API key: `export GEMINI_API_KEY="your-key"`
 
 ### Python/DSPy Not Installed
 ```

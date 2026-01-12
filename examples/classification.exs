@@ -1,12 +1,12 @@
 # Classification Example
 #
-# Run with: mix run examples/classification.exs
+# Run with: mix run --no-start examples/classification.exs
 
 DSPex.run(fn ->
   IO.puts("DSPex Classification Example")
   IO.puts("=============================\n")
 
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
 
   # Sentiment classification

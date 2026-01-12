@@ -1,7 +1,7 @@
 defmodule DSPex.MixProject do
   use Mix.Project
 
-  @version "0.3.0"
+  @version "0.5.0"
   @source_url "https://github.com/nshkrdotcom/dspex"
 
   def project do
@@ -40,7 +40,7 @@ defmodule DSPex.MixProject do
 
   defp deps do
     [
-      # SnakeBridge - Python bridge for DSPy (local path for development)
+      # SnakeBridge - Python bridge
       {:snakebridge, path: "../snakebridge"},
 
       # JSON encoding
@@ -56,7 +56,7 @@ defmodule DSPex.MixProject do
   defp python_deps do
     [
       # generate: :all enables full API surface generation
-      {:dspy, "2.6.5", generate: :all, submodules: true}
+      {:dspy, "3.1.2", generate: :all, submodules: true}
     ]
   end
 
@@ -75,6 +75,8 @@ defmodule DSPex.MixProject do
       extras: [
         "README.md",
         {"examples/README.md", filename: "examples"},
+        {"guides/flagship_multi_pool_gepa.md", filename: "flagship-multi-pool-gepa"},
+        {"guides/flagship_multi_pool_rlm.md", filename: "flagship-multi-pool-rlm"},
         "CHANGELOG.md",
         "LICENSE"
       ],
@@ -87,7 +89,7 @@ defmodule DSPex.MixProject do
   defp package do
     [
       name: "dspex",
-      files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE assets examples),
+      files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE assets),
       licenses: ["MIT"],
       links: %{
         "GitHub" => @source_url,

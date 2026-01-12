@@ -1,12 +1,12 @@
 # Summarization Example
 #
-# Run with: mix run examples/summarization.exs
+# Run with: mix run --no-start examples/summarization.exs
 
 DSPex.run(fn ->
   IO.puts("DSPex Summarization Example")
   IO.puts("============================\n")
 
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
 
   summarizer = DSPex.predict!("text -> summary")

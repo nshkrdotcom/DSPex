@@ -1,12 +1,12 @@
 # Direct LM Call Example
 #
-# Run with: mix run examples/direct_lm_call.exs
+# Run with: mix run --no-start examples/direct_lm_call.exs
 
 DSPex.run(fn ->
   IO.puts("DSPex Direct LM Call Example")
   IO.puts("==============================\n")
 
-  lm = DSPex.lm!("openai/gpt-4o-mini", temperature: 0.9)
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest", temperature: 0.9)
 
   # Call LM directly (not through a module)
   messages = [

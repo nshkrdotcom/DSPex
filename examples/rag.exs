@@ -1,8 +1,8 @@
 # Retrieval-Augmented Generation (RAG) Example
 #
-# Run with: mix run examples/rag.exs
+# Run with: mix run --no-start examples/rag.exs
 #
-# Requires: OPENAI_API_KEY environment variable
+# Requires: GEMINI_API_KEY environment variable
 
 defmodule SimpleRetriever do
   def retrieve(docs, query, k) do
@@ -28,7 +28,7 @@ DSPex.run(fn ->
   IO.puts("DSPex RAG Example")
   IO.puts("=================\n")
 
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
 
   docs = [

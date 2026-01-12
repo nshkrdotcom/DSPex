@@ -35,7 +35,7 @@ Add DSPex to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:dspex, "~> 0.3.0"}
+    {:dspex, "~> 0.5.0"}
   ]
 end
 ```
@@ -59,7 +59,7 @@ mix snakebridge.setup  # Installs dspy-ai automatically
 ```elixir
 DSPex.run(fn ->
   # 1. Create and configure a language model
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
 
   # 2. Create a predictor with a signature
@@ -110,14 +110,14 @@ answer = DSPex.attr!(result, "answer")
 Any LiteLLM-compatible provider works out of the box:
 
 ```elixir
+# Google Gemini (default)
+lm = DSPex.lm!("gemini/gemini-flash-lite-latest", temperature: 0.7)
+
 # OpenAI
-lm = DSPex.lm!("openai/gpt-4o-mini", temperature: 0.7)
+lm = DSPex.lm!("openai/gpt-4o-mini")
 
 # Anthropic
 lm = DSPex.lm!("anthropic/claude-3-sonnet-20240229")
-
-# Google Gemini
-lm = DSPex.lm!("google/gemini-pro")
 
 # Local Ollama
 lm = DSPex.lm!("ollama/llama2")
@@ -128,7 +128,7 @@ lm = DSPex.lm!("ollama/llama2")
 Bypass modules and call the LM directly:
 
 ```elixir
-lm = DSPex.lm!("openai/gpt-4o-mini")
+lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
 DSPex.configure!(lm: lm)
 
 # Direct call with messages
@@ -138,27 +138,36 @@ response = DSPex.method!(lm, "forward", [messages])
 
 ## Examples
 
-DSPex includes 17 comprehensive examples demonstrating various use cases:
+DSPex includes 19 comprehensive examples demonstrating various use cases:
+
+Use `mix run --no-start` so DSPex owns the Snakepit lifecycle and closes the
+process registry DETS cleanly (avoids repair warnings after unclean exits).
 
 | Example | Description | Run Command |
 |---------|-------------|-------------|
-| `basic.exs` | Simple Q&A prediction | `mix run examples/basic.exs` |
-| `chain_of_thought.exs` | Reasoning with visible steps | `mix run examples/chain_of_thought.exs` |
-| `qa_with_context.exs` | Context-aware Q&A | `mix run examples/qa_with_context.exs` |
-| `multi_hop_qa.exs` | Multi-hop question answering | `mix run examples/multi_hop_qa.exs` |
-| `rag.exs` | Retrieval-augmented generation | `mix run examples/rag.exs` |
-| `custom_signature.exs` | Signatures with instructions | `mix run examples/custom_signature.exs` |
-| `multi_field.exs` | Multiple inputs/outputs | `mix run examples/multi_field.exs` |
-| `classification.exs` | Sentiment analysis | `mix run examples/classification.exs` |
-| `entity_extraction.exs` | Extract people, orgs, locations | `mix run examples/entity_extraction.exs` |
-| `code_gen.exs` | Code generation with reasoning | `mix run examples/code_gen.exs` |
-| `math_reasoning.exs` | Complex math problem solving | `mix run examples/math_reasoning.exs` |
-| `summarization.exs` | Text summarization | `mix run examples/summarization.exs` |
-| `translation.exs` | Multi-language translation | `mix run examples/translation.exs` |
-| `custom_module.exs` | Custom module composition | `mix run examples/custom_module.exs` |
-| `optimization.exs` | BootstrapFewShot optimization | `mix run examples/optimization.exs` |
-| `direct_lm_call.exs` | Direct LM interaction | `mix run examples/direct_lm_call.exs` |
-| `timeout_test.exs` | Timeout configuration demo | `mix run examples/timeout_test.exs` |
+| `basic.exs` | Simple Q&A prediction | `mix run --no-start examples/basic.exs` |
+| `chain_of_thought.exs` | Reasoning with visible steps | `mix run --no-start examples/chain_of_thought.exs` |
+| `qa_with_context.exs` | Context-aware Q&A | `mix run --no-start examples/qa_with_context.exs` |
+| `multi_hop_qa.exs` | Multi-hop question answering | `mix run --no-start examples/multi_hop_qa.exs` |
+| `rag.exs` | Retrieval-augmented generation | `mix run --no-start examples/rag.exs` |
+| `custom_signature.exs` | Signatures with instructions | `mix run --no-start examples/custom_signature.exs` |
+| `multi_field.exs` | Multiple inputs/outputs | `mix run --no-start examples/multi_field.exs` |
+| `classification.exs` | Sentiment analysis | `mix run --no-start examples/classification.exs` |
+| `entity_extraction.exs` | Extract people, orgs, locations | `mix run --no-start examples/entity_extraction.exs` |
+| `code_gen.exs` | Code generation with reasoning | `mix run --no-start examples/code_gen.exs` |
+| `math_reasoning.exs` | Complex math problem solving | `mix run --no-start examples/math_reasoning.exs` |
+| `summarization.exs` | Text summarization | `mix run --no-start examples/summarization.exs` |
+| `translation.exs` | Multi-language translation | `mix run --no-start examples/translation.exs` |
+| `custom_module.exs` | Custom module composition | `mix run --no-start examples/custom_module.exs` |
+| `optimization.exs` | BootstrapFewShot optimization | `mix run --no-start examples/optimization.exs` |
+| `flagship_multi_pool_gepa.exs` | Multi-pool GEPA + numpy analytics pipeline | `mix run --no-start examples/flagship_multi_pool_gepa.exs` |
+| `flagship_multi_pool_rlm.exs` | Multi-pool RLM + numpy analytics pipeline | `mix run --no-start examples/flagship_multi_pool_rlm.exs` |
+| `direct_lm_call.exs` | Direct LM interaction | `mix run --no-start examples/direct_lm_call.exs` |
+| `timeout_test.exs` | Timeout configuration demo | `mix run --no-start examples/timeout_test.exs` |
+
+For flagship walkthroughs, see:
+- `guides/flagship_multi_pool_gepa.md` (GEPA)
+- `guides/flagship_multi_pool_rlm.md` (RLM)
 
 ## Timeout Configuration
 
@@ -284,7 +293,7 @@ All functions have `!` variants that raise on error instead of returning `{:erro
 
 - **Elixir** ~> 1.18
 - **Python** 3.8+
-- **API Key** — Set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc. based on your provider
+- **API Key** — Set `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc. based on your provider
 
 ## Related Projects
 

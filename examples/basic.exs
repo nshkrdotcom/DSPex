@@ -1,8 +1,8 @@
 # Basic DSPex Example
 #
-# Run with: mix run examples/basic.exs
+# Run with: mix run --no-start examples/basic.exs
 #
-# Requires: OPENAI_API_KEY environment variable
+# Requires: GEMINI_API_KEY environment variable
 
 DSPex.run(fn ->
   IO.puts("DSPex Basic Example")
@@ -10,8 +10,8 @@ DSPex.run(fn ->
 
   # Create and configure LM
   IO.puts("1. Creating language model...")
-  lm = DSPex.lm!("openai/gpt-4o-mini", temperature: 0.7)
-  IO.puts("   Created: openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest", temperature: 0.7)
+  IO.puts("   Created: gemini/gemini-flash-lite-latest")
 
   IO.puts("\n2. Configuring DSPy...")
   DSPex.configure!(lm: lm)

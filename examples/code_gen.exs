@@ -1,12 +1,12 @@
 # Code Generation Example
 #
-# Run with: mix run examples/code_gen.exs
+# Run with: mix run --no-start examples/code_gen.exs
 
 DSPex.run(fn ->
   IO.puts("DSPex Code Generation Example")
   IO.puts("===============================\n")
 
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
 
   coder = DSPex.chain_of_thought!("task, language -> code")

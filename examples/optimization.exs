@@ -1,21 +1,22 @@
 # Optimization Example (BootstrapFewShot)
 #
-# Run with: mix run examples/optimization.exs
+# Run with: mix run --no-start examples/optimization.exs
 #
-# Requires: OPENAI_API_KEY environment variable
+# Requires: GEMINI_API_KEY environment variable
 
 DSPex.run(fn ->
   IO.puts("DSPex Optimization Example")
   IO.puts("==========================\n")
 
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
 
   student = DSPex.predict!("question -> answer")
 
   build_example = fn question, answer ->
-    example = DSPex.call!("dspy", "Example", [], question: question, answer: answer)
-    DSPex.method!(example, "with_inputs", ["question"])
+    {:ok, example} = Dspy.Example.new([], question: question, answer: answer)
+    {:ok, example} = Dspy.Example.with_inputs(example, ["question"])
+    example
   end
 
   trainset = [
@@ -24,10 +25,10 @@ DSPex.run(fn ->
     build_example.("What color do you get by mixing blue and yellow?", "Green")
   ]
 
-  optimizer = DSPex.call!("dspy", "BootstrapFewShot", [])
+  {:ok, optimizer} = Dspy.BootstrapFewShot.new([])
 
   # Some DSPy optimizers accept a metric argument. If needed, pass `metric:` here.
-  optimized = DSPex.method!(optimizer, "compile", [student], trainset: trainset)
+  {:ok, optimized} = Dspy.BootstrapFewShot.compile(optimizer, student, trainset: trainset)
 
   question = "What is the capital of Italy?"
   result = DSPex.method!(optimized, "forward", [], question: question)

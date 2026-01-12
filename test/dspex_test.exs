@@ -45,6 +45,17 @@ defmodule DSPexTest do
 
     test "exports attr/2" do
       assert function_exported?(DSPex, :attr, 2)
+      assert function_exported?(DSPex, :attr, 3)
+    end
+
+    test "exports attr!/2 and attr!/3" do
+      assert function_exported?(DSPex, :attr!, 2)
+      assert function_exported?(DSPex, :attr!, 3)
+    end
+
+    test "exports set_attr/3 and set_attr/4" do
+      assert function_exported?(DSPex, :set_attr, 3)
+      assert function_exported?(DSPex, :set_attr, 4)
     end
   end
 

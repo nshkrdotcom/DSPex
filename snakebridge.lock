@@ -5,7 +5,7 @@
   },
   "environment": {
     "elixir_version": "1.18.4",
-    "generator_hash": "414f40015bf26aeec26eea176fde200f683161c67c898cbd549c228fab6baa0a",
+    "generator_hash": "79886ffdbf8011c74b010a281617d713dd8799618d19ca3020def9d89664073e",
     "hardware": {
       "accelerator": "cpu",
       "cpu_features": [
@@ -26,24 +26,24 @@
       "arch": "x86_64",
       "os": "linux"
     },
-    "python_packages_hash": "sha256:cb49be0a4c595826a69593626ad2083ba29e3cd5213518511bce55d3ae6afdce",
+    "python_packages_hash": "sha256:9c3a452db43d30d0f3b2a489ed870b18ac04a848047629e4c52872100098de8c",
     "python_platform": "x86_64-pc-linux-gnu",
-    "python_runtime_hash": "1319c137ea5d30f1d7599943cb0e72666648c20a94cf5932dd095364d07dafeb",
+    "python_runtime_hash": "df2bb64c335c6096abfe779d140288d2ff1f66d033f7472986e3032854e5c9ee",
     "python_version": "3.12.3",
-    "snakebridge_version": "0.8.1"
+    "snakebridge_version": "0.10.0"
   },
   "libraries": {
     "dspy": {
       "hash": null,
-      "requested": "2.6.5",
-      "resolved": "2.6.5"
+      "requested": "3.1.2",
+      "resolved": "3.1.2"
     }
   },
   "python_packages": {
     "dspy": {
-      "version": "2.6.5",
+      "version": "3.1.2",
       "hash": null
     }
   },
-  "version": "0.8.1"
+  "version": "0.10.0"
 }

@@ -1,12 +1,12 @@
 # Q&A with Context Example
 #
-# Run with: mix run examples/qa_with_context.exs
+# Run with: mix run --no-start examples/qa_with_context.exs
 
 DSPex.run(fn ->
   IO.puts("DSPex Q&A with Context Example")
   IO.puts("================================\n")
 
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
 
   qa = DSPex.predict!("context, question -> answer")

@@ -1,14 +1,14 @@
 # Multi-hop QA Example
 #
-# Run with: mix run examples/multi_hop_qa.exs
+# Run with: mix run --no-start examples/multi_hop_qa.exs
 #
-# Requires: OPENAI_API_KEY environment variable
+# Requires: GEMINI_API_KEY environment variable
 
 DSPex.run(fn ->
   IO.puts("DSPex Multi-hop QA Example")
   IO.puts("=============================\n")
 
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
 
   hop1 = DSPex.predict!("question -> answer")

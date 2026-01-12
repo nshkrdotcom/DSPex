@@ -1,12 +1,12 @@
 # Entity Extraction Example
 #
-# Run with: mix run examples/entity_extraction.exs
+# Run with: mix run --no-start examples/entity_extraction.exs
 
 DSPex.run(fn ->
   IO.puts("DSPex Entity Extraction Example")
   IO.puts("=================================\n")
 
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
 
   extractor = DSPex.predict!("text -> people, organizations, locations")

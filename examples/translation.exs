@@ -1,12 +1,12 @@
 # Translation Example
 #
-# Run with: mix run examples/translation.exs
+# Run with: mix run --no-start examples/translation.exs
 
 DSPex.run(fn ->
   IO.puts("DSPex Translation Example")
   IO.puts("==========================\n")
 
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
 
   translator = DSPex.predict!("text, target_language -> translation")

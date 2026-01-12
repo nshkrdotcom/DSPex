@@ -75,7 +75,7 @@ run_example() {
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
 
-    if run_cmd mix run "$file" 2>&1; then
+    if run_cmd mix run --no-start "$file" 2>&1; then
         local end=$(date +%s)
         local duration=$((end - start))
         RESULTS+=("0")
@@ -129,8 +129,8 @@ main() {
     print_header
 
     # Check for API key
-    if [[ -z "$OPENAI_API_KEY" ]]; then
-        echo -e "${RED}Error: OPENAI_API_KEY not set${NC}"
+    if [[ -z "$GEMINI_API_KEY" ]]; then
+        echo -e "${RED}Error: GEMINI_API_KEY not set${NC}"
         exit 1
     fi
 
@@ -156,6 +156,8 @@ main() {
         "examples/custom_signature.exs"
         "examples/custom_module.exs"
         "examples/optimization.exs"
+        "examples/flagship_multi_pool_gepa.exs"
+        "examples/flagship_multi_pool_rlm.exs"
         "examples/direct_lm_call.exs"
     )
 

@@ -1,8 +1,8 @@
 # Custom Module Example
 #
-# Run with: mix run examples/custom_module.exs
+# Run with: mix run --no-start examples/custom_module.exs
 #
-# Requires: OPENAI_API_KEY environment variable
+# Requires: GEMINI_API_KEY environment variable
 
 defmodule CustomQA do
   def new do
@@ -27,7 +27,7 @@ DSPex.run(fn ->
   IO.puts("DSPex Custom Module Example")
   IO.puts("===========================\n")
 
-  lm = DSPex.lm!("openai/gpt-4o-mini")
+  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
   DSPex.configure!(lm: lm)
 
   qa = CustomQA.new()
