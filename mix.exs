@@ -41,7 +41,7 @@ defmodule DSPex.MixProject do
   defp deps do
     [
       # SnakeBridge - Python bridge
-      {:snakebridge, path: "../snakebridge"},
+      {:snakebridge, "~> 0.11.0"},
 
       # JSON encoding
       {:jason, "~> 1.4"},
@@ -89,11 +89,10 @@ defmodule DSPex.MixProject do
   defp package do
     [
       name: "dspex",
-      files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE assets),
+      files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE),
       licenses: ["MIT"],
       links: %{
         "GitHub" => @source_url,
-        "Documentation" => "https://hexdocs.pm/dspex",
         "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
       },
       maintainers: ["nshkrdotcom"]

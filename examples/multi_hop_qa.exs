@@ -22,11 +22,14 @@ DSPex.run(fn ->
   state = DSPex.attr!(hop1_result, "answer")
   IO.puts("Hop 1 answer: #{state}")
 
-  context = "The University of Michigan is located in #{state}."
+  capitals = %{"Michigan" => "Lansing"}
+  capital = Map.get(capitals, state, "Unknown")
+  context = "The capital of #{state} is #{capital}."
+  IO.puts("Retrieved context: #{context}")
   hop2_question = "What is the capital of #{state}?"
   hop2_result = DSPex.method!(hop2, "forward", [], context: context, question: hop2_question)
-  capital = DSPex.attr!(hop2_result, "answer")
-  IO.puts("Hop 2 answer: #{capital}\n")
+  hop2_answer = DSPex.attr!(hop2_result, "answer")
+  IO.puts("Hop 2 answer: #{hop2_answer}\n")
 
   IO.puts("Done!")
 end)

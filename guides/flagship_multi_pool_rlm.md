@@ -20,14 +20,18 @@ mix snakebridge.setup
 export GEMINI_API_KEY="your-key-here"
 ```
 
-RLM uses `PythonInterpreter`, which requires Deno:
+RLM uses `PythonInterpreter`, which requires Deno (external runtime binary):
 
 ```bash
-# macOS/Linux
-curl -fsSL https://deno.land/install.sh | sh
+asdf plugin add deno https://github.com/asdf-community/asdf-deno.git
+asdf install
+```
 
-# Or via Homebrew
-brew install deno
+Or install directly:
+
+```bash
+curl -fsSL https://deno.land/install.sh | sh
+export PATH="$HOME/.deno/bin:$PATH"
 ```
 
 ## Running The Example
@@ -55,11 +59,11 @@ that must remain on the same worker for session consistency.
 
 ## RLM Usage
 
-RLM is created with a signature and a capped recursion budget:
+RLM is created with a signature plus iteration and call budgets:
 
 ```elixir
 {:ok, rlm} =
-  Dspy.Predict.RLM.new(
+  Dspy.Predict.RLMClass.new(
     "context, query -> output",
     4,
     12,
@@ -68,7 +72,6 @@ RLM is created with a signature and a capped recursion budget:
     [],
     nil,
     nil,
-    max_depth: 2,
     __runtime__: [pool_name: :rlm_pool, session_id: session_id]
   )
 ```

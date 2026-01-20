@@ -4,10 +4,10 @@
 #
 # Requires: GEMINI_API_KEY environment variable
 
+alias Dspy.{Example, GEPA}
 alias SnakeBridge.ConfigHelper
 alias SnakeBridge.Runtime
 alias Snakepit.Bridge.SessionStore
-alias Dspy.{Example, GEPA}
 
 defmodule DSPex.FlagshipMultiPoolGepa do
   @moduledoc false
@@ -469,63 +469,32 @@ defmodule DSPex.FlagshipMultiPoolGepa do
     runtime_opts = runtime(session.pool, session.session_id)
     IO.puts("  #{label}:")
 
-    # Debug: Check what we have
-    lm = Map.get(session, :lm)
-    IO.puts("    [debug] lm ref: #{if lm, do: "present", else: "nil"}")
-
-    if lm do
-      # Debug: Check history length directly in Python
-      len_code = "len(getattr(lm, 'history', []))"
-
-      history_len =
-        DSPex.call!("builtins", "eval", [len_code, %{"lm" => lm}], __runtime__: runtime_opts)
-
-      IO.puts("    [debug] Python-side history length: #{history_len}")
-
-      # Debug: Check what type history is
-      type_code = "type(getattr(lm, 'history', None)).__name__"
-
-      history_type =
-        DSPex.call!("builtins", "eval", [type_code, %{"lm" => lm}], __runtime__: runtime_opts)
-
-      IO.puts("    [debug] history type: #{history_type}")
-    end
-
-    # Fetch actual history data
-    case fetch_lm_history(session, 6) do
-      [] ->
+    case fetch_prompt_history(runtime_opts, 6) do
+      {:ok, []} ->
         IO.puts("    (no history)")
 
-      history ->
+      {:ok, history} ->
         Enum.with_index(history, 1)
         |> Enum.each(fn {entry, idx} ->
           print_history_entry(idx, entry)
         end)
+
+      {:error, reason} ->
+        IO.puts("    (history fetch failed: #{reason})")
     end
   end
 
-  defp fetch_lm_history(session, limit) do
-    runtime_opts = runtime(session.pool, session.session_id)
-    lm = Map.get(session, :lm)
+  defp fetch_prompt_history(runtime_opts, limit) do
+    history = DSPex.call!("dspy", "inspect_history", [limit], __runtime__: runtime_opts)
 
-    if is_nil(lm) do
-      []
+    if is_list(history) do
+      {:ok, history}
     else
-      # Use eval with lm in globals - same approach that works for debug
-      code = "list(lm.history[-#{limit}:])"
-      history = DSPex.call!("builtins", "eval", [code, %{"lm" => lm}], __runtime__: runtime_opts)
-
-      IO.puts("    [debug] fetched history: #{inspect(history, limit: 3, printable_limit: 200)}")
-
-      case history do
-        list when is_list(list) -> list
-        _ -> []
-      end
+      {:ok, []}
     end
   rescue
     e ->
-      IO.puts("    [debug] fetch failed: #{Exception.message(e)})")
-      []
+      {:error, Exception.message(e)}
   end
 
   defp print_history_entry(idx, entry) when is_map(entry) do

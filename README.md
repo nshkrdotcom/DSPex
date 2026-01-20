@@ -30,6 +30,15 @@ DSPex brings [DSPy](https://github.com/stanfordnlp/dspy) — Stanford's framewor
 
 ## Installation
 
+Prerequisites (one-time):
+- Python 3.9+
+- [uv](https://docs.astral.sh/uv/) for Python package setup:
+  `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- Optional (RLM example only): Deno runtime (external binary), install via asdf:
+  `asdf plugin add deno https://github.com/asdf-community/asdf-deno.git`
+  `asdf install`
+  (uses the pinned version in `.tool-versions`)
+
 Add DSPex to your `mix.exs`:
 
 ```elixir
@@ -51,8 +60,12 @@ Then install dependencies and set up Python:
 
 ```bash
 mix deps.get
-mix snakebridge.setup  # Installs dspy-ai automatically
+mix snakebridge.setup  # Creates managed venv + installs dspy-ai automatically
 ```
+
+SnakeBridge manages an isolated venv under `priv/snakepit/python/venv`; no manual venv creation or pip installs needed.
+
+The RLM flagship example uses DSPy’s default PythonInterpreter (Pyodide/WASM), which requires Deno on your PATH.
 
 ## Quick Start
 

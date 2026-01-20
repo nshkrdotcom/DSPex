@@ -3,8 +3,9 @@
 # Run with: mix run --no-start examples/flagship_multi_pool_rlm.exs
 #
 # Requires: GEMINI_API_KEY environment variable
-# Requires: Deno for PythonInterpreter (see https://docs.deno.com/runtime/getting_started/installation/)
+# Requires: Deno for PythonInterpreter (install via asdf or https://deno.land/install)
 
+alias Dspy.Predict.RLMClass
 alias SnakeBridge.ConfigHelper
 alias SnakeBridge.Runtime
 alias Snakepit.Bridge.SessionStore
@@ -16,7 +17,6 @@ defmodule DSPex.FlagshipMultiPoolRlm do
   @triage_signature "ticket -> category, urgency, action"
   @rlm_signature "context, query -> output"
   @rlm_max_iterations 4
-  @rlm_max_depth 2
   @rlm_max_llm_calls 12
   @rlm_max_output_chars 4_000
   @rlm_verbose false
@@ -158,7 +158,7 @@ defmodule DSPex.FlagshipMultiPoolRlm do
     :ok = DSPex.configure!(with_runtime([lm: lm], :rlm_pool, session_id))
 
     {:ok, rlm} =
-      Dspy.Predict.RLM.new(
+      RLMClass.new(
         @rlm_signature,
         @rlm_max_iterations,
         @rlm_max_llm_calls,
@@ -167,7 +167,7 @@ defmodule DSPex.FlagshipMultiPoolRlm do
         @rlm_tools,
         @rlm_sub_lm,
         @rlm_interpreter,
-        with_runtime([max_depth: @rlm_max_depth], :rlm_pool, session_id)
+        with_runtime([], :rlm_pool, session_id)
       )
 
     %{
@@ -261,7 +261,7 @@ defmodule DSPex.FlagshipMultiPoolRlm do
           raise "RLM error: #{inspect(reason)}"
       end
     else
-      IO.puts("  Deno not found; skipping RLM step (install Deno to enable RLM).")
+      print_deno_missing()
       %{query: nil, answer: nil}
     end
   end
@@ -303,8 +303,7 @@ defmodule DSPex.FlagshipMultiPoolRlm do
 
   defp build_rlm_context(triage_results) do
     incidents =
-      triage_results
-      |> Enum.map(fn item ->
+      Enum.map_join(triage_results, "\n\n", fn item ->
         """
         Ticket #{item.id}:
           - Report: #{item.text}
@@ -313,7 +312,6 @@ defmodule DSPex.FlagshipMultiPoolRlm do
           - Action: #{item.action}
         """
       end)
-      |> Enum.join("\n\n")
 
     timeline = """
     Timeline notes:
@@ -358,28 +356,31 @@ defmodule DSPex.FlagshipMultiPoolRlm do
     runtime_opts = runtime(session.pool, session.session_id)
     IO.puts("  #{label}:")
 
-    lm = Map.get(session, :lm)
+    case fetch_prompt_history(runtime_opts, 6) do
+      {:ok, []} ->
+        IO.puts("    (no history)")
 
-    if lm do
-      code = "list(lm.history[-6:])"
-      history = DSPex.call!("builtins", "eval", [code, %{"lm" => lm}], __runtime__: runtime_opts)
+      {:ok, history} ->
+        Enum.with_index(history, 1)
+        |> Enum.each(fn {entry, idx} ->
+          print_history_entry(idx, entry)
+        end)
 
-      case history do
-        list when is_list(list) ->
-          Enum.with_index(list, 1)
-          |> Enum.each(fn {entry, idx} ->
-            print_history_entry(idx, entry)
-          end)
+      {:error, reason} ->
+        IO.puts("    (history fetch failed: #{reason})")
+    end
+  end
 
-        _ ->
-          IO.puts("    (no history)")
-      end
+  defp fetch_prompt_history(runtime_opts, limit) do
+    history = DSPex.call!("dspy", "inspect_history", [limit], __runtime__: runtime_opts)
+
+    if is_list(history) do
+      {:ok, history}
     else
-      IO.puts("    (no history)")
+      {:ok, []}
     end
   rescue
-    e ->
-      IO.puts("    (history fetch failed: #{Exception.message(e)})")
+    e -> {:error, Exception.message(e)}
   end
 
   defp print_history_entry(idx, entry) when is_map(entry) do
@@ -489,6 +490,35 @@ defmodule DSPex.FlagshipMultiPoolRlm do
 
   defp deno_available? do
     System.find_executable("deno") != nil
+  end
+
+  defp print_deno_missing do
+    IO.puts(ansi(:yellow, "  Deno not found; skipping RLM step."))
+
+    Enum.each(deno_install_instructions(), fn line ->
+      IO.puts(line)
+    end)
+  end
+
+  defp deno_install_instructions do
+    [
+      "  Deno is an external runtime binary used by DSPy RLM's default interpreter.",
+      "  Install (asdf):",
+      "    asdf plugin add deno https://github.com/asdf-community/asdf-deno.git",
+      "    asdf install",
+      "  Or install directly:",
+      "    curl -fsSL https://deno.land/install.sh | sh",
+      "    export PATH=\"$HOME/.deno/bin:$PATH\"",
+      "  Then rerun: mix run --no-start examples/flagship_multi_pool_rlm.exs"
+    ]
+  end
+
+  defp ansi(color, text) do
+    if IO.ANSI.enabled?() do
+      IO.ANSI.format([color, :bright, text, :reset]) |> IO.iodata_to_binary()
+    else
+      text
+    end
   end
 end
 

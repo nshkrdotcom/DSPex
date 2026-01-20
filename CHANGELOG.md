@@ -8,11 +8,15 @@ All notable changes to DSPex will be documented in this file.
 - Flagship multi-pool RLM example plus guide, including session rehydration and prompt history inspection.
 
 ### Changed
-- Regenerated DSPy wrappers/manifest with SnakeBridge 0.10.0 and DSPy 3.1.2 (full API surface, updated graceful serialization helpers).
+- Regenerated DSPy wrappers/manifest with SnakeBridge 0.11.0 and DSPy 3.1.2 (full API surface, updated graceful serialization helpers).
 - Examples now lean on generated wrappers for signature creation, examples, GEPA optimization, and RLM, with tuple return handling.
-- RLM flagship uses `Dspy.Predict.RLM` to match DSPy 3.1.2’s export path.
+- RLM flagship uses `Dspy.Predict.RLMClass` to match DSPy 3.1.2’s export path.
+- RLM flagship init now matches DSPy 3.1.2 RLM parameters (removed unsupported `max_depth`).
 - Flagship GEPA/RLM demos now inspect LM history via `builtins.eval` with graceful serialization safeguards.
 - Examples index, run-all script, and docs now include the RLM flagship demo and guide.
+- README setup now calls out `uv` and the managed venv location for first-time installs.
+- Runtime Python selection now prefers the Snakepit-managed venv, avoiding mismatched installs on clean setups.
+- RLM docs now include Deno/asdf setup guidance with a pinned `.tool-versions`.
 
 ## [0.4.0] - 2026-01-12
 

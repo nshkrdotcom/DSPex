@@ -13,6 +13,15 @@ mix snakebridge.setup
 export GEMINI_API_KEY="your-key-here"
 ```
 
+RLM example only (Deno runtime, external binary):
+
+```bash
+asdf plugin add deno https://github.com/asdf-community/asdf-deno.git
+asdf install
+```
+
+This uses the pinned Deno version in `.tool-versions`.
+
 ## Running Examples
 
 Run any example individually:
@@ -336,7 +345,8 @@ End-to-end demo showcasing Recursive Language Models with multi-pool routing:
 - RLM analysis over a long context buffer
 - Prompt history inspection (via LM history)
 
-**Note:** RLM uses `PythonInterpreter`, which requires Deno.
+**Note:** RLM uses `PythonInterpreter`, which requires Deno (external runtime).
+Install via asdf: `asdf plugin add deno https://github.com/asdf-community/asdf-deno.git` then `asdf install`.
 
 ```bash
 mix run --no-start examples/flagship_multi_pool_rlm.exs
