@@ -1,16 +1,18 @@
-# Math Reasoning Example
+# Math Reasoning Example - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/math_reasoning.exs
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Math Reasoning Example")
   IO.puts("==============================\n")
 
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-  DSPex.configure!(lm: lm)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, _} = Dspy.configure(lm: lm)
 
   # Chain of thought for math problems
-  solver = DSPex.chain_of_thought!("problem -> answer")
+  {:ok, solver} = Dspy.ChainOfThought.new("problem -> answer", [])
 
   problems = [
     "A train travels 120 miles in 2 hours. What is its average speed?",
@@ -20,9 +22,9 @@ DSPex.run(fn ->
 
   for problem <- problems do
     IO.puts("Problem: #{problem}")
-    result = DSPex.method!(solver, "forward", [], problem: problem)
-    reasoning = DSPex.attr!(result, "reasoning")
-    answer = DSPex.attr!(result, "answer")
+    {:ok, result} = Dspy.ChainOfThought.forward(solver, problem: problem)
+    {:ok, reasoning} = SnakeBridge.attr(result, "reasoning")
+    {:ok, answer} = SnakeBridge.attr(result, "answer")
     IO.puts("Reasoning: #{reasoning}")
     IO.puts("Answer: #{answer}\n")
   end

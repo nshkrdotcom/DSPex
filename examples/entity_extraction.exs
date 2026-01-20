@@ -1,15 +1,17 @@
-# Entity Extraction Example
+# Entity Extraction Example - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/entity_extraction.exs
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Entity Extraction Example")
   IO.puts("=================================\n")
 
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-  DSPex.configure!(lm: lm)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, _} = Dspy.configure(lm: lm)
 
-  extractor = DSPex.predict!("text -> people, organizations, locations")
+  {:ok, extractor} = Dspy.PredictClass.new("text -> people, organizations, locations", [])
 
   text = """
   Apple CEO Tim Cook announced a new partnership with Microsoft at their
@@ -19,11 +21,11 @@ DSPex.run(fn ->
 
   IO.puts("Text: #{String.trim(text)}\n")
 
-  result = DSPex.method!(extractor, "forward", [], text: text)
+  {:ok, result} = Dspy.PredictClass.forward(extractor, text: text)
 
-  people = DSPex.attr!(result, "people")
-  orgs = DSPex.attr!(result, "organizations")
-  locations = DSPex.attr!(result, "locations")
+  {:ok, people} = SnakeBridge.attr(result, "people")
+  {:ok, orgs} = SnakeBridge.attr(result, "organizations")
+  {:ok, locations} = SnakeBridge.attr(result, "locations")
 
   IO.puts("Extracted Entities:")
   IO.puts("  People: #{people}")

@@ -1,17 +1,19 @@
-# Optimization Example (BootstrapFewShot)
+# Optimization Example (BootstrapFewShot) - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/optimization.exs
 #
 # Requires: GEMINI_API_KEY environment variable
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Optimization Example")
   IO.puts("==========================\n")
 
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-  DSPex.configure!(lm: lm)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, _} = Dspy.configure(lm: lm)
 
-  student = DSPex.predict!("question -> answer")
+  {:ok, student} = Dspy.PredictClass.new("question -> answer", [])
 
   build_example = fn question, answer ->
     {:ok, example} = Dspy.Example.new([], question: question, answer: answer)
@@ -31,8 +33,8 @@ DSPex.run(fn ->
   {:ok, optimized} = Dspy.BootstrapFewShot.compile(optimizer, student, trainset: trainset)
 
   question = "What is the capital of Italy?"
-  result = DSPex.method!(optimized, "forward", [], question: question)
-  answer = DSPex.attr!(result, "answer")
+  {:ok, result} = Dspy.PredictClass.forward(optimized, question: question)
+  {:ok, answer} = SnakeBridge.attr(result, "answer")
 
   IO.puts("Question: #{question}")
   IO.puts("Answer: #{answer}\n")

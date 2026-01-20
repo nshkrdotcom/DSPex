@@ -1,34 +1,36 @@
-# Basic DSPex Example
+# Basic DSPex Example - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/basic.exs
 #
 # Requires: GEMINI_API_KEY environment variable
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Basic Example")
   IO.puts("===================\n")
 
-  # Create and configure LM
+  # Create and configure LM using native bindings
   IO.puts("1. Creating language model...")
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest", temperature: 0.7)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [], temperature: 0.7)
   IO.puts("   Created: gemini/gemini-flash-lite-latest")
 
   IO.puts("\n2. Configuring DSPy...")
-  DSPex.configure!(lm: lm)
+  {:ok, _} = Dspy.configure(lm: lm)
   IO.puts("   Configured!")
 
-  # Create predictor
+  # Create predictor using native bindings
   IO.puts("\n3. Creating Predict module...")
-  predict = DSPex.predict!("question -> answer")
+  {:ok, predict} = Dspy.PredictClass.new("question -> answer", [])
   IO.puts("   Created!")
 
-  # Run prediction
+  # Run prediction using native method call
   IO.puts("\n4. Running prediction...")
   question = "What is the capital of Hawaii?"
   IO.puts("   Q: #{question}")
 
-  result = DSPex.method!(predict, "forward", [], question: question)
-  answer = DSPex.attr!(result, "answer")
+  {:ok, result} = Dspy.PredictClass.forward(predict, question: question)
+  {:ok, answer} = SnakeBridge.attr(result, "answer")
   IO.puts("   A: #{answer}")
 
   IO.puts("\nDone!")

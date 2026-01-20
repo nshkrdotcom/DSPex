@@ -1,16 +1,18 @@
-# Multi-Field Signature Example
+# Multi-Field Signature Example - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/multi_field.exs
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Multi-Field Signature Example")
   IO.puts("=====================================\n")
 
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-  DSPex.configure!(lm: lm)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, _} = Dspy.configure(lm: lm)
 
   # Multiple inputs and outputs
-  analyzer = DSPex.predict!("title, content -> category, keywords, tone")
+  {:ok, analyzer} = Dspy.PredictClass.new("title, content -> category, keywords, tone", [])
 
   title = "Breaking: Major Tech Company Announces Layoffs"
   content = "The company cited economic headwinds and a need to focus on AI initiatives."
@@ -19,11 +21,11 @@ DSPex.run(fn ->
   IO.puts("  Title: #{title}")
   IO.puts("  Content: #{content}\n")
 
-  result = DSPex.method!(analyzer, "forward", [], title: title, content: content)
+  {:ok, result} = Dspy.PredictClass.forward(analyzer, title: title, content: content)
 
-  category = DSPex.attr!(result, "category")
-  keywords = DSPex.attr!(result, "keywords")
-  tone = DSPex.attr!(result, "tone")
+  {:ok, category} = SnakeBridge.attr(result, "category")
+  {:ok, keywords} = SnakeBridge.attr(result, "keywords")
+  {:ok, tone} = SnakeBridge.attr(result, "tone")
 
   IO.puts("Output:")
   IO.puts("  Category: #{category}")

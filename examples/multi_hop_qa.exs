@@ -1,25 +1,27 @@
-# Multi-hop QA Example
+# Multi-hop QA Example - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/multi_hop_qa.exs
 #
 # Requires: GEMINI_API_KEY environment variable
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Multi-hop QA Example")
   IO.puts("=============================\n")
 
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-  DSPex.configure!(lm: lm)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, _} = Dspy.configure(lm: lm)
 
-  hop1 = DSPex.predict!("question -> answer")
-  hop2 = DSPex.predict!("context, question -> answer")
+  {:ok, hop1} = Dspy.PredictClass.new("question -> answer", [])
+  {:ok, hop2} = Dspy.PredictClass.new("context, question -> answer", [])
 
   question = "What is the capital of the state where the University of Michigan is located?"
   IO.puts("Question: #{question}\n")
 
   hop1_question = "Which state is the University of Michigan located in?"
-  hop1_result = DSPex.method!(hop1, "forward", [], question: hop1_question)
-  state = DSPex.attr!(hop1_result, "answer")
+  {:ok, hop1_result} = Dspy.PredictClass.forward(hop1, question: hop1_question)
+  {:ok, state} = SnakeBridge.attr(hop1_result, "answer")
   IO.puts("Hop 1 answer: #{state}")
 
   capitals = %{"Michigan" => "Lansing"}
@@ -27,8 +29,8 @@ DSPex.run(fn ->
   context = "The capital of #{state} is #{capital}."
   IO.puts("Retrieved context: #{context}")
   hop2_question = "What is the capital of #{state}?"
-  hop2_result = DSPex.method!(hop2, "forward", [], context: context, question: hop2_question)
-  hop2_answer = DSPex.attr!(hop2_result, "answer")
+  {:ok, hop2_result} = Dspy.PredictClass.forward(hop2, context: context, question: hop2_question)
+  {:ok, hop2_answer} = SnakeBridge.attr(hop2_result, "answer")
   IO.puts("Hop 2 answer: #{hop2_answer}\n")
 
   IO.puts("Done!")

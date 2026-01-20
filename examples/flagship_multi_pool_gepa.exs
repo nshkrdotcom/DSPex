@@ -1,4 +1,4 @@
-# Flagship Multi-Pool + GEPA Demo
+# Flagship Multi-Pool + GEPA Demo - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/flagship_multi_pool_gepa.exs
 #
@@ -26,8 +26,10 @@ defmodule DSPex.FlagshipMultiPoolGepa do
   def run do
     configure_snakepit!()
 
-    DSPex.run(
+    Snakepit.run_as_script(
       fn ->
+        Application.ensure_all_started(:snakebridge)
+
         banner()
         print_pools()
 
@@ -175,9 +177,12 @@ defmodule DSPex.FlagshipMultiPoolGepa do
   defp setup_predictor(pool, label, signature, temperature) do
     session_id = unique_session(label)
     ensure_session(session_id)
-    lm = DSPex.lm!(@model, with_runtime([temperature: temperature], pool, session_id))
-    :ok = DSPex.configure!(with_runtime([lm: lm], pool, session_id))
-    predictor = DSPex.predict!(signature, with_runtime([], pool, session_id))
+
+    {:ok, lm} =
+      Dspy.LM.new(@model, [], with_runtime([temperature: temperature], pool, session_id))
+
+    {:ok, _} = Dspy.configure(with_runtime([lm: lm], pool, session_id))
+    {:ok, predictor} = Dspy.PredictClass.new(signature, [], with_runtime([], pool, session_id))
 
     %{
       label: label,
@@ -192,9 +197,12 @@ defmodule DSPex.FlagshipMultiPoolGepa do
   defp setup_chain_of_thought(pool, label, signature, temperature) do
     session_id = unique_session(label)
     ensure_session(session_id)
-    lm = DSPex.lm!(@model, with_runtime([temperature: temperature], pool, session_id))
-    :ok = DSPex.configure!(with_runtime([lm: lm], pool, session_id))
-    module = DSPex.chain_of_thought!(signature, with_runtime([], pool, session_id))
+
+    {:ok, lm} =
+      Dspy.LM.new(@model, [], with_runtime([temperature: temperature], pool, session_id))
+
+    {:ok, _} = Dspy.configure(with_runtime([lm: lm], pool, session_id))
+    {:ok, module} = Dspy.ChainOfThought.new(signature, [], with_runtime([], pool, session_id))
 
     %{
       label: label,
@@ -233,16 +241,18 @@ defmodule DSPex.FlagshipMultiPoolGepa do
 
   defp triage_ticket(session, ticket) do
     opts = with_runtime([ticket: ticket.text], session.pool, session.session_id)
-    result = DSPex.method!(session.predictor, "forward", [], opts)
+    {:ok, result} = Dspy.PredictClass.forward(session.predictor, opts)
+
+    runtime_opts = runtime(session.pool, session.session_id)
 
     %{
       id: ticket.id,
       text: ticket.text,
       gold_category: ticket.category,
       gold_urgency: ticket.urgency,
-      category: to_string(DSPex.attr!(result, "category")),
-      urgency: to_string(DSPex.attr!(result, "urgency")),
-      action: to_string(DSPex.attr!(result, "action")),
+      category: to_string(SnakeBridge.attr!(result, "category", __runtime__: runtime_opts)),
+      urgency: to_string(SnakeBridge.attr!(result, "urgency", __runtime__: runtime_opts)),
+      action: to_string(SnakeBridge.attr!(result, "action", __runtime__: runtime_opts)),
       session: session.label
     }
   end
@@ -296,7 +306,7 @@ defmodule DSPex.FlagshipMultiPoolGepa do
 
   defp call_insights(session, item) do
     opts = with_runtime([ticket: item.text], session.pool, session.session_id)
-    DSPex.method(session.module, "forward", [], opts)
+    Dspy.ChainOfThought.forward(session.module, opts)
   end
 
   defp format_insight(item, result, session) do
@@ -304,8 +314,8 @@ defmodule DSPex.FlagshipMultiPoolGepa do
 
     %{
       id: item.id,
-      summary: to_string(DSPex.attr!(result, "summary", __runtime__: runtime_opts)),
-      root_cause: to_string(DSPex.attr!(result, "root_cause", __runtime__: runtime_opts))
+      summary: to_string(SnakeBridge.attr!(result, "summary", __runtime__: runtime_opts)),
+      root_cause: to_string(SnakeBridge.attr!(result, "root_cause", __runtime__: runtime_opts))
     }
   end
 
@@ -330,11 +340,14 @@ defmodule DSPex.FlagshipMultiPoolGepa do
         score_prediction(item)
       end)
 
-    runtime = runtime(session.pool, session.session_id)
-    {:ok, numpy_version} = Runtime.get_module_attr("numpy", "__version__", __runtime__: runtime)
-    mean = DSPex.call!("numpy", "mean", [scores], __runtime__: runtime)
-    std = DSPex.call!("numpy", "std", [scores], __runtime__: runtime)
-    p80 = DSPex.call!("numpy", "percentile", [scores, 80], __runtime__: runtime)
+    runtime_opts = runtime(session.pool, session.session_id)
+
+    {:ok, numpy_version} =
+      Runtime.get_module_attr("numpy", "__version__", __runtime__: runtime_opts)
+
+    {:ok, mean} = SnakeBridge.call("numpy", "mean", [scores], __runtime__: runtime_opts)
+    {:ok, std} = SnakeBridge.call("numpy", "std", [scores], __runtime__: runtime_opts)
+    {:ok, p80} = SnakeBridge.call("numpy", "percentile", [scores, 80], __runtime__: runtime_opts)
 
     IO.puts("  numpy version: #{numpy_version}")
     IO.puts("  mean score: #{Float.round(mean, 3)}")
@@ -349,8 +362,8 @@ defmodule DSPex.FlagshipMultiPoolGepa do
 
     metric = build_gepa_metric(session)
 
-    reflection_lm =
-      DSPex.lm!(@model, with_runtime([temperature: 0.9], session.pool, session.session_id))
+    {:ok, reflection_lm} =
+      Dspy.LM.new(@model, [], with_runtime([temperature: 0.9], session.pool, session.session_id))
 
     {:ok, gepa} =
       GEPA.new(
@@ -405,9 +418,13 @@ defmodule DSPex.FlagshipMultiPoolGepa do
   end
 
   defp build_gepa_metric(session) do
-    runtime = runtime(session.pool, session.session_id)
-    dspy_module = DSPex.call!("importlib", "import_module", ["dspy"], __runtime__: runtime)
-    numpy_module = DSPex.call!("importlib", "import_module", ["numpy"], __runtime__: runtime)
+    runtime_opts = runtime(session.pool, session.session_id)
+
+    {:ok, dspy_module} =
+      SnakeBridge.call("importlib", "import_module", ["dspy"], __runtime__: runtime_opts)
+
+    {:ok, numpy_module} =
+      SnakeBridge.call("importlib", "import_module", ["numpy"], __runtime__: runtime_opts)
 
     code = ~S"""
     def metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
@@ -438,28 +455,26 @@ defmodule DSPex.FlagshipMultiPoolGepa do
 
     expr = "(lambda _ns: (exec(_code, _ns, _ns), _ns['metric'])[1])({})"
 
-    DSPex.call!("builtins", "eval", [expr, globals], __runtime__: runtime)
+    SnakeBridge.call!("builtins", "eval", [expr, globals], __runtime__: runtime_opts)
   end
 
   defp compare_baseline_vs_optimized(triage_sessions, optimizer_session, optimized, holdout) do
     baseline_session = List.first(triage_sessions)
     baseline = triage_ticket(baseline_session, holdout)
 
-    optimized_result =
-      DSPex.method!(
+    {:ok, optimized_result} =
+      Dspy.PredictClass.forward(
         optimized,
-        "forward",
-        [],
         with_runtime([ticket: holdout.text], optimizer_session.pool, optimizer_session.session_id)
       )
 
     runtime_opts = runtime(optimizer_session.pool, optimizer_session.session_id)
 
     optimized_category =
-      to_string(DSPex.attr!(optimized_result, "category", __runtime__: runtime_opts))
+      to_string(SnakeBridge.attr!(optimized_result, "category", __runtime__: runtime_opts))
 
     optimized_urgency =
-      to_string(DSPex.attr!(optimized_result, "urgency", __runtime__: runtime_opts))
+      to_string(SnakeBridge.attr!(optimized_result, "urgency", __runtime__: runtime_opts))
 
     IO.puts("  Baseline -> #{baseline.category}/#{baseline.urgency}")
     IO.puts("  Optimized -> #{optimized_category}/#{optimized_urgency}")
@@ -469,7 +484,7 @@ defmodule DSPex.FlagshipMultiPoolGepa do
     runtime_opts = runtime(session.pool, session.session_id)
     IO.puts("  #{label}:")
 
-    case fetch_prompt_history(runtime_opts, 6) do
+    case fetch_prompt_history(session, runtime_opts, 6) do
       {:ok, []} ->
         IO.puts("    (no history)")
 
@@ -484,8 +499,12 @@ defmodule DSPex.FlagshipMultiPoolGepa do
     end
   end
 
-  defp fetch_prompt_history(runtime_opts, limit) do
-    history = DSPex.call!("dspy", "inspect_history", [limit], __runtime__: runtime_opts)
+  defp fetch_prompt_history(session, runtime_opts, limit) do
+    lm = Map.fetch!(session, :lm)
+    code = "list(lm.history[-#{limit}:])"
+
+    {:ok, history} =
+      SnakeBridge.call("builtins", "eval", [code, %{"lm" => lm}], __runtime__: runtime_opts)
 
     if is_list(history) do
       {:ok, history}

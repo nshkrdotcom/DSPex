@@ -1,4 +1,4 @@
-# Custom Module Example
+# Custom Module Example - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/custom_module.exs
 #
@@ -6,29 +6,32 @@
 
 defmodule CustomQA do
   def new do
-    %{
-      extract: DSPex.predict!("question -> keywords"),
-      answer: DSPex.predict!("question, keywords -> answer")
-    }
+    {:ok, extract} = Dspy.PredictClass.new("question -> keywords", [])
+    {:ok, answer} = Dspy.PredictClass.new("question, keywords -> answer", [])
+    %{extract: extract, answer: answer}
   end
 
   def forward(%{extract: extract, answer: answer}, question) do
-    keywords_result = DSPex.method!(extract, "forward", [], question: question)
-    keywords = DSPex.attr!(keywords_result, "keywords")
+    {:ok, keywords_result} = Dspy.PredictClass.forward(extract, question: question)
+    {:ok, keywords} = SnakeBridge.attr(keywords_result, "keywords")
 
-    answer_result =
-      DSPex.method!(answer, "forward", [], question: question, keywords: keywords)
+    {:ok, answer_result} =
+      Dspy.PredictClass.forward(answer, question: question, keywords: keywords)
 
-    {keywords, DSPex.attr!(answer_result, "answer")}
+    {:ok, final_answer} = SnakeBridge.attr(answer_result, "answer")
+
+    {keywords, final_answer}
   end
 end
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Custom Module Example")
   IO.puts("===========================\n")
 
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-  DSPex.configure!(lm: lm)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, _} = Dspy.configure(lm: lm)
 
   qa = CustomQA.new()
   question = "How does Elixir build on Erlang's concurrency model?"

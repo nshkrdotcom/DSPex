@@ -1,15 +1,17 @@
-# Code Generation Example
+# Code Generation Example - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/code_gen.exs
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Code Generation Example")
   IO.puts("===============================\n")
 
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-  DSPex.configure!(lm: lm)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, _} = Dspy.configure(lm: lm)
 
-  coder = DSPex.chain_of_thought!("task, language -> code")
+  {:ok, coder} = Dspy.ChainOfThought.new("task, language -> code", [])
 
   tasks = [
     {"Write a function to check if a number is prime", "Python"},
@@ -18,9 +20,9 @@ DSPex.run(fn ->
 
   for {task, lang} <- tasks do
     IO.puts("Task: #{task} (#{lang})")
-    result = DSPex.method!(coder, "forward", [], task: task, language: lang)
-    reasoning = DSPex.attr!(result, "reasoning")
-    code = DSPex.attr!(result, "code")
+    {:ok, result} = Dspy.ChainOfThought.forward(coder, task: task, language: lang)
+    {:ok, reasoning} = SnakeBridge.attr(result, "reasoning")
+    {:ok, code} = SnakeBridge.attr(result, "code")
     IO.puts("Reasoning: #{String.slice(reasoning, 0..100)}...")
     IO.puts("Code:\n#{code}\n")
   end

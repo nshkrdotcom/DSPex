@@ -1,15 +1,17 @@
-# Q&A with Context Example
+# Q&A with Context Example - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/qa_with_context.exs
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Q&A with Context Example")
   IO.puts("================================\n")
 
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-  DSPex.configure!(lm: lm)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, _} = Dspy.configure(lm: lm)
 
-  qa = DSPex.predict!("context, question -> answer")
+  {:ok, qa} = Dspy.PredictClass.new("context, question -> answer", [])
 
   context = """
   The Erlang programming language was created by Joe Armstrong, Robert Virding,
@@ -28,8 +30,8 @@ DSPex.run(fn ->
   IO.puts("Context: #{String.slice(context, 0..100)}...\n")
 
   for question <- questions do
-    result = DSPex.method!(qa, "forward", [], context: context, question: question)
-    answer = DSPex.attr!(result, "answer")
+    {:ok, result} = Dspy.PredictClass.forward(qa, context: context, question: question)
+    {:ok, answer} = SnakeBridge.attr(result, "answer")
     IO.puts("Q: #{question}")
     IO.puts("A: #{answer}\n")
   end

@@ -1,16 +1,18 @@
-# Classification Example
+# Classification Example - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/classification.exs
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Classification Example")
   IO.puts("=============================\n")
 
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-  DSPex.configure!(lm: lm)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, _} = Dspy.configure(lm: lm)
 
   # Sentiment classification
-  classifier = DSPex.predict!("text -> sentiment")
+  {:ok, classifier} = Dspy.PredictClass.new("text -> sentiment", [])
 
   texts = [
     "I love this product! It's amazing!",
@@ -21,8 +23,8 @@ DSPex.run(fn ->
   IO.puts("Sentiment Classification:")
 
   for text <- texts do
-    result = DSPex.method!(classifier, "forward", [], text: text)
-    sentiment = DSPex.attr!(result, "sentiment")
+    {:ok, result} = Dspy.PredictClass.forward(classifier, text: text)
+    {:ok, sentiment} = SnakeBridge.attr(result, "sentiment")
     IO.puts("  \"#{String.slice(text, 0..40)}...\" -> #{sentiment}")
   end
 

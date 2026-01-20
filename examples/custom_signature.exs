@@ -1,13 +1,15 @@
-# Custom Signature with Instructions Example
+# Custom Signature with Instructions Example - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/custom_signature.exs
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Custom Signature Example")
   IO.puts("================================\n")
 
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-  DSPex.configure!(lm: lm)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, _} = Dspy.configure(lm: lm)
 
   # Create a signature with custom instructions via generated wrappers
   {:ok, sig} =
@@ -17,7 +19,7 @@ DSPex.run(fn ->
     )
 
   # Create predictor with custom signature
-  predict = DSPex.predict!(sig)
+  {:ok, predict} = Dspy.PredictClass.new(sig, [])
 
   questions = [
     "What is photosynthesis?",
@@ -25,8 +27,8 @@ DSPex.run(fn ->
   ]
 
   for question <- questions do
-    result = DSPex.method!(predict, "forward", [], question: question)
-    answer = DSPex.attr!(result, "answer")
+    {:ok, result} = Dspy.PredictClass.forward(predict, question: question)
+    {:ok, answer} = SnakeBridge.attr(result, "answer")
     IO.puts("Q: #{question}")
     IO.puts("A: #{answer}\n")
   end

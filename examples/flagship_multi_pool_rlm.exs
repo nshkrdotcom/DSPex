@@ -1,4 +1,4 @@
-# Flagship Multi-Pool + RLM Demo
+# Flagship Multi-Pool + RLM Demo - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/flagship_multi_pool_rlm.exs
 #
@@ -33,8 +33,10 @@ defmodule DSPex.FlagshipMultiPoolRlm do
   def run do
     configure_snakepit!()
 
-    DSPex.run(
+    Snakepit.run_as_script(
       fn ->
+        Application.ensure_all_started(:snakebridge)
+
         banner()
         print_pools()
 
@@ -154,8 +156,8 @@ defmodule DSPex.FlagshipMultiPoolRlm do
     session_id = unique_session("rlm")
     ensure_session(session_id)
 
-    lm = DSPex.lm!(@model, with_runtime([temperature: 0.3], :rlm_pool, session_id))
-    :ok = DSPex.configure!(with_runtime([lm: lm], :rlm_pool, session_id))
+    {:ok, lm} = Dspy.LM.new(@model, [], with_runtime([temperature: 0.3], :rlm_pool, session_id))
+    {:ok, _} = Dspy.configure(with_runtime([lm: lm], :rlm_pool, session_id))
 
     {:ok, rlm} =
       RLMClass.new(
@@ -193,9 +195,12 @@ defmodule DSPex.FlagshipMultiPoolRlm do
   defp setup_predictor(pool, label, signature, temperature) do
     session_id = unique_session(label)
     ensure_session(session_id)
-    lm = DSPex.lm!(@model, with_runtime([temperature: temperature], pool, session_id))
-    :ok = DSPex.configure!(with_runtime([lm: lm], pool, session_id))
-    predictor = DSPex.predict!(signature, with_runtime([], pool, session_id))
+
+    {:ok, lm} =
+      Dspy.LM.new(@model, [], with_runtime([temperature: temperature], pool, session_id))
+
+    {:ok, _} = Dspy.configure(with_runtime([lm: lm], pool, session_id))
+    {:ok, predictor} = Dspy.PredictClass.new(signature, [], with_runtime([], pool, session_id))
 
     %{
       label: label,
@@ -233,16 +238,18 @@ defmodule DSPex.FlagshipMultiPoolRlm do
 
   defp triage_ticket(session, ticket) do
     opts = with_runtime([ticket: ticket.text], session.pool, session.session_id)
-    result = DSPex.method!(session.predictor, "forward", [], opts)
+    {:ok, result} = Dspy.PredictClass.forward(session.predictor, opts)
+
+    runtime_opts = runtime(session.pool, session.session_id)
 
     %{
       id: ticket.id,
       text: ticket.text,
       gold_category: ticket.category,
       gold_urgency: ticket.urgency,
-      category: to_string(DSPex.attr!(result, "category")),
-      urgency: to_string(DSPex.attr!(result, "urgency")),
-      action: to_string(DSPex.attr!(result, "action")),
+      category: to_string(SnakeBridge.attr!(result, "category", __runtime__: runtime_opts)),
+      urgency: to_string(SnakeBridge.attr!(result, "urgency", __runtime__: runtime_opts)),
+      action: to_string(SnakeBridge.attr!(result, "action", __runtime__: runtime_opts)),
       session: session.label
     }
   end
@@ -283,10 +290,10 @@ defmodule DSPex.FlagshipMultiPoolRlm do
   defp call_rlm(session, context, query) do
     opts = with_runtime([context: context, query: query], session.pool, session.session_id)
 
-    case DSPex.method(session.rlm, "forward", [], opts) do
+    case RLMClass.forward(session.rlm, opts) do
       {:ok, result} ->
         runtime_opts = runtime(session.pool, session.session_id)
-        answer = DSPex.attr!(result, "output", __runtime__: runtime_opts)
+        {:ok, answer} = SnakeBridge.attr(result, "output", __runtime__: runtime_opts)
         {:ok, to_string(answer)}
 
       {:error, reason} ->
@@ -338,11 +345,14 @@ defmodule DSPex.FlagshipMultiPoolRlm do
         score_prediction(item)
       end)
 
-    runtime = runtime(session.pool, session.session_id)
-    {:ok, numpy_version} = Runtime.get_module_attr("numpy", "__version__", __runtime__: runtime)
-    mean = DSPex.call!("numpy", "mean", [scores], __runtime__: runtime)
-    std = DSPex.call!("numpy", "std", [scores], __runtime__: runtime)
-    p80 = DSPex.call!("numpy", "percentile", [scores, 80], __runtime__: runtime)
+    runtime_opts = runtime(session.pool, session.session_id)
+
+    {:ok, numpy_version} =
+      Runtime.get_module_attr("numpy", "__version__", __runtime__: runtime_opts)
+
+    {:ok, mean} = SnakeBridge.call("numpy", "mean", [scores], __runtime__: runtime_opts)
+    {:ok, std} = SnakeBridge.call("numpy", "std", [scores], __runtime__: runtime_opts)
+    {:ok, p80} = SnakeBridge.call("numpy", "percentile", [scores, 80], __runtime__: runtime_opts)
 
     IO.puts("  numpy version: #{numpy_version}")
     IO.puts("  mean score: #{Float.round(mean, 3)}")
@@ -356,7 +366,7 @@ defmodule DSPex.FlagshipMultiPoolRlm do
     runtime_opts = runtime(session.pool, session.session_id)
     IO.puts("  #{label}:")
 
-    case fetch_prompt_history(runtime_opts, 6) do
+    case fetch_prompt_history(session, runtime_opts, 6) do
       {:ok, []} ->
         IO.puts("    (no history)")
 
@@ -371,8 +381,12 @@ defmodule DSPex.FlagshipMultiPoolRlm do
     end
   end
 
-  defp fetch_prompt_history(runtime_opts, limit) do
-    history = DSPex.call!("dspy", "inspect_history", [limit], __runtime__: runtime_opts)
+  defp fetch_prompt_history(session, runtime_opts, limit) do
+    lm = Map.fetch!(session, :lm)
+    code = "list(lm.history[-#{limit}:])"
+
+    {:ok, history} =
+      SnakeBridge.call("builtins", "eval", [code, %{"lm" => lm}], __runtime__: runtime_opts)
 
     if is_list(history) do
       {:ok, history}

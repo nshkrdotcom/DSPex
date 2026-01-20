@@ -1,17 +1,19 @@
-# Timeout Configuration Examples
+# Timeout Configuration Examples - Using Generated Native Bindings
 #
-# Demonstrates SnakeBridge 0.10+ timeout architecture with DSPex
+# Demonstrates SnakeBridge 0.10+ timeout architecture
 #
 # Run with: mix run --no-start examples/timeout_test.exs
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Timeout Configuration Examples")
   IO.puts("=====================================\n")
 
-  # Setup
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-  DSPex.configure!(lm: lm)
-  predict = DSPex.predict!("question -> answer")
+  # Setup using native bindings
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, _} = Dspy.configure(lm: lm)
+  {:ok, predict} = Dspy.PredictClass.new("question -> answer", [])
 
   # -------------------------------------------------------------------------
   # Example 1: Default timeout (10 min via ml_inference profile)
@@ -19,8 +21,8 @@ DSPex.run(fn ->
   IO.puts("1. Default timeout (ml_inference profile = 10 min)")
   IO.puts("   DSPy calls automatically use :ml_inference profile")
 
-  result = DSPex.method!(predict, "forward", [], question: "What is 2+2?")
-  answer = DSPex.attr!(result, "answer")
+  {:ok, result} = Dspy.PredictClass.forward(predict, question: "What is 2+2?")
+  {:ok, answer} = SnakeBridge.attr(result, "answer")
   IO.puts("   Answer: #{answer}\n")
 
   # -------------------------------------------------------------------------
@@ -29,13 +31,13 @@ DSPex.run(fn ->
   IO.puts("2. Per-call timeout override (exact milliseconds)")
   IO.puts("   Using __runtime__: [timeout: 120_000] for 2 minute timeout")
 
-  result =
-    DSPex.method!(predict, "forward", [],
+  {:ok, result} =
+    Dspy.PredictClass.forward(predict,
       question: "What is the capital of France?",
       __runtime__: [timeout: 120_000]
     )
 
-  answer = DSPex.attr!(result, "answer")
+  {:ok, answer} = SnakeBridge.attr(result, "answer")
   IO.puts("   Answer: #{answer}\n")
 
   # -------------------------------------------------------------------------
@@ -44,51 +46,56 @@ DSPex.run(fn ->
   IO.puts("3. Per-call timeout with profile")
   IO.puts("   Using __runtime__: [timeout_profile: :batch_job] for 1 hour timeout")
 
-  result =
-    DSPex.method!(predict, "forward", [],
+  {:ok, result} =
+    Dspy.PredictClass.forward(predict,
       question: "Explain quantum computing briefly",
       __runtime__: [timeout_profile: :batch_job]
     )
 
-  answer = DSPex.attr!(result, "answer")
+  {:ok, answer} = SnakeBridge.attr(result, "answer")
   IO.puts("   Answer: #{answer}\n")
 
   # -------------------------------------------------------------------------
-  # Example 4: Using DSPex.with_timeout helper
+  # Example 4: Direct runtime option passing
   # -------------------------------------------------------------------------
-  IO.puts("4. Using DSPex.with_timeout/2 helper")
+  IO.puts("4. Direct runtime option passing")
+  IO.puts("   Passing timeout directly in opts")
 
-  opts = DSPex.with_timeout([question: "What color is the sky?"], timeout: 60_000)
-  IO.puts("   Options: #{inspect(opts)}")
+  {:ok, result} =
+    Dspy.PredictClass.forward(predict,
+      question: "What color is the sky?",
+      __runtime__: [timeout: 60_000]
+    )
 
-  result = DSPex.method!(predict, "forward", [], opts)
-  answer = DSPex.attr!(result, "answer")
+  {:ok, answer} = SnakeBridge.attr(result, "answer")
   IO.puts("   Answer: #{answer}\n")
 
   # -------------------------------------------------------------------------
-  # Example 5: Using DSPex.timeout_profile helper
+  # Example 5: Using streaming profile
   # -------------------------------------------------------------------------
-  IO.puts("5. Using DSPex.timeout_profile/1 helper")
+  IO.puts("5. Using streaming timeout profile")
 
-  profile_opts = DSPex.timeout_profile(:streaming)
-  IO.puts("   Profile opts: #{inspect(profile_opts)}")
+  {:ok, result} =
+    Dspy.PredictClass.forward(predict,
+      question: "What is 1+1?",
+      __runtime__: [timeout_profile: :streaming]
+    )
 
-  merged_opts = Keyword.merge([question: "What is 1+1?"], profile_opts)
-  result = DSPex.method!(predict, "forward", [], merged_opts)
-  answer = DSPex.attr!(result, "answer")
+  {:ok, answer} = SnakeBridge.attr(result, "answer")
   IO.puts("   Answer: #{answer}\n")
 
   # -------------------------------------------------------------------------
-  # Example 6: Using DSPex.timeout_ms helper
+  # Example 6: Custom timeout in milliseconds
   # -------------------------------------------------------------------------
-  IO.puts("6. Using DSPex.timeout_ms/1 helper")
+  IO.puts("6. Custom timeout (90 seconds)")
 
-  ms_opts = DSPex.timeout_ms(90_000)
-  IO.puts("   Timeout opts: #{inspect(ms_opts)}")
+  {:ok, result} =
+    Dspy.PredictClass.forward(predict,
+      question: "Name a planet",
+      __runtime__: [timeout: 90_000]
+    )
 
-  merged_opts = Keyword.merge([question: "Name a planet"], ms_opts)
-  result = DSPex.method!(predict, "forward", [], merged_opts)
-  answer = DSPex.attr!(result, "answer")
+  {:ok, answer} = SnakeBridge.attr(result, "answer")
   IO.puts("   Answer: #{answer}\n")
 
   # -------------------------------------------------------------------------

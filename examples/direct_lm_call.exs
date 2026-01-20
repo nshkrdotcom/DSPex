@@ -1,12 +1,14 @@
-# Direct LM Call Example
+# Direct LM Call Example - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/direct_lm_call.exs
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Direct LM Call Example")
   IO.puts("==============================\n")
 
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest", temperature: 0.9)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [], temperature: 0.9)
 
   # Call LM directly (not through a module)
   messages = [
@@ -16,7 +18,7 @@ DSPex.run(fn ->
   IO.puts("Calling LM directly with messages...\n")
 
   # Direct call returns list of completions
-  completions = DSPex.method!(lm, "__call__", [], messages: messages)
+  {:ok, completions} = Dspy.LM.call(lm, [], messages: messages)
 
   # Get first completion
   first = Enum.at(completions, 0)
@@ -27,7 +29,7 @@ DSPex.run(fn ->
     %{"role" => "user", "content" => "What's 2+2? Reply with just the number."}
   ]
 
-  completions2 = DSPex.method!(lm, "__call__", [], messages: messages2)
+  {:ok, completions2} = Dspy.LM.call(lm, [], messages: messages2)
   IO.puts("2+2 = #{Enum.at(completions2, 0)}")
 
   IO.puts("\nDone!")

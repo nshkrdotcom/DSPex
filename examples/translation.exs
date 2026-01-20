@@ -1,15 +1,17 @@
-# Translation Example
+# Translation Example - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/translation.exs
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Translation Example")
   IO.puts("==========================\n")
 
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-  DSPex.configure!(lm: lm)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, _} = Dspy.configure(lm: lm)
 
-  translator = DSPex.predict!("text, target_language -> translation")
+  {:ok, translator} = Dspy.PredictClass.new("text, target_language -> translation", [])
 
   phrases = [
     {"Hello, how are you?", "Spanish"},
@@ -18,8 +20,8 @@ DSPex.run(fn ->
   ]
 
   for {text, lang} <- phrases do
-    result = DSPex.method!(translator, "forward", [], text: text, target_language: lang)
-    translation = DSPex.attr!(result, "translation")
+    {:ok, result} = Dspy.PredictClass.forward(translator, text: text, target_language: lang)
+    {:ok, translation} = SnakeBridge.attr(result, "translation")
     IO.puts("#{text}")
     IO.puts("  -> [#{lang}] #{translation}\n")
   end

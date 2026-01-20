@@ -1,15 +1,17 @@
-# Summarization Example
+# Summarization Example - Using Generated Native Bindings
 #
 # Run with: mix run --no-start examples/summarization.exs
 
-DSPex.run(fn ->
+Snakepit.run_as_script(fn ->
+  Application.ensure_all_started(:snakebridge)
+
   IO.puts("DSPex Summarization Example")
   IO.puts("============================\n")
 
-  lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-  DSPex.configure!(lm: lm)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, _} = Dspy.configure(lm: lm)
 
-  summarizer = DSPex.predict!("text -> summary")
+  {:ok, summarizer} = Dspy.PredictClass.new("text -> summary", [])
 
   text = """
   Elixir is a dynamic, functional language for building scalable and maintainable
@@ -23,8 +25,8 @@ DSPex.run(fn ->
   IO.puts(String.trim(text))
   IO.puts("")
 
-  result = DSPex.method!(summarizer, "forward", [], text: text)
-  summary = DSPex.attr!(result, "summary")
+  {:ok, result} = Dspy.PredictClass.forward(summarizer, text: text)
+  {:ok, summary} = SnakeBridge.attr(result, "summary")
 
   IO.puts("Summary: #{summary}")
   IO.puts("\nDone!")

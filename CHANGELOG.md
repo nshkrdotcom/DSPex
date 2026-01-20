@@ -2,6 +2,16 @@
 
 All notable changes to DSPex will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- All examples now use generated native bindings (`Dspy.*` modules) instead of the `DSPex` wrapper layer.
+- Examples use `Dspy.LM.new/3`, `Dspy.PredictClass.new/3`, `Dspy.ChainOfThought.new/3` for module creation.
+- Examples use `Dspy.PredictClass.forward/2`, `Dspy.ChainOfThought.forward/2` for inference calls.
+- Examples use `SnakeBridge.attr/3` and `SnakeBridge.call/4` for attribute access and generic calls.
+- Examples use `Snakepit.run_as_script/2` instead of `DSPex.run/2`.
+- Flagship demos updated to use native `Dspy.GEPA`, `Dspy.BootstrapFewShot`, and `Dspy.Predict.RLMClass` modules.
+
 ## [0.5.0] - 2026-01-19
 
 ### Added
