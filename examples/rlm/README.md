@@ -66,7 +66,7 @@ export GEMINI_API_KEY="your-key"
 ## Run
 
 ```bash
-mix run --no-start examples/rlm/rlm_data_extraction_experiment_fixed.exs
+mix run --no-start examples/rlm/rlm_data_extraction_experiment.exs
 ```
 
 ## Results
@@ -74,7 +74,7 @@ mix run --no-start examples/rlm/rlm_data_extraction_experiment_fixed.exs
 Observed run: RLM 100% vs Direct 0% on `gemini/gemini-flash-lite-latest`.
 
 ```text
-$ mix run --no-start examples/rlm/rlm_data_extraction_experiment_fixed.exs
+$ mix run --no-start examples/rlm/rlm_data_extraction_experiment.exs
 🐍 Checking Python package requirements...
 
 ╔══════════════════════════════════════════════════════════════════╗

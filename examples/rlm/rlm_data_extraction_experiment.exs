@@ -6,7 +6,7 @@
 # Dataset: NYC 311 Service Requests (real government data, auto-downloaded)
 # Source: https://data.cityofnewyork.us/resource/erm2-nwe9.csv
 #
-# Run with: mix run --no-start examples/rlm_data_extraction_experiment.exs
+# Run with: mix run --no-start examples/rlm/rlm_data_extraction_experiment.exs
 #
 # Requires:
 #   - GEMINI_API_KEY (or other LLM provider)
@@ -167,27 +167,80 @@ defmodule RLMExperiment.DataExtraction do
   end
 
   defp compute_data_stats(csv_path) do
-    # Use Python/pandas for accurate stats computation
+    # Use Python (stdlib csv) for accurate stats computation
     session_id = unique_session("stats")
     ensure_session(session_id)
     runtime_opts = runtime(:analytics_pool, session_id)
+    csv_abs = Path.expand(csv_path)
 
-    # One-liner that returns stats dict directly
-    code =
-      "import pandas as pd; df = pd.read_csv('#{csv_path}'); " <>
-        "{'total_rows': len(df), " <>
-        "'columns': list(df.columns), " <>
-        "'brooklyn_count': int(df[df['borough'] == 'BROOKLYN'].shape[0]), " <>
-        "'nypd_count': int(df[df['agency'] == 'NYPD'].shape[0]), " <>
-        "'noise_count': int(df[df['complaint_type'].str.contains('Noise', case=False, na=False)].shape[0]), " <>
-        "'closed_count': int(df[df['status'] == 'Closed'].shape[0]), " <>
-        "'top_complaint': df['complaint_type'].value_counts().index[0], " <>
-        "'top_complaint_count': int(df['complaint_type'].value_counts().values[0]), " <>
-        "'brooklyn_noise_closed': int(df[(df['borough'] == 'BROOKLYN') & (df['complaint_type'].str.contains('Noise', case=False, na=False)) & (df['status'] == 'Closed')].shape[0]), " <>
-        "'boroughs': df['borough'].value_counts().to_dict(), " <>
-        "'agencies': df['agency'].value_counts().to_dict()}"
+    code = """
+    import csv
+    from collections import Counter
 
-    {:ok, stats} = SnakeBridge.call("builtins", "eval", [code], __runtime__: runtime_opts)
+    with open('#{csv_abs}', newline='', encoding='utf-8', errors='replace') as f:
+        reader = csv.DictReader(f)
+        columns = reader.fieldnames or []
+        boroughs = Counter()
+        agencies = Counter()
+        complaint_types = Counter()
+        total_rows = 0
+        brooklyn_count = 0
+        nypd_count = 0
+        noise_count = 0
+        closed_count = 0
+        brooklyn_noise_closed = 0
+
+        for row in reader:
+            total_rows += 1
+            borough = (row.get('borough') or '').strip()
+            agency = (row.get('agency') or '').strip()
+            complaint = (row.get('complaint_type') or '').strip()
+            status = (row.get('status') or '').strip()
+
+            if borough:
+                boroughs[borough] += 1
+            if agency:
+                agencies[agency] += 1
+            if complaint:
+                complaint_types[complaint] += 1
+
+            if borough == 'BROOKLYN':
+                brooklyn_count += 1
+            if agency == 'NYPD':
+                nypd_count += 1
+            if 'noise' in complaint.lower():
+                noise_count += 1
+            if status == 'Closed':
+                closed_count += 1
+            if borough == 'BROOKLYN' and 'noise' in complaint.lower() and status == 'Closed':
+                brooklyn_noise_closed += 1
+
+    top_complaint = 'Unknown'
+    top_complaint_count = 0
+    if complaint_types:
+        top_complaint, top_complaint_count = complaint_types.most_common(1)[0]
+
+    result = {
+        'total_rows': int(total_rows),
+        'columns': list(columns),
+        'brooklyn_count': int(brooklyn_count),
+        'nypd_count': int(nypd_count),
+        'noise_count': int(noise_count),
+        'closed_count': int(closed_count),
+        'top_complaint': top_complaint,
+        'top_complaint_count': int(top_complaint_count),
+        'brooklyn_noise_closed': int(brooklyn_noise_closed),
+        'boroughs': dict(boroughs),
+        'agencies': dict(agencies)
+    }
+    """
+
+    globals = %{"_code" => code}
+    expr = "(lambda _ns: (exec(_code, _ns, _ns), _ns['result'])[1])({})"
+
+    {:ok, stats} =
+      SnakeBridge.call("builtins", "eval", [expr, globals], __runtime__: runtime_opts)
+
     {:ok, stats}
   rescue
     e ->
@@ -225,33 +278,51 @@ defmodule RLMExperiment.DataExtraction do
     session_id = unique_session("context")
     ensure_session(session_id)
     runtime_opts = runtime(:analytics_pool, session_id)
+    csv_abs = Path.expand(csv_path)
 
-    # Read CSV and build text representation using Python
+    # Read CSV and build text representation using Python (stdlib csv)
     # This creates a "document-like" version of the data
+    # Note: \# escapes the hash so Elixir doesn't interpret as interpolation
     code = """
-    import pandas as pd
-    df = pd.read_csv('#{csv_path}')
+    import csv
 
-    lines = ['NYC 311 SERVICE REQUESTS DATA DUMP', '=' * 60]
-    lines.append(f'Total Records: {len(df)}')
-    lines.append(f'Columns: {", ".join(df.columns)}')
-    lines.append('')
-    lines.append('DATA RECORDS:')
-    lines.append('-' * 60)
+    with open('#{csv_abs}', newline='', encoding='utf-8', errors='replace') as f:
+        reader = csv.DictReader(f)
+        columns = reader.fieldnames or []
 
-    for idx, row in df.iterrows():
-        parts = [f'Record #{idx + 1}']
-        for col in df.columns:
-            val = row[col]
-            if pd.notna(val):
-                parts.append(f'  {col}: {val}')
-        lines.append('\\n'.join(parts))
+        lines = ['NYC 311 SERVICE REQUESTS DATA DUMP', '=' * 60]
+        lines.append('Total Records: 0')
+        lines.append(f'Columns: {", ".join(columns)}')
         lines.append('')
+        lines.append('DATA RECORDS:')
+        lines.append('-' * 60)
 
-    '\\n'.join(lines)
+        total_rows = 0
+        for idx, row in enumerate(reader):
+            total_rows += 1
+            parts = [f'Record \#{idx + 1}']
+            for col in columns:
+                val = row.get(col)
+                if val is None:
+                    continue
+                val = str(val).strip()
+                if not val:
+                    continue
+                val = val.replace('\\n', ' ').replace('\\r', ' ')
+                parts.append(f'  {col}: {val}')
+            lines.append('\\n'.join(parts))
+            lines.append('')
+
+        lines[2] = f'Total Records: {total_rows}'
+
+    result = '\\n'.join(lines)
     """
 
-    {:ok, context} = SnakeBridge.call("builtins", "eval", [code], __runtime__: runtime_opts)
+    globals = %{"_code" => code}
+    expr = "(lambda _ns: (exec(_code, _ns, _ns), _ns['result'])[1])({})"
+
+    {:ok, context} =
+      SnakeBridge.call("builtins", "eval", [expr, globals], __runtime__: runtime_opts)
 
     stats = %{
       char_count: String.length(context),
@@ -582,10 +653,13 @@ defmodule RLMExperiment.DataExtraction do
   defp evaluate_answer(_query, %{answer: nil}), do: false
 
   defp evaluate_answer(%{ground_truth: gt, exact_match: false}, %{answer: answer}) do
-    # For non-exact match, check if key info is present
-    gt_str = to_string(gt) |> String.downcase()
-    answer_str = to_string(answer) |> String.downcase()
-    String.contains?(answer_str, String.slice(gt_str, 0, 20))
+    gt_str = to_string(gt)
+    answer_str = to_string(answer)
+
+    gt_norm = normalize_text(gt_str)
+    answer_norm = normalize_text(answer_str)
+
+    check_fuzzy_match(gt_str, answer_str, gt_norm, answer_norm)
   end
 
   defp evaluate_answer(%{ground_truth: gt}, %{answer: answer}) when is_integer(gt) do
@@ -598,6 +672,48 @@ defmodule RLMExperiment.DataExtraction do
 
   defp evaluate_answer(%{ground_truth: gt}, %{answer: answer}) do
     to_string(gt) == to_string(answer)
+  end
+
+  defp check_fuzzy_match(_gt_str, _answer_str, gt_norm, answer_norm)
+       when gt_norm == "" or answer_norm == "",
+       do: false
+
+  defp check_fuzzy_match(_gt_str, _answer_str, gt_norm, answer_norm)
+       when gt_norm == answer_norm,
+       do: true
+
+  defp check_fuzzy_match(gt_str, answer_str, gt_norm, answer_norm) do
+    if String.contains?(answer_norm, gt_norm) do
+      true
+    else
+      check_label_and_count_match(gt_str, answer_str)
+    end
+  end
+
+  defp check_label_and_count_match(gt_str, answer_str) do
+    {gt_label, gt_count} = split_label_and_count(gt_str)
+    {answer_label, answer_count} = split_label_and_count(answer_str)
+
+    label_match? = labels_match?(gt_label, answer_label)
+    count_match? = counts_match?(gt_count, answer_count, answer_str)
+
+    label_match? and count_match?
+  end
+
+  defp labels_match?(gt_label, answer_label) do
+    gt_label != "" and answer_label != "" and
+      normalize_text(gt_label) == normalize_text(answer_label)
+  end
+
+  defp counts_match?(nil, _, _), do: false
+  defp counts_match?(count, nil, answer_str), do: extract_and_compare(answer_str, count)
+  defp counts_match?(count, num, _), do: count == num
+
+  defp extract_and_compare(answer_str, count) do
+    case extract_number(answer_str) do
+      {:ok, num} -> num == count
+      :error -> false
+    end
   end
 
   defp extract_number(text) do
@@ -614,6 +730,38 @@ defmodule RLMExperiment.DataExtraction do
       nil ->
         :error
     end
+  end
+
+  defp split_label_and_count(text) do
+    label =
+      text
+      |> String.replace(~r/[\d,]+/, " ")
+      |> String.trim()
+
+    count =
+      case Regex.run(~r/(\d[\d,]*)/, text) do
+        [_, match] ->
+          match
+          |> String.replace(",", "")
+          |> Integer.parse()
+          |> case do
+            {num, _} -> num
+            :error -> nil
+          end
+
+        _ ->
+          nil
+      end
+
+    {label, count}
+  end
+
+  defp normalize_text(text) do
+    text
+    |> to_string()
+    |> String.downcase()
+    |> String.replace(~r/[^a-z0-9]+/, " ")
+    |> String.trim()
   end
 
   defp status_emoji(true), do: "✅ CORRECT"

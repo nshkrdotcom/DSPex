@@ -21,7 +21,7 @@ asdf install
 ```
 
 This uses the pinned Deno version in `.tool-versions`.
-Required for `flagship_multi_pool_rlm.exs` and `rlm/rlm_data_extraction_experiment_fixed.exs`.
+Required for `flagship_multi_pool_rlm.exs` and `rlm/rlm_data_extraction_experiment.exs`.
 
 ## Running Examples
 
@@ -359,7 +359,7 @@ Guide: `guides/flagship_multi_pool_rlm.md`
 
 ---
 
-### RLM Data Extraction (NYC 311) (`rlm/rlm_data_extraction_experiment_fixed.exs`)
+### RLM Data Extraction (NYC 311) (`rlm/rlm_data_extraction_experiment.exs`)
 
 Realistic, structured data extraction at scale:
 - Uses 50,000 rows of NYC 311 service request data (real government dataset)
@@ -367,7 +367,7 @@ Realistic, structured data extraction at scale:
 - Observed result with `gemini/gemini-flash-lite-latest`: RLM 100% vs Direct 0%
 
 ```bash
-mix run --no-start examples/rlm/rlm_data_extraction_experiment_fixed.exs
+mix run --no-start examples/rlm/rlm_data_extraction_experiment.exs
 ```
 
 Guide: `examples/rlm/README.md`
@@ -470,7 +470,7 @@ DSPEX_RUN_TIMEOUT_SECONDS=0 ./examples/run_all.sh
 | `optimization.exs` | Optimizer | BootstrapFewShot optimization |
 | `flagship_multi_pool_gepa.exs` | Flagship | Multi-pool GEPA + numpy analytics |
 | `flagship_multi_pool_rlm.exs` | Flagship | Multi-pool RLM + numpy analytics |
-| `rlm/rlm_data_extraction_experiment_fixed.exs` | RLM | NYC 311 data extraction (real dataset) |
+| `rlm/rlm_data_extraction_experiment.exs` | RLM | NYC 311 data extraction (real dataset) |
 | `direct_lm_call.exs` | Direct LM | Raw LM interaction |
 | `timeout_test.exs` | Various | Timeout configuration demo |
 

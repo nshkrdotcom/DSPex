@@ -175,7 +175,7 @@ process registry DETS cleanly (avoids repair warnings after unclean exits).
 | `optimization.exs` | BootstrapFewShot optimization | `mix run --no-start examples/optimization.exs` |
 | `flagship_multi_pool_gepa.exs` | Multi-pool GEPA + numpy analytics pipeline | `mix run --no-start examples/flagship_multi_pool_gepa.exs` |
 | `flagship_multi_pool_rlm.exs` | Multi-pool RLM + numpy analytics pipeline | `mix run --no-start examples/flagship_multi_pool_rlm.exs` |
-| `rlm/rlm_data_extraction_experiment_fixed.exs` | RLM data extraction on NYC 311 (real dataset) | `mix run --no-start examples/rlm/rlm_data_extraction_experiment_fixed.exs` |
+| `rlm/rlm_data_extraction_experiment.exs` | RLM data extraction on NYC 311 (real dataset) | `mix run --no-start examples/rlm/rlm_data_extraction_experiment.exs` |
 | `direct_lm_call.exs` | Direct LM interaction | `mix run --no-start examples/direct_lm_call.exs` |
 | `timeout_test.exs` | Timeout configuration demo | `mix run --no-start examples/timeout_test.exs` |
 
