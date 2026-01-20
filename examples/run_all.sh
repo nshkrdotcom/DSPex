@@ -158,6 +158,7 @@ main() {
         "examples/optimization.exs"
         "examples/flagship_multi_pool_gepa.exs"
         "examples/flagship_multi_pool_rlm.exs"
+        "examples/rlm/rlm_data_extraction_experiment_fixed.exs"
         "examples/direct_lm_call.exs"
     )
 

@@ -11,6 +11,8 @@ All notable changes to DSPex will be documented in this file.
 - Examples use `SnakeBridge.attr/3` and `SnakeBridge.call/4` for attribute access and generic calls.
 - Examples use `Snakepit.run_as_script/2` instead of `DSPex.run/2`.
 - Flagship demos updated to use native `Dspy.GEPA`, `Dspy.BootstrapFewShot`, and `Dspy.Predict.RLMClass` modules.
+- Added a realistic RLM data extraction example over 50,000 NYC 311 records, with ground-truth evaluation and direct LLM comparison.
+- Documented the NYC 311 RLM experiment and added it to the examples index and runner.
 
 ## [0.5.0] - 2026-01-19
 

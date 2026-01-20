@@ -151,7 +151,7 @@ response = DSPex.method!(lm, "forward", [messages])
 
 ## Examples
 
-DSPex includes 19 comprehensive examples demonstrating various use cases:
+DSPex includes 20 comprehensive examples demonstrating various use cases:
 
 Use `mix run --no-start` so DSPex owns the Snakepit lifecycle and closes the
 process registry DETS cleanly (avoids repair warnings after unclean exits).
@@ -175,8 +175,11 @@ process registry DETS cleanly (avoids repair warnings after unclean exits).
 | `optimization.exs` | BootstrapFewShot optimization | `mix run --no-start examples/optimization.exs` |
 | `flagship_multi_pool_gepa.exs` | Multi-pool GEPA + numpy analytics pipeline | `mix run --no-start examples/flagship_multi_pool_gepa.exs` |
 | `flagship_multi_pool_rlm.exs` | Multi-pool RLM + numpy analytics pipeline | `mix run --no-start examples/flagship_multi_pool_rlm.exs` |
+| `rlm/rlm_data_extraction_experiment_fixed.exs` | RLM data extraction on NYC 311 (real dataset) | `mix run --no-start examples/rlm/rlm_data_extraction_experiment_fixed.exs` |
 | `direct_lm_call.exs` | Direct LM interaction | `mix run --no-start examples/direct_lm_call.exs` |
 | `timeout_test.exs` | Timeout configuration demo | `mix run --no-start examples/timeout_test.exs` |
+
+Realistic RLM benchmark: the NYC 311 data extraction experiment uses 50,000 real records with exact, computable ground truth. On `gemini/gemini-flash-lite-latest`, an observed run scored RLM 100% vs Direct 0%.
 
 For flagship walkthroughs, see:
 - `guides/flagship_multi_pool_gepa.md` (GEPA)

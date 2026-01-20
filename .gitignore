@@ -174,3 +174,7 @@ gemini_ex/
 
 .venv/
 dspy_reference/
+/priv/plts/
+/priv/rlm_cache/
+/priv/snakebridge/
+/priv/snakepit/
