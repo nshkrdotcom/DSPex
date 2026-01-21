@@ -2,6 +2,7 @@ import Config
 
 config :snakebridge,
   verbose: false,
+  generated_layout: :split,
   runtime: [
     library_profiles: %{"dspy" => :ml_inference}
   ]

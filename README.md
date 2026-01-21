@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>DSPy for Elixir via SnakeBridge</strong><br>
-  Declarative LLM programming with full access to Stanford's DSPy framework
+  Declarative LLM programming with full access to Stanford NLP's DSPy framework
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
 
 ## Overview
 
-DSPex brings [DSPy](https://github.com/stanfordnlp/dspy) — Stanford's framework for programming language models — to Elixir. Rather than generating wrapper code, DSPex provides a minimal, transparent interface through [SnakeBridge](https://github.com/nshkrdotcom/snakebridge)'s Universal FFI. Call any DSPy function directly from Elixir with full type safety and automatic Python lifecycle management.
+DSPex brings [DSPy](https://github.com/stanfordnlp/dspy) — Stanford NLP's framework for programming language models — to Elixir. Rather than generating wrapper code, DSPex provides a minimal, transparent interface through [SnakeBridge](https://github.com/nshkrdotcom/snakebridge)'s Universal FFI. Call any DSPy function directly from Elixir with full type safety and automatic Python lifecycle management.
 
 **Why DSPex?**
 
@@ -44,7 +44,7 @@ Add DSPex to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:dspex, "~> 0.5.0"}
+    {:dspex, "~> 0.6.0"}
   ]
 end
 ```
@@ -141,12 +141,11 @@ lm = DSPex.lm!("ollama/llama2")
 Bypass modules and call the LM directly:
 
 ```elixir
-lm = DSPex.lm!("gemini/gemini-flash-lite-latest")
-DSPex.configure!(lm: lm)
+{:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [], temperature: 0.9)
 
 # Direct call with messages
-messages = [%{role: "user", content: "Say hello in French"}]
-response = DSPex.method!(lm, "forward", [messages])
+messages = [%{"role" => "user", "content" => "Say hello in French"}]
+{:ok, response} = Dspy.LM.forward(lm, [], messages: messages)
 ```
 
 ## Examples
@@ -280,20 +279,20 @@ All functions have `!` variants that raise on error instead of returning `{:erro
 ┌─────────────────────────────────────────────────────────┐
 │                    Your Elixir App                      │
 ├─────────────────────────────────────────────────────────┤
-│                      DSPex.run/1                        │
+│                     DSPex.run/1                         │
 │              (Python lifecycle wrapper)                 │
 ├─────────────────────────────────────────────────────────┤
-│                   SnakeBridge.call/4                    │
+│                  SnakeBridge.call/4                     │
 │                   (Universal FFI)                       │
 ├─────────────────────────────────────────────────────────┤
 │                    Snakepit gRPC                        │
-│              (Python process bridge)                    │
+│               (Python process bridge)                   │
 ├─────────────────────────────────────────────────────────┤
 │                     Python DSPy                         │
-│            (Stanford's LLM framework)                   │
+│            (Stanford NLP's LLM framework)               │
 ├─────────────────────────────────────────────────────────┤
-│                   LLM Providers                         │
-│     (OpenAI, Anthropic, Google, Ollama, etc.)           │
+│                    LLM Providers                        │
+│       (OpenAI, Anthropic, Google, Ollama, etc.)         │
 └─────────────────────────────────────────────────────────┘
 ```
 

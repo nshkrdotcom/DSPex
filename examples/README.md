@@ -21,7 +21,8 @@ asdf install
 ```
 
 This uses the pinned Deno version in `.tool-versions`.
-Required for `flagship_multi_pool_rlm.exs` and `rlm/rlm_data_extraction_experiment.exs`.
+Required for `flagship_multi_pool_rlm.exs`, `rlm/rlm_data_extraction_experiment.exs`,
+and `introspect/dspy_api_introspect.exs`.
 
 ## Running Examples
 
@@ -374,18 +375,32 @@ Guide: `examples/rlm/README.md`
 
 ---
 
+### DSPy API Introspection (RLM) (`introspect/dspy_api_introspect.exs`)
+
+RLM introspection over the generated DSPy Elixir wrapper:
+- Loads `lib/snakebridge_generated/dspy` (all generated modules) as long context
+- Uses RLM to build a compact API cheat sheet
+- CLI presets and overrides for custom queries
+
+```bash
+mix run --no-start examples/introspect/dspy_api_introspect.exs
+```
+
+Guide: `examples/introspect/README.md`
+
+---
+
 ### Direct LM Calls (`direct_lm_call.exs`)
 
 Bypass DSPy modules and call the LM directly:
-- Uses `__call__` method on the language model
+- Uses `Dspy.LM.forward/3`
 - Works with raw message format
-- Returns list of completions
+- Returns a provider response payload
 
 ```elixir
-lm = DSPex.lm!("gemini/gemini-flash-lite-latest", temperature: 0.9)
+{:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [], temperature: 0.9)
 messages = [%{"role" => "user", "content" => "Tell me a joke about programming."}]
-completions = DSPex.method!(lm, "__call__", [], messages: messages)
-response = Enum.at(completions, 0)
+{:ok, response} = Dspy.LM.forward(lm, [], messages: messages)
 ```
 
 **Run:** `mix run --no-start examples/direct_lm_call.exs`
@@ -471,6 +486,7 @@ DSPEX_RUN_TIMEOUT_SECONDS=0 ./examples/run_all.sh
 | `flagship_multi_pool_gepa.exs` | Flagship | Multi-pool GEPA + numpy analytics |
 | `flagship_multi_pool_rlm.exs` | Flagship | Multi-pool RLM + numpy analytics |
 | `rlm/rlm_data_extraction_experiment.exs` | RLM | NYC 311 data extraction (real dataset) |
+| `introspect/dspy_api_introspect.exs` | RLM | API introspection over generated wrapper |
 | `direct_lm_call.exs` | Direct LM | Raw LM interaction |
 | `timeout_test.exs` | Various | Timeout configuration demo |
 

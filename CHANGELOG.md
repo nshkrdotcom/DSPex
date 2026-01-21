@@ -4,15 +4,19 @@ All notable changes to DSPex will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-01-21
+
+### Added
+- NYC 311 RLM data extraction experiment (50k records) with caching, ground-truth evaluation, and documentation.
+- DSPy API introspection example using RLM with presets, rules/facts toggles, trace controls, and context modes.
+- Split generated DSPy wrappers into per-module files (SnakeBridge 0.12.0), replacing the monolithic `dspy.ex`.
+
 ### Changed
-- All examples now use generated native bindings (`Dspy.*` modules) instead of the `DSPex` wrapper layer.
-- Examples use `Dspy.LM.new/3`, `Dspy.PredictClass.new/3`, `Dspy.ChainOfThought.new/3` for module creation.
-- Examples use `Dspy.PredictClass.forward/2`, `Dspy.ChainOfThought.forward/2` for inference calls.
-- Examples use `SnakeBridge.attr/3` and `SnakeBridge.call/4` for attribute access and generic calls.
-- Examples use `Snakepit.run_as_script/2` instead of `DSPex.run/2`.
-- Flagship demos updated to use native `Dspy.GEPA`, `Dspy.BootstrapFewShot`, and `Dspy.Predict.RLMClass` modules.
-- Added a realistic RLM data extraction example over 50,000 NYC 311 records, with ground-truth evaluation and direct LLM comparison.
-- Documented the NYC 311 RLM experiment and added it to the examples index and runner.
+- Examples now use generated native bindings (`Dspy.*` modules) and `Snakepit.run_as_script/2` instead of the DSPex wrapper layer.
+- Flagship demos now use native `Dspy.GEPA`, `Dspy.BootstrapFewShot`, and `Dspy.Predict.RLMClass` modules.
+- RLM data extraction experiment consolidated into one script, switched pandas to stdlib CSV, and improved evaluation + extraction logic.
+- RLM data extraction experiment now includes trace controls and LM history inspection settings via environment variables.
+- Examples index/run-all scripts updated to include the NYC 311 experiment and introspection guide.
 
 ## [0.5.0] - 2026-01-19
 

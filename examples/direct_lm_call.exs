@@ -17,20 +17,52 @@ Snakepit.run_as_script(fn ->
 
   IO.puts("Calling LM directly with messages...\n")
 
-  # Direct call returns list of completions
-  {:ok, completions} = Dspy.LM.call(lm, [], messages: messages)
+  {:ok, response} = Dspy.LM.forward(lm, [], messages: messages)
 
-  # Get first completion
-  first = Enum.at(completions, 0)
-  IO.puts("Response: #{first}\n")
+  extract_text = fn payload ->
+    cond do
+      is_map(payload) ->
+        case Map.get(payload, "choices") do
+          [first | _] when is_map(first) ->
+            message = Map.get(first, "message") || %{}
+
+            Map.get(message, "content") || Map.get(first, "text") ||
+              inspect(first, limit: 4, printable_limit: 200)
+
+          [first | _] when is_binary(first) ->
+            first
+
+          _ ->
+            inspect(payload, limit: 4, printable_limit: 200)
+        end
+
+      is_list(payload) ->
+        case payload do
+          [first | _] when is_binary(first) -> first
+          [first | _] -> inspect(first, limit: 4, printable_limit: 200)
+          _ -> inspect(payload, limit: 4, printable_limit: 200)
+        end
+
+      SnakeBridge.ref?(payload) ->
+        case SnakeBridge.call("builtins", "repr", [payload]) do
+          {:ok, repr} -> to_string(repr)
+          {:error, _} -> "<response ref>"
+        end
+
+      true ->
+        inspect(payload, limit: 4, printable_limit: 200)
+    end
+  end
+
+  IO.puts("Response: #{extract_text.(response)}\n")
 
   # Another direct call
   messages2 = [
     %{"role" => "user", "content" => "What's 2+2? Reply with just the number."}
   ]
 
-  {:ok, completions2} = Dspy.LM.call(lm, [], messages: messages2)
-  IO.puts("2+2 = #{Enum.at(completions2, 0)}")
+  {:ok, response2} = Dspy.LM.forward(lm, [], messages: messages2)
+  IO.puts("2+2 = #{extract_text.(response2)}")
 
   IO.puts("\nDone!")
 end)

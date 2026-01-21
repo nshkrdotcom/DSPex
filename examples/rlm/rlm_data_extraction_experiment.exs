@@ -15,6 +15,7 @@
 
 alias Dspy.Predict.RLMClass
 alias SnakeBridge.ConfigHelper
+alias Snakepit.Bridge.SessionStore
 
 defmodule RLMExperiment.DataExtraction do
   @moduledoc """
@@ -50,8 +51,42 @@ defmodule RLMExperiment.DataExtraction do
   # Allow thorough exploration
   @rlm_max_llm_calls 20
   @rlm_max_output_chars 8_000
+  # Trace controls (enabled by default). Set DSPY_TRACE=0 to disable.
+  @trace_enabled (case System.get_env("DSPY_TRACE") do
+                    nil ->
+                      true
+
+                    value ->
+                      String.downcase(value) not in ["0", "false", "off", "no"]
+                  end)
+
+  @trace_history_limit (case System.get_env("DSPY_TRACE_LIMIT") do
+                          nil ->
+                            0
+
+                          value ->
+                            case Integer.parse(value) do
+                              {num, _} -> num
+                              :error -> 0
+                            end
+                        end)
+
+  @trace_prompt_chars (case System.get_env("DSPY_TRACE_PROMPT_CHARS") do
+                         nil ->
+                           0
+
+                         value ->
+                           case Integer.parse(value) do
+                             {num, _} -> num
+                             :error -> 0
+                           end
+                       end)
+
   # Show RLM's reasoning/code
-  @rlm_verbose true
+  @rlm_verbose (case System.get_env("DSPY_RLM_VERBOSE") do
+                  nil -> @trace_enabled
+                  value -> String.downcase(value) not in ["0", "false", "off", "no"]
+                end)
 
   # Pool configuration
   @pools [
@@ -109,8 +144,25 @@ defmodule RLMExperiment.DataExtraction do
         IO.puts("\n#{section("Step 6: Accuracy Evaluation")}")
         evaluation = evaluate_results(queries, rlm_results, direct_results)
 
-        # Step 7: Summary
-        IO.puts("\n#{section("Summary")}")
+        # Step 7: Trace review
+        IO.puts("\n#{section("Step 7: Trace Review")}")
+
+        if trace_enabled?() do
+          print_trace_settings()
+          print_session_workers("RLM session", [rlm_session])
+          print_session_workers("Direct session", [direct_session])
+
+          IO.puts("\n  LM History via Graceful Serialization (RLM)")
+          print_prompt_history("RLM", rlm_session)
+
+          IO.puts("\n  LM History via Graceful Serialization (Direct)")
+          print_prompt_history("Direct", direct_session)
+        else
+          IO.puts("  Tracing disabled. Set DSPY_TRACE=1 to enable.")
+        end
+
+        # Step 8: Summary
+        IO.puts("\n#{section("Step 8: Summary")}")
         print_summary(evaluation, context_stats)
       end,
       restart: true
@@ -451,6 +503,7 @@ defmodule RLMExperiment.DataExtraction do
       )
 
     %{
+      label: "rlm",
       session_id: session_id,
       pool: :rlm_pool,
       rlm: rlm,
@@ -535,6 +588,7 @@ defmodule RLMExperiment.DataExtraction do
       )
 
     %{
+      label: "direct",
       session_id: session_id,
       pool: :direct_pool,
       predictor: predictor,
@@ -840,8 +894,6 @@ defmodule RLMExperiment.DataExtraction do
   end
 
   defp ensure_session(session_id) do
-    alias Snakepit.Bridge.SessionStore
-
     case SessionStore.create_session(session_id) do
       {:ok, _session} -> :ok
       {:error, :already_exists} -> :ok
@@ -855,6 +907,177 @@ defmodule RLMExperiment.DataExtraction do
 
   defp with_runtime(opts, pool, session_id, extra_runtime \\ []) do
     Keyword.put(opts, :__runtime__, runtime(pool, session_id, extra_runtime))
+  end
+
+  defp print_prompt_history(label, session) do
+    runtime_opts = runtime(session.pool, session.session_id)
+    IO.puts("  #{label}:")
+
+    case fetch_prompt_history(session, runtime_opts, trace_history_limit()) do
+      {:ok, []} ->
+        IO.puts("    (no history)")
+
+      {:ok, history} ->
+        Enum.with_index(history, 1)
+        |> Enum.each(fn {entry, idx} ->
+          print_history_entry(idx, entry, runtime_opts)
+        end)
+
+      {:error, reason} ->
+        IO.puts("    (history fetch failed: #{reason})")
+    end
+  end
+
+  defp fetch_prompt_history(session, runtime_opts, limit) do
+    lm = Map.fetch!(session, :lm)
+
+    code =
+      case limit do
+        :all -> "list(lm.history)"
+        _ -> "list(lm.history[-#{limit}:])"
+      end
+
+    {:ok, history} =
+      SnakeBridge.call("builtins", "eval", [code, %{"lm" => lm}], __runtime__: runtime_opts)
+
+    if is_list(history) do
+      {:ok, history}
+    else
+      {:ok, []}
+    end
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
+
+  defp print_history_entry(idx, entry, runtime_opts) when is_map(entry) do
+    model = entry["model"] || "unknown"
+    cost = format_cost(entry["cost"])
+    usage = format_usage(entry["usage"])
+
+    IO.puts("    [#{idx}] model=#{model}, cost=#{cost}, #{usage}")
+
+    if prompt = entry["prompt"] do
+      prompt_str = render_history_value(prompt, runtime_opts)
+      print_trace_block("prompt", prompt_str, trace_prompt_limit())
+    end
+
+    if response = entry["response"] do
+      response_str = render_history_value(response, runtime_opts)
+      print_trace_block("response", response_str, trace_prompt_limit())
+    end
+
+    meta = Map.drop(entry, ["model", "cost", "usage", "prompt", "response"])
+
+    if map_size(meta) > 0 do
+      meta_str = inspect(meta, limit: :infinity, printable_limit: 2_000)
+      print_trace_block("meta", meta_str, trace_prompt_limit())
+    end
+  end
+
+  defp print_history_entry(idx, _entry, _runtime_opts) do
+    IO.puts("    [#{idx}] (invalid entry)")
+  end
+
+  defp format_cost(nil), do: "$0.00"
+
+  defp format_cost(cost) when is_number(cost),
+    do: "$#{:erlang.float_to_binary(cost * 1.0, decimals: 4)}"
+
+  defp format_cost(_), do: "$?.??"
+
+  defp format_usage(nil), do: "tokens=?"
+  defp format_usage(%{"total_tokens" => total}), do: "tokens=#{total}"
+  defp format_usage(%{"prompt_tokens" => p, "completion_tokens" => c}), do: "tokens=#{p}+#{c}"
+  defp format_usage(_), do: "tokens=?"
+
+  defp render_history_value(value, runtime_opts) do
+    cond do
+      is_binary(value) ->
+        value
+
+      SnakeBridge.ref?(value) ->
+        render_ref_value(value, runtime_opts)
+
+      true ->
+        inspect(value, limit: :infinity, printable_limit: :infinity)
+    end
+  end
+
+  defp render_ref_value(ref, runtime_opts) do
+    case SnakeBridge.call("builtins", "repr", [ref], __runtime__: runtime_opts) do
+      {:ok, repr} -> to_string(repr)
+      {:error, _} -> "<#{ref.type_name}> (ref)"
+    end
+  rescue
+    _ -> "<ref>"
+  end
+
+  defp print_trace_block(label, text, limit) do
+    {snippet, truncated?} = maybe_truncate(text, limit)
+    header = if truncated?, do: "#{label} (truncated)", else: label
+
+    IO.puts("        #{header}:")
+
+    snippet
+    |> String.split("\n")
+    |> Enum.each(fn line ->
+      IO.puts("          #{line}")
+    end)
+  end
+
+  defp maybe_truncate(text, :all), do: {text, false}
+
+  defp maybe_truncate(text, limit) when is_integer(limit) and limit > 0 do
+    if String.length(text) > limit do
+      {String.slice(text, 0, limit) <> " ...", true}
+    else
+      {text, false}
+    end
+  end
+
+  defp maybe_truncate(text, _limit), do: {text, false}
+
+  defp print_session_workers(title, sessions) do
+    IO.puts("\n#{title} worker routing:")
+
+    Enum.each(sessions, fn session ->
+      case SessionStore.get_session(session.session_id) do
+        {:ok, %{last_worker_id: worker_id}} when is_binary(worker_id) ->
+          IO.puts("  #{session.label} -> #{worker_id}")
+
+        _ ->
+          IO.puts("  #{session.label} -> (not assigned)")
+      end
+    end)
+  end
+
+  defp trace_enabled?, do: @trace_enabled
+
+  defp trace_history_limit do
+    if @trace_history_limit > 0, do: @trace_history_limit, else: :all
+  end
+
+  defp trace_prompt_limit do
+    if @trace_prompt_chars > 0, do: @trace_prompt_chars, else: :all
+  end
+
+  defp print_trace_settings do
+    IO.puts("  Trace: on")
+
+    history =
+      case trace_history_limit() do
+        :all -> "all"
+        limit -> Integer.to_string(limit)
+      end
+
+    prompt =
+      case trace_prompt_limit() do
+        :all -> "full"
+        limit -> Integer.to_string(limit)
+      end
+
+    IO.puts("  History limit: #{history}")
+    IO.puts("  Prompt chars: #{prompt}")
   end
 
   defp section(title) do
