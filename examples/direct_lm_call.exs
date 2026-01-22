@@ -2,9 +2,9 @@
 #
 # Run with: mix run --no-start examples/direct_lm_call.exs
 
-Snakepit.run_as_script(fn ->
-  Application.ensure_all_started(:snakebridge)
+require SnakeBridge
 
+SnakeBridge.script do
   IO.puts("DSPex Direct LM Call Example")
   IO.puts("==============================\n")
 
@@ -65,4 +65,4 @@ Snakepit.run_as_script(fn ->
   IO.puts("2+2 = #{extract_text.(response2)}")
 
   IO.puts("\nDone!")
-end)
+end

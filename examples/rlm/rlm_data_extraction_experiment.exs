@@ -30,6 +30,7 @@ defmodule RLMExperiment.DataExtraction do
   RLM solves this by storing data as a Python variable and letting the
   model write code to explore/query it.
   """
+  require SnakeBridge
 
   # ============================================================================
   # Configuration
@@ -108,65 +109,60 @@ defmodule RLMExperiment.DataExtraction do
 
     configure_snakepit!()
 
-    Snakepit.run_as_script(
-      fn ->
-        Application.ensure_all_started(:snakebridge)
+    SnakeBridge.script restart: true do
+      banner()
 
-        banner()
+      # Step 1: Download and cache the dataset
+      IO.puts("\n#{section("Step 1: Data Acquisition")}")
+      {:ok, csv_path} = ensure_dataset()
+      {:ok, data_stats} = compute_data_stats(csv_path)
+      print_data_stats(data_stats)
 
-        # Step 1: Download and cache the dataset
-        IO.puts("\n#{section("Step 1: Data Acquisition")}")
-        {:ok, csv_path} = ensure_dataset()
-        {:ok, data_stats} = compute_data_stats(csv_path)
-        print_data_stats(data_stats)
+      # Step 2: Build the long context (simulate document)
+      IO.puts("\n#{section("Step 2: Context Construction")}")
+      {:ok, context, context_stats} = build_context(csv_path)
+      print_context_stats(context_stats)
 
-        # Step 2: Build the long context (simulate document)
-        IO.puts("\n#{section("Step 2: Context Construction")}")
-        {:ok, context, context_stats} = build_context(csv_path)
-        print_context_stats(context_stats)
+      # Step 3: Define queries with computable ground truth
+      IO.puts("\n#{section("Step 3: Query Definition")}")
+      queries = define_queries(data_stats)
+      print_queries(queries)
 
-        # Step 3: Define queries with computable ground truth
-        IO.puts("\n#{section("Step 3: Query Definition")}")
-        queries = define_queries(data_stats)
-        print_queries(queries)
+      # Step 4: Run RLM on queries
+      IO.puts("\n#{section("Step 4: RLM Execution")}")
+      rlm_session = build_rlm_session()
+      rlm_results = run_rlm_queries(rlm_session, context, queries)
 
-        # Step 4: Run RLM on queries
-        IO.puts("\n#{section("Step 4: RLM Execution")}")
-        rlm_session = build_rlm_session()
-        rlm_results = run_rlm_queries(rlm_session, context, queries)
+      # Step 5: Run direct LLM for comparison (truncated context)
+      IO.puts("\n#{section("Step 5: Direct LLM Comparison")}")
+      direct_session = build_direct_session()
+      direct_results = run_direct_queries(direct_session, context, queries)
 
-        # Step 5: Run direct LLM for comparison (truncated context)
-        IO.puts("\n#{section("Step 5: Direct LLM Comparison")}")
-        direct_session = build_direct_session()
-        direct_results = run_direct_queries(direct_session, context, queries)
+      # Step 6: Evaluate accuracy
+      IO.puts("\n#{section("Step 6: Accuracy Evaluation")}")
+      evaluation = evaluate_results(queries, rlm_results, direct_results)
 
-        # Step 6: Evaluate accuracy
-        IO.puts("\n#{section("Step 6: Accuracy Evaluation")}")
-        evaluation = evaluate_results(queries, rlm_results, direct_results)
+      # Step 7: Trace review
+      IO.puts("\n#{section("Step 7: Trace Review")}")
 
-        # Step 7: Trace review
-        IO.puts("\n#{section("Step 7: Trace Review")}")
+      if trace_enabled?() do
+        print_trace_settings()
+        print_session_workers("RLM session", [rlm_session])
+        print_session_workers("Direct session", [direct_session])
 
-        if trace_enabled?() do
-          print_trace_settings()
-          print_session_workers("RLM session", [rlm_session])
-          print_session_workers("Direct session", [direct_session])
+        IO.puts("\n  LM History via Graceful Serialization (RLM)")
+        print_prompt_history("RLM", rlm_session)
 
-          IO.puts("\n  LM History via Graceful Serialization (RLM)")
-          print_prompt_history("RLM", rlm_session)
+        IO.puts("\n  LM History via Graceful Serialization (Direct)")
+        print_prompt_history("Direct", direct_session)
+      else
+        IO.puts("  Tracing disabled. Set DSPY_TRACE=1 to enable.")
+      end
 
-          IO.puts("\n  LM History via Graceful Serialization (Direct)")
-          print_prompt_history("Direct", direct_session)
-        else
-          IO.puts("  Tracing disabled. Set DSPY_TRACE=1 to enable.")
-        end
-
-        # Step 8: Summary
-        IO.puts("\n#{section("Step 8: Summary")}")
-        print_summary(evaluation, context_stats)
-      end,
-      restart: true
-    )
+      # Step 8: Summary
+      IO.puts("\n#{section("Step 8: Summary")}")
+      print_summary(evaluation, context_stats)
+    end
   end
 
   # ============================================================================

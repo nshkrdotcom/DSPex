@@ -1,7 +1,7 @@
 defmodule DSPex.MixProject do
   use Mix.Project
 
-  @version "0.6.0"
+  @version "0.7.0"
   @source_url "https://github.com/nshkrdotcom/dspex"
 
   def project do
@@ -41,7 +41,7 @@ defmodule DSPex.MixProject do
   defp deps do
     [
       # SnakeBridge - Python bridge
-      {:snakebridge, "~> 0.12.0"},
+      {:snakebridge, "~> 0.13.0"},
 
       # JSON encoding
       {:jason, "~> 1.4"},
@@ -64,6 +64,9 @@ defmodule DSPex.MixProject do
   defp elixirc_paths(_), do: ["lib"]
 
   defp docs do
+    dspy_groups = snakebridge_groups()
+    dspy_nests = snakebridge_nests()
+
     [
       main: "readme",
       name: "DSPex",
@@ -80,10 +83,27 @@ defmodule DSPex.MixProject do
         "CHANGELOG.md",
         "LICENSE"
       ],
-      groups_for_modules: [
-        "Core API": [DSPex]
-      ]
+      groups_for_modules: [{"Core API", [DSPex]}] ++ dspy_groups,
+      nest_modules_by_prefix: dspy_nests
     ]
+  end
+
+  defp snakebridge_groups do
+    if Code.ensure_loaded?(SnakeBridge.Docs) and
+         function_exported?(SnakeBridge.Docs, :groups_for_modules, 1) do
+      SnakeBridge.Docs.groups_for_modules(libraries: ["dspy"])
+    else
+      []
+    end
+  end
+
+  defp snakebridge_nests do
+    if Code.ensure_loaded?(SnakeBridge.Docs) and
+         function_exported?(SnakeBridge.Docs, :nest_modules_by_prefix, 1) do
+      SnakeBridge.Docs.nest_modules_by_prefix(libraries: ["dspy"])
+    else
+      []
+    end
   end
 
   defp package do

@@ -11,6 +11,7 @@ alias Snakepit.Bridge.SessionStore
 
 defmodule DSPex.FlagshipMultiPoolGepa do
   @moduledoc false
+  require SnakeBridge
 
   @model "gemini/gemini-flash-lite-latest"
   @triage_signature "ticket -> category, urgency, action"
@@ -26,56 +27,51 @@ defmodule DSPex.FlagshipMultiPoolGepa do
   def run do
     configure_snakepit!()
 
-    Snakepit.run_as_script(
-      fn ->
-        Application.ensure_all_started(:snakebridge)
+    SnakeBridge.script restart: true do
+      banner()
+      print_pools()
 
-        banner()
-        print_pools()
+      tickets = tickets()
+      holdout = holdout_ticket()
 
-        tickets = tickets()
-        holdout = holdout_ticket()
+      IO.puts("\n==> Step 1: Build DSPy modules across pools")
+      triage_sessions = build_triage_sessions()
+      insights_session = build_insights_session()
+      optimizer_session = build_optimizer_session()
+      analytics_session = build_analytics_session()
 
-        IO.puts("\n==> Step 1: Build DSPy modules across pools")
-        triage_sessions = build_triage_sessions()
-        insights_session = build_insights_session()
-        optimizer_session = build_optimizer_session()
-        analytics_session = build_analytics_session()
+      print_session_workers("Triage sessions", triage_sessions)
+      print_session_workers("Insights session", [insights_session])
+      print_session_workers("Optimizer session", [optimizer_session])
+      print_session_workers("Analytics session", [analytics_session])
 
-        print_session_workers("Triage sessions", triage_sessions)
-        print_session_workers("Insights session", [insights_session])
-        print_session_workers("Optimizer session", [optimizer_session])
-        print_session_workers("Analytics session", [analytics_session])
+      IO.puts("\n==> Step 2: Run triage predictions in parallel")
+      triage_results = run_triage_predictions(triage_sessions, tickets)
 
-        IO.puts("\n==> Step 2: Run triage predictions in parallel")
-        triage_results = run_triage_predictions(triage_sessions, tickets)
+      IO.puts("\n==> Step 3: Generate insights in a separate DSPy pool")
+      insights = run_insights(insights_session, triage_results)
 
-        IO.puts("\n==> Step 3: Generate insights in a separate DSPy pool")
-        insights = run_insights(insights_session, triage_results)
+      IO.puts("\n==> Step 4: Evaluate with numpy in the analytics pool")
+      analytics = run_numpy_eval(analytics_session, triage_results)
 
-        IO.puts("\n==> Step 4: Evaluate with numpy in the analytics pool")
-        analytics = run_numpy_eval(analytics_session, triage_results)
+      IO.puts("\n==> Step 5: GEPA optimization (max_metric_calls=3)")
+      optimized = run_gepa_optimizer(optimizer_session, tickets)
 
-        IO.puts("\n==> Step 5: GEPA optimization (max_metric_calls=3)")
-        optimized = run_gepa_optimizer(optimizer_session, tickets)
+      IO.puts("\n==> Step 6: Baseline vs optimized on a holdout ticket")
+      compare_baseline_vs_optimized(triage_sessions, optimizer_session, optimized, holdout)
 
-        IO.puts("\n==> Step 6: Baseline vs optimized on a holdout ticket")
-        compare_baseline_vs_optimized(triage_sessions, optimizer_session, optimized, holdout)
+      IO.puts("\n==> LM History via Graceful Serialization (triage pool)")
+      IO.puts("    (ModelResponse objects become refs, other fields preserved)")
 
-        IO.puts("\n==> LM History via Graceful Serialization (triage pool)")
-        IO.puts("    (ModelResponse objects become refs, other fields preserved)")
+      Enum.each(triage_sessions, fn session ->
+        print_prompt_history("Triage #{session.label}", session)
+      end)
 
-        Enum.each(triage_sessions, fn session ->
-          print_prompt_history("Triage #{session.label}", session)
-        end)
+      IO.puts("\n==> LM History via Graceful Serialization (optimizer pool)")
+      print_prompt_history("GEPA", optimizer_session)
 
-        IO.puts("\n==> LM History via Graceful Serialization (optimizer pool)")
-        print_prompt_history("GEPA", optimizer_session)
-
-        summary(triage_results, insights, analytics)
-      end,
-      restart: true
-    )
+      summary(triage_results, insights, analytics)
+    end
   end
 
   defp configure_snakepit! do
@@ -178,40 +174,46 @@ defmodule DSPex.FlagshipMultiPoolGepa do
     session_id = unique_session(label)
     ensure_session(session_id)
 
-    {:ok, lm} =
-      Dspy.LM.new(@model, [], with_runtime([temperature: temperature], pool, session_id))
-
-    {:ok, _} = Dspy.configure(with_runtime([lm: lm], pool, session_id))
-    {:ok, predictor} = Dspy.PredictClass.new(signature, [], with_runtime([], pool, session_id))
-
-    %{
+    session = %{
       label: label,
       pool: pool,
-      session_id: session_id,
-      predictor: predictor,
-      # Store LM reference for history access
-      lm: lm
+      session_id: session_id
     }
+
+    with_session_runtime(session, fn ->
+      {:ok, lm} = Dspy.LM.new(@model, [], temperature: temperature)
+      {:ok, _} = Dspy.configure(lm: lm)
+      {:ok, predictor} = Dspy.PredictClass.new(signature, [])
+
+      Map.merge(session, %{
+        predictor: predictor,
+        # Store LM reference for history access
+        lm: lm
+      })
+    end)
   end
 
   defp setup_chain_of_thought(pool, label, signature, temperature) do
     session_id = unique_session(label)
     ensure_session(session_id)
 
-    {:ok, lm} =
-      Dspy.LM.new(@model, [], with_runtime([temperature: temperature], pool, session_id))
-
-    {:ok, _} = Dspy.configure(with_runtime([lm: lm], pool, session_id))
-    {:ok, module} = Dspy.ChainOfThought.new(signature, [], with_runtime([], pool, session_id))
-
-    %{
+    session = %{
       label: label,
       pool: pool,
-      session_id: session_id,
-      module: module,
-      # Store LM reference for history access
-      lm: lm
+      session_id: session_id
     }
+
+    with_session_runtime(session, fn ->
+      {:ok, lm} = Dspy.LM.new(@model, [], temperature: temperature)
+      {:ok, _} = Dspy.configure(lm: lm)
+      {:ok, module} = Dspy.ChainOfThought.new(signature, [])
+
+      Map.merge(session, %{
+        module: module,
+        # Store LM reference for history access
+        lm: lm
+      })
+    end)
   end
 
   defp run_triage_predictions(sessions, tickets) do
@@ -240,21 +242,20 @@ defmodule DSPex.FlagshipMultiPoolGepa do
   end
 
   defp triage_ticket(session, ticket) do
-    opts = with_runtime([ticket: ticket.text], session.pool, session.session_id)
-    {:ok, result} = Dspy.PredictClass.forward(session.predictor, opts)
+    with_session_runtime(session, fn ->
+      {:ok, result} = Dspy.PredictClass.forward(session.predictor, ticket: ticket.text)
 
-    runtime_opts = runtime(session.pool, session.session_id)
-
-    %{
-      id: ticket.id,
-      text: ticket.text,
-      gold_category: ticket.category,
-      gold_urgency: ticket.urgency,
-      category: to_string(SnakeBridge.attr!(result, "category", __runtime__: runtime_opts)),
-      urgency: to_string(SnakeBridge.attr!(result, "urgency", __runtime__: runtime_opts)),
-      action: to_string(SnakeBridge.attr!(result, "action", __runtime__: runtime_opts)),
-      session: session.label
-    }
+      %{
+        id: ticket.id,
+        text: ticket.text,
+        gold_category: ticket.category,
+        gold_urgency: ticket.urgency,
+        category: to_string(SnakeBridge.attr!(result, "category")),
+        urgency: to_string(SnakeBridge.attr!(result, "urgency")),
+        action: to_string(SnakeBridge.attr!(result, "action")),
+        session: session.label
+      }
+    end)
   end
 
   defp run_insights(session, triage_results) do
@@ -305,18 +306,19 @@ defmodule DSPex.FlagshipMultiPoolGepa do
   end
 
   defp call_insights(session, item) do
-    opts = with_runtime([ticket: item.text], session.pool, session.session_id)
-    Dspy.ChainOfThought.forward(session.module, opts)
+    with_session_runtime(session, fn ->
+      Dspy.ChainOfThought.forward(session.module, ticket: item.text)
+    end)
   end
 
   defp format_insight(item, result, session) do
-    runtime_opts = runtime(session.pool, session.session_id)
-
-    %{
-      id: item.id,
-      summary: to_string(SnakeBridge.attr!(result, "summary", __runtime__: runtime_opts)),
-      root_cause: to_string(SnakeBridge.attr!(result, "root_cause", __runtime__: runtime_opts))
-    }
+    with_session_runtime(session, fn ->
+      %{
+        id: item.id,
+        summary: to_string(SnakeBridge.attr!(result, "summary")),
+        root_cause: to_string(SnakeBridge.attr!(result, "root_cause"))
+      }
+    end)
   end
 
   defp rehydrate_insights_session(session) do
@@ -340,21 +342,19 @@ defmodule DSPex.FlagshipMultiPoolGepa do
         score_prediction(item)
       end)
 
-    runtime_opts = runtime(session.pool, session.session_id)
+    with_session_runtime(session, fn ->
+      {:ok, numpy_version} = Runtime.get_module_attr("numpy", "__version__")
+      {:ok, mean} = SnakeBridge.call("numpy", "mean", [scores])
+      {:ok, std} = SnakeBridge.call("numpy", "std", [scores])
+      {:ok, p80} = SnakeBridge.call("numpy", "percentile", [scores, 80])
 
-    {:ok, numpy_version} =
-      Runtime.get_module_attr("numpy", "__version__", __runtime__: runtime_opts)
+      IO.puts("  numpy version: #{numpy_version}")
+      IO.puts("  mean score: #{Float.round(mean, 3)}")
+      IO.puts("  std dev: #{Float.round(std, 3)}")
+      IO.puts("  80th percentile: #{Float.round(p80, 3)}")
 
-    {:ok, mean} = SnakeBridge.call("numpy", "mean", [scores], __runtime__: runtime_opts)
-    {:ok, std} = SnakeBridge.call("numpy", "std", [scores], __runtime__: runtime_opts)
-    {:ok, p80} = SnakeBridge.call("numpy", "percentile", [scores, 80], __runtime__: runtime_opts)
-
-    IO.puts("  numpy version: #{numpy_version}")
-    IO.puts("  mean score: #{Float.round(mean, 3)}")
-    IO.puts("  std dev: #{Float.round(std, 3)}")
-    IO.puts("  80th percentile: #{Float.round(p80, 3)}")
-
-    %{mean: mean, std: std, p80: p80}
+      %{mean: mean, std: std, p80: p80}
+    end)
   end
 
   defp run_gepa_optimizer(session, tickets) do
@@ -362,149 +362,128 @@ defmodule DSPex.FlagshipMultiPoolGepa do
 
     metric = build_gepa_metric(session)
 
-    {:ok, reflection_lm} =
-      Dspy.LM.new(@model, [], with_runtime([temperature: 0.9], session.pool, session.session_id))
+    with_session_runtime(session, fn ->
+      {:ok, reflection_lm} = Dspy.LM.new(@model, [], temperature: 0.9)
 
-    {:ok, gepa} =
-      GEPA.new(
-        metric,
-        with_runtime(
-          [
-            reflection_lm: reflection_lm,
-            max_metric_calls: 3,
-            reflection_minibatch_size: 1,
-            track_stats: true
-          ],
-          session.pool,
-          session.session_id
+      {:ok, gepa} =
+        GEPA.new(
+          metric,
+          reflection_lm: reflection_lm,
+          max_metric_calls: 3,
+          reflection_minibatch_size: 1,
+          track_stats: true
         )
-      )
 
-    trainset = build_examples(session, train_tickets)
+      trainset = build_examples(session, train_tickets)
 
-    {:ok, optimized} =
-      GEPA.compile(
-        gepa,
-        session.predictor,
-        with_runtime([trainset: trainset, valset: trainset], session.pool, session.session_id)
-      )
+      {:ok, optimized} =
+        GEPA.compile(
+          gepa,
+          session.predictor,
+          trainset: trainset,
+          valset: trainset
+        )
 
-    optimized
+      optimized
+    end)
   end
 
   defp build_examples(session, tickets) do
     Enum.map(tickets, fn ticket ->
-      {:ok, example} =
-        Example.new(
-          [],
-          with_runtime(
-            [
-              ticket: ticket.text,
-              category: ticket.category,
-              urgency: ticket.urgency
-            ],
-            session.pool,
-            session.session_id
+      with_session_runtime(session, fn ->
+        {:ok, example} =
+          Example.new(
+            [],
+            ticket: ticket.text,
+            category: ticket.category,
+            urgency: ticket.urgency
           )
-        )
 
-      {:ok, example} =
-        Example.with_inputs(example, ["ticket"],
-          __runtime__: runtime(session.pool, session.session_id)
-        )
-
-      example
+        {:ok, example} = Example.with_inputs(example, ["ticket"])
+        example
+      end)
     end)
   end
 
   defp build_gepa_metric(session) do
-    runtime_opts = runtime(session.pool, session.session_id)
+    with_session_runtime(session, fn ->
+      {:ok, dspy_module} = SnakeBridge.call("importlib", "import_module", ["dspy"])
+      {:ok, numpy_module} = SnakeBridge.call("importlib", "import_module", ["numpy"])
 
-    {:ok, dspy_module} =
-      SnakeBridge.call("importlib", "import_module", ["dspy"], __runtime__: runtime_opts)
+      code = ~S"""
+      def metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
+          gold_cat = str(getattr(gold, "category", "")).strip().lower()
+          pred_cat = str(getattr(pred, "category", "")).strip().lower()
+          gold_urg = str(getattr(gold, "urgency", "")).strip().lower()
+          pred_urg = str(getattr(pred, "urgency", "")).strip().lower()
 
-    {:ok, numpy_module} =
-      SnakeBridge.call("importlib", "import_module", ["numpy"], __runtime__: runtime_opts)
+          cat_score = 1.0 if gold_cat == pred_cat else 0.0
+          urg_score = 1.0 if gold_urg == pred_urg else 0.0
+          score = float(np.mean([cat_score, urg_score]))
 
-    code = ~S"""
-    def metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
-        gold_cat = str(getattr(gold, "category", "")).strip().lower()
-        pred_cat = str(getattr(pred, "category", "")).strip().lower()
-        gold_urg = str(getattr(gold, "urgency", "")).strip().lower()
-        pred_urg = str(getattr(pred, "urgency", "")).strip().lower()
+          feedback_parts = []
+          if cat_score == 0.0:
+              feedback_parts.append(f"Category mismatch: expected '{gold_cat}' got '{pred_cat}'.")
+          if urg_score == 0.0:
+              feedback_parts.append(f"Urgency mismatch: expected '{gold_urg}' got '{pred_urg}'.")
 
-        cat_score = 1.0 if gold_cat == pred_cat else 0.0
-        urg_score = 1.0 if gold_urg == pred_urg else 0.0
-        score = float(np.mean([cat_score, urg_score]))
+          feedback = " ".join(feedback_parts) if feedback_parts else "Perfect match. Keep the intent and be concise."
+          return dspy.Prediction(score=score, feedback=feedback)
+      """
 
-        feedback_parts = []
-        if cat_score == 0.0:
-            feedback_parts.append(f"Category mismatch: expected '{gold_cat}' got '{pred_cat}'.")
-        if urg_score == 0.0:
-            feedback_parts.append(f"Urgency mismatch: expected '{gold_urg}' got '{pred_urg}'.")
+      globals = %{
+        "_code" => code,
+        "dspy" => dspy_module,
+        "np" => numpy_module
+      }
 
-        feedback = " ".join(feedback_parts) if feedback_parts else "Perfect match. Keep the intent and be concise."
-        return dspy.Prediction(score=score, feedback=feedback)
-    """
+      expr = "(lambda _ns: (exec(_code, _ns, _ns), _ns['metric'])[1])({})"
 
-    globals = %{
-      "_code" => code,
-      "dspy" => dspy_module,
-      "np" => numpy_module
-    }
-
-    expr = "(lambda _ns: (exec(_code, _ns, _ns), _ns['metric'])[1])({})"
-
-    SnakeBridge.call!("builtins", "eval", [expr, globals], __runtime__: runtime_opts)
+      SnakeBridge.call!("builtins", "eval", [expr, globals])
+    end)
   end
 
   defp compare_baseline_vs_optimized(triage_sessions, optimizer_session, optimized, holdout) do
     baseline_session = List.first(triage_sessions)
     baseline = triage_ticket(baseline_session, holdout)
 
-    {:ok, optimized_result} =
-      Dspy.PredictClass.forward(
-        optimized,
-        with_runtime([ticket: holdout.text], optimizer_session.pool, optimizer_session.session_id)
-      )
+    {optimized_category, optimized_urgency} =
+      with_session_runtime(optimizer_session, fn ->
+        {:ok, optimized_result} =
+          Dspy.PredictClass.forward(optimized, ticket: holdout.text)
 
-    runtime_opts = runtime(optimizer_session.pool, optimizer_session.session_id)
+        optimized_category = to_string(SnakeBridge.attr!(optimized_result, "category"))
+        optimized_urgency = to_string(SnakeBridge.attr!(optimized_result, "urgency"))
 
-    optimized_category =
-      to_string(SnakeBridge.attr!(optimized_result, "category", __runtime__: runtime_opts))
-
-    optimized_urgency =
-      to_string(SnakeBridge.attr!(optimized_result, "urgency", __runtime__: runtime_opts))
+        {optimized_category, optimized_urgency}
+      end)
 
     IO.puts("  Baseline -> #{baseline.category}/#{baseline.urgency}")
     IO.puts("  Optimized -> #{optimized_category}/#{optimized_urgency}")
   end
 
   defp print_prompt_history(label, session) do
-    runtime_opts = runtime(session.pool, session.session_id)
-    IO.puts("  #{label}:")
+    with_session_runtime(session, fn ->
+      IO.puts("  #{label}:")
 
-    case fetch_prompt_history(session, runtime_opts, 6) do
-      {:ok, []} ->
-        IO.puts("    (no history)")
+      case fetch_prompt_history(session, 6) do
+        {:ok, []} ->
+          IO.puts("    (no history)")
 
-      {:ok, history} ->
-        Enum.with_index(history, 1)
-        |> Enum.each(fn {entry, idx} ->
-          print_history_entry(idx, entry)
-        end)
+        {:ok, history} ->
+          print_history_entries(history)
 
-      {:error, reason} ->
-        IO.puts("    (history fetch failed: #{reason})")
-    end
+        {:error, reason} ->
+          IO.puts("    (history fetch failed: #{reason})")
+      end
+    end)
   end
 
-  defp fetch_prompt_history(session, runtime_opts, limit) do
+  defp fetch_prompt_history(session, limit) do
     lm = Map.fetch!(session, :lm)
     code = "list(lm.history[-#{limit}:])"
 
-    {:ok, history} =
-      SnakeBridge.call("builtins", "eval", [code, %{"lm" => lm}], __runtime__: runtime_opts)
+    {:ok, history} = SnakeBridge.call("builtins", "eval", [code, %{"lm" => lm}])
 
     if is_list(history) do
       {:ok, history}
@@ -514,6 +493,12 @@ defmodule DSPex.FlagshipMultiPoolGepa do
   rescue
     e ->
       {:error, Exception.message(e)}
+  end
+
+  defp print_history_entries(history) do
+    history
+    |> Enum.with_index(1)
+    |> Enum.each(fn {entry, idx} -> print_history_entry(idx, entry) end)
   end
 
   defp print_history_entry(idx, entry) when is_map(entry) do
@@ -603,12 +588,11 @@ defmodule DSPex.FlagshipMultiPoolGepa do
     end
   end
 
-  defp runtime(pool, session_id, extra \\ []) do
-    Keyword.merge([pool_name: pool, session_id: session_id], extra)
-  end
-
-  defp with_runtime(opts, pool, session_id, extra_runtime \\ []) do
-    Keyword.put(opts, :__runtime__, runtime(pool, session_id, extra_runtime))
+  defp with_session_runtime(session, fun) when is_function(fun, 0) do
+    SnakeBridge.RuntimeContext.with_runtime(
+      [pool_name: session.pool, session_id: session.session_id],
+      fun
+    )
   end
 end
 

@@ -3,7 +3,7 @@ defmodule DSPex do
   DSPex - DSPy for Elixir via SnakeBridge.
 
   Minimal wrapper that provides transparent access to DSPy through SnakeBridge's
-  Universal FFI. No code generation needed - just call Python directly.
+  Universal FFI, alongside the generated `Dspy.*` bindings for the full API surface.
 
   ## Quick Start
 
@@ -23,7 +23,7 @@ defmodule DSPex do
 
   ## Timeout Configuration
 
-  DSPex leverages SnakeBridge 0.7.7+'s timeout architecture for LLM workloads.
+  DSPex leverages SnakeBridge 0.13+'s timeout architecture for LLM workloads.
   By default, all DSPy calls use the `:ml_inference` profile (10 minute timeout).
 
   ### Timeout Profiles

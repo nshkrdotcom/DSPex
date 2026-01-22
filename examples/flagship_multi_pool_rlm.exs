@@ -12,6 +12,7 @@ alias Snakepit.Bridge.SessionStore
 
 defmodule DSPex.FlagshipMultiPoolRlm do
   @moduledoc false
+  require SnakeBridge
 
   @model "gemini/gemini-flash-lite-latest"
   @triage_signature "ticket -> category, urgency, action"
@@ -33,51 +34,46 @@ defmodule DSPex.FlagshipMultiPoolRlm do
   def run do
     configure_snakepit!()
 
-    Snakepit.run_as_script(
-      fn ->
-        Application.ensure_all_started(:snakebridge)
+    SnakeBridge.script restart: true do
+      banner()
+      print_pools()
 
-        banner()
-        print_pools()
+      tickets = tickets()
+      holdout = holdout_ticket()
 
-        tickets = tickets()
-        holdout = holdout_ticket()
+      IO.puts("\n==> Step 1: Build DSPy modules across pools")
+      triage_sessions = build_triage_sessions()
+      rlm_session = build_rlm_session()
+      analytics_session = build_analytics_session()
 
-        IO.puts("\n==> Step 1: Build DSPy modules across pools")
-        triage_sessions = build_triage_sessions()
-        rlm_session = build_rlm_session()
-        analytics_session = build_analytics_session()
+      print_session_workers("Triage sessions", triage_sessions)
+      print_session_workers("RLM session", [rlm_session])
+      print_session_workers("Analytics session", [analytics_session])
 
-        print_session_workers("Triage sessions", triage_sessions)
-        print_session_workers("RLM session", [rlm_session])
-        print_session_workers("Analytics session", [analytics_session])
+      IO.puts("\n==> Step 2: Run triage predictions in parallel")
+      triage_results = run_triage_predictions(triage_sessions, tickets)
 
-        IO.puts("\n==> Step 2: Run triage predictions in parallel")
-        triage_results = run_triage_predictions(triage_sessions, tickets)
+      IO.puts("\n==> Step 3: RLM analysis over long context")
+      rlm_result = run_rlm_analysis(rlm_session, triage_results)
 
-        IO.puts("\n==> Step 3: RLM analysis over long context")
-        rlm_result = run_rlm_analysis(rlm_session, triage_results)
+      IO.puts("\n==> Step 4: Evaluate with numpy in the analytics pool")
+      analytics = run_numpy_eval(analytics_session, triage_results)
 
-        IO.puts("\n==> Step 4: Evaluate with numpy in the analytics pool")
-        analytics = run_numpy_eval(analytics_session, triage_results)
+      IO.puts("\n==> Step 5: Baseline vs holdout triage")
+      baseline = triage_ticket(List.first(triage_sessions), holdout)
+      IO.puts("  Holdout -> #{baseline.category}/#{baseline.urgency}")
 
-        IO.puts("\n==> Step 5: Baseline vs holdout triage")
-        baseline = triage_ticket(List.first(triage_sessions), holdout)
-        IO.puts("  Holdout -> #{baseline.category}/#{baseline.urgency}")
+      IO.puts("\n==> LM History via Graceful Serialization (triage pool)")
 
-        IO.puts("\n==> LM History via Graceful Serialization (triage pool)")
+      Enum.each(triage_sessions, fn session ->
+        print_prompt_history("Triage #{session.label}", session)
+      end)
 
-        Enum.each(triage_sessions, fn session ->
-          print_prompt_history("Triage #{session.label}", session)
-        end)
+      IO.puts("\n==> LM History via Graceful Serialization (RLM pool)")
+      print_prompt_history("RLM", rlm_session)
 
-        IO.puts("\n==> LM History via Graceful Serialization (RLM pool)")
-        print_prompt_history("RLM", rlm_session)
-
-        summary(triage_results, rlm_result, analytics)
-      end,
-      restart: true
-    )
+      summary(triage_results, rlm_result, analytics)
+    end
   end
 
   defp configure_snakepit! do

@@ -2,9 +2,9 @@
 #
 # Run with: mix run --no-start examples/classification.exs
 
-Snakepit.run_as_script(fn ->
-  Application.ensure_all_started(:snakebridge)
+require SnakeBridge
 
+SnakeBridge.script do
   IO.puts("DSPex Classification Example")
   IO.puts("=============================\n")
 
@@ -29,4 +29,4 @@ Snakepit.run_as_script(fn ->
   end
 
   IO.puts("\nDone!")
-end)
+end

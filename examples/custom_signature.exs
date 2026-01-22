@@ -2,9 +2,9 @@
 #
 # Run with: mix run --no-start examples/custom_signature.exs
 
-Snakepit.run_as_script(fn ->
-  Application.ensure_all_started(:snakebridge)
+require SnakeBridge
 
+SnakeBridge.script do
   IO.puts("DSPex Custom Signature Example")
   IO.puts("================================\n")
 
@@ -34,4 +34,4 @@ Snakepit.run_as_script(fn ->
   end
 
   IO.puts("Done!")
-end)
+end

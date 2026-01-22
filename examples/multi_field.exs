@@ -2,9 +2,9 @@
 #
 # Run with: mix run --no-start examples/multi_field.exs
 
-Snakepit.run_as_script(fn ->
-  Application.ensure_all_started(:snakebridge)
+require SnakeBridge
 
+SnakeBridge.script do
   IO.puts("DSPex Multi-Field Signature Example")
   IO.puts("=====================================\n")
 
@@ -33,4 +33,4 @@ Snakepit.run_as_script(fn ->
   IO.puts("  Tone: #{tone}")
 
   IO.puts("\nDone!")
-end)
+end

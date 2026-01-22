@@ -4,6 +4,8 @@
 #
 # Requires: GEMINI_API_KEY environment variable
 
+require SnakeBridge
+
 defmodule SimpleRetriever do
   def retrieve(docs, query, k) do
     terms =
@@ -24,9 +26,7 @@ defmodule SimpleRetriever do
   end
 end
 
-Snakepit.run_as_script(fn ->
-  Application.ensure_all_started(:snakebridge)
-
+SnakeBridge.script do
   IO.puts("DSPex RAG Example")
   IO.puts("=================\n")
 
@@ -65,4 +65,4 @@ Snakepit.run_as_script(fn ->
   IO.puts("Retrieved context:\n#{context}\n")
   IO.puts("Answer: #{answer}\n")
   IO.puts("Done!")
-end)
+end

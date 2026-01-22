@@ -19,6 +19,7 @@ alias Snakepit.Bridge.SessionStore
 
 defmodule DSPex.DspyApiIntrospect do
   @moduledoc false
+  require SnakeBridge
 
   @default_model "gemini/gemini-flash-lite-latest"
   @default_signature "context, query -> output"
@@ -105,40 +106,35 @@ defmodule DSPex.DspyApiIntrospect do
 
     configure_snakepit!(opts)
 
-    Snakepit.run_as_script(
-      fn ->
-        Application.ensure_all_started(:snakebridge)
+    SnakeBridge.script restart: true do
+      {:ok, context, stats, sources} = load_context(opts.file, opts)
+      query = augment_query(opts.query, sources, opts)
+      opts = %{opts | query: query}
 
-        {:ok, context, stats, sources} = load_context(opts.file, opts)
-        query = augment_query(opts.query, sources, opts)
-        opts = %{opts | query: query}
+      banner(opts)
+      print_file_stats(stats)
 
-        banner(opts)
-        print_file_stats(stats)
+      session = build_rlm_session(opts)
 
-        session = build_rlm_session(opts)
+      case run_query(session, context, opts.query) do
+        {:ok, answer} ->
+          print_section("Result")
+          print_result(answer, opts, session)
 
-        case run_query(session, context, opts.query) do
-          {:ok, answer} ->
-            print_section("Result")
-            print_result(answer, opts, session)
+        {:error, reason} ->
+          raise "RLM error: #{inspect(reason)}"
+      end
 
-          {:error, reason} ->
-            raise "RLM error: #{inspect(reason)}"
-        end
-
-        if trace_enabled?(opts, parsed) do
-          print_section("Trace Review")
-          print_trace_settings(opts)
-          print_session_workers("RLM session", [session])
-          print_prompt_history("RLM", session, opts)
-        else
-          print_section("Trace Review")
-          IO.puts("  Tracing disabled. Use --trace to enable.")
-        end
-      end,
-      restart: true
-    )
+      if trace_enabled?(opts, parsed) do
+        print_section("Trace Review")
+        print_trace_settings(opts)
+        print_session_workers("RLM session", [session])
+        print_prompt_history("RLM", session, opts)
+      else
+        print_section("Trace Review")
+        IO.puts("  Tracing disabled. Use --trace to enable.")
+      end
+    end
   end
 
   defp parse_args(argv) do

@@ -4,6 +4,16 @@ All notable changes to DSPex will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-01-21
+
+### Added
+- HexDocs grouping for generated `Dspy.*` modules to mirror DSPy’s package structure.
+- Python docstring metadata surfaced in generated module docs (via SnakeBridge 0.13.0).
+
+### Changed
+- Upgraded to SnakeBridge 0.13.0 and regenerated DSPy bindings/manifest.
+- README and guides updated to reflect dual access: generated `Dspy.*` modules plus `DSPex` FFI helpers.
+
 ## [0.6.0] - 2026-01-21
 
 ### Added

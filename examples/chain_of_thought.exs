@@ -4,9 +4,9 @@
 #
 # Requires: GEMINI_API_KEY environment variable
 
-Snakepit.run_as_script(fn ->
-  Application.ensure_all_started(:snakebridge)
+require SnakeBridge
 
+SnakeBridge.script do
   IO.puts("DSPex Chain of Thought Example")
   IO.puts("===============================\n")
 
@@ -32,4 +32,4 @@ Snakepit.run_as_script(fn ->
   end
 
   IO.puts("Done!")
-end)
+end

@@ -4,9 +4,9 @@
 #
 # Requires: GEMINI_API_KEY environment variable
 
-Snakepit.run_as_script(fn ->
-  Application.ensure_all_started(:snakebridge)
+require SnakeBridge
 
+SnakeBridge.script do
   IO.puts("DSPex Optimization Example")
   IO.puts("==========================\n")
 
@@ -39,4 +39,4 @@ Snakepit.run_as_script(fn ->
   IO.puts("Question: #{question}")
   IO.puts("Answer: #{answer}\n")
   IO.puts("Done!")
-end)
+end

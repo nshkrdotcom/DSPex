@@ -1,12 +1,12 @@
 # Timeout Configuration Examples - Using Generated Native Bindings
 #
-# Demonstrates SnakeBridge 0.10+ timeout architecture
+# Demonstrates SnakeBridge 0.13+ timeout architecture
 #
 # Run with: mix run --no-start examples/timeout_test.exs
 
-Snakepit.run_as_script(fn ->
-  Application.ensure_all_started(:snakebridge)
+require SnakeBridge
 
+SnakeBridge.script do
   IO.puts("DSPex Timeout Configuration Examples")
   IO.puts("=====================================\n")
 
@@ -107,4 +107,4 @@ Snakepit.run_as_script(fn ->
   IO.puts("  :ml_inference - 10 minutes  (LLM inference, DSPex default)")
   IO.puts("  :batch_job    - 1 hour      (long-running batch operations)")
   IO.puts("\nDone!")
-end)
+end

@@ -18,12 +18,13 @@
 
 ## Overview
 
-DSPex brings [DSPy](https://github.com/stanfordnlp/dspy) — Stanford NLP's framework for programming language models — to Elixir. Rather than generating wrapper code, DSPex provides a minimal, transparent interface through [SnakeBridge](https://github.com/nshkrdotcom/snakebridge)'s Universal FFI. Call any DSPy function directly from Elixir with full type safety and automatic Python lifecycle management.
+DSPex brings [DSPy](https://github.com/stanfordnlp/dspy) — Stanford NLP's framework for programming language models — to Elixir. It ships with SnakeBridge-generated `Dspy.*` bindings that mirror DSPy's package layout (great for HexDocs + IDE navigation), plus a minimal `DSPex` convenience layer over [SnakeBridge](https://github.com/nshkrdotcom/snakebridge)'s Universal FFI. Use the generated modules for the full API surface or the thin FFI wrapper for direct calls.
 
 **Why DSPex?**
 
-- **Zero boilerplate** — No code generation needed, just call Python directly
+- **Two access layers** — Generated `Dspy.*` modules + a minimal `DSPex` FFI wrapper
 - **Full DSPy access** — Signatures, Predict, ChainOfThought, optimizers, and more
+- **Python-shaped docs** — Module tree mirrors DSPy packages for clean HexDocs
 - **100+ LLM providers** — OpenAI, Anthropic, Google, Ollama, and anything LiteLLM supports
 - **Production-ready timeouts** — Built-in profiles for ML inference workloads
 - **Elixir-native error handling** — `{:ok, result}` / `{:error, reason}` everywhere
@@ -44,7 +45,7 @@ Add DSPex to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:dspex, "~> 0.6.0"}
+    {:dspex, "~> 0.7.0"}
   ]
 end
 ```
@@ -64,6 +65,9 @@ mix snakebridge.setup  # Creates managed venv + installs dspy-ai automatically
 ```
 
 SnakeBridge manages an isolated venv under `priv/snakepit/python/venv`; no manual venv creation or pip installs needed.
+
+For local development against a checkout of SnakeBridge, set `SNAKEBRIDGE_PATH` to
+the SnakeBridge repo path before running Mix tasks.
 
 The RLM flagship example uses DSPy’s default PythonInterpreter (Pyodide/WASM), which requires Deno on your PATH.
 
@@ -234,7 +238,8 @@ config :snakebridge,
 
 ## API Reference
 
-DSPex provides a thin wrapper over SnakeBridge's Universal FFI:
+DSPex provides a thin wrapper over SnakeBridge's Universal FFI, and the generated
+`Dspy.*` modules expose the full DSPy API surface:
 
 ### Lifecycle
 
@@ -275,6 +280,9 @@ All functions have `!` variants that raise on error instead of returning `{:erro
 
 ## Architecture
 
+Generated `Dspy.*` modules are thin wrappers over `SnakeBridge.Runtime`; they follow
+the same gRPC execution path as the `DSPex` convenience API.
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Your Elixir App                      │
@@ -298,8 +306,8 @@ All functions have `!` variants that raise on error instead of returning `{:erro
 
 **Key Design Principles:**
 
-- **Minimal wrapper** — DSPex delegates to SnakeBridge, no magic
-- **No code generation** — Call Python directly at runtime
+- **Dual API** — Generated `Dspy.*` bindings plus the minimal `DSPex` wrapper
+- **Python-shaped docs** — DSPy modules appear as a familiar package tree
 - **Automatic lifecycle** — Snakepit manages Python processes
 - **Session-aware** — Maintains Python state across calls
 - **Thread-safe** — gRPC bridge handles concurrency
@@ -307,7 +315,7 @@ All functions have `!` variants that raise on error instead of returning `{:erro
 ## Requirements
 
 - **Elixir** ~> 1.18
-- **Python** 3.8+
+- **Python** 3.9+
 - **API Key** — Set `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc. based on your provider
 
 ## Related Projects

@@ -2,9 +2,9 @@
 #
 # Run with: mix run --no-start examples/math_reasoning.exs
 
-Snakepit.run_as_script(fn ->
-  Application.ensure_all_started(:snakebridge)
+require SnakeBridge
 
+SnakeBridge.script do
   IO.puts("DSPex Math Reasoning Example")
   IO.puts("==============================\n")
 
@@ -30,4 +30,4 @@ Snakepit.run_as_script(fn ->
   end
 
   IO.puts("Done!")
-end)
+end

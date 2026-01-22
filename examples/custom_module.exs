@@ -4,6 +4,8 @@
 #
 # Requires: GEMINI_API_KEY environment variable
 
+require SnakeBridge
+
 defmodule CustomQA do
   def new do
     {:ok, extract} = Dspy.PredictClass.new("question -> keywords", [])
@@ -24,9 +26,7 @@ defmodule CustomQA do
   end
 end
 
-Snakepit.run_as_script(fn ->
-  Application.ensure_all_started(:snakebridge)
-
+SnakeBridge.script do
   IO.puts("DSPex Custom Module Example")
   IO.puts("===========================\n")
 
@@ -42,4 +42,4 @@ Snakepit.run_as_script(fn ->
   IO.puts("Keywords: #{inspect(keywords)}")
   IO.puts("Answer: #{answer}\n")
   IO.puts("Done!")
-end)
+end
