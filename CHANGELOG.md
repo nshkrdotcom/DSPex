@@ -4,6 +4,20 @@ All notable changes to DSPex will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-01-23
+
+### Added
+- New generated modules: `Dspy.Metadata`, `Dspy.Dsp`, `Dspy.Predict.Retry`, `Dspy.Retrievers.DatabricksRm`, `Dspy.Retrievers.WeaviateRm`.
+- Docstring fallback for methods without docstrings now inherit their class-level docstring (e.g., RLM methods display the RLM module description).
+- Config hash tracking in `snakebridge.lock` for library configuration changes.
+
+### Changed
+- Upgraded to SnakeBridge 0.14.0 and Snakepit 0.11.1; regenerated all DSPy bindings.
+- Refined type specs for module/class references (improved naming precision).
+
+### Removed
+- `Dspy.ChainOfThoughtWithHint` and `Dspy.Program` modules (removed upstream in DSPy).
+
 ## [0.7.0] - 2026-01-21
 
 ### Added
