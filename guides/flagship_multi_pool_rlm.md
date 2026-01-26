@@ -63,7 +63,7 @@ RLM is created with a signature plus iteration and call budgets:
 
 ```elixir
 {:ok, rlm} =
-  Dspy.Predict.RLMClass.new(
+  Dspy.Predict.RLM.new(
     "context, query -> output",
     4,
     12,
@@ -79,11 +79,9 @@ RLM is created with a signature plus iteration and call budgets:
 The example stores a long context buffer and asks for a summary:
 
 ```elixir
-result =
-  DSPex.method!(
+{:ok, result} =
+  Dspy.Predict.RLM.forward(
     rlm,
-    "forward",
-    [],
     context: context,
     query: "Identify the top two recurring issues and recommend next actions.",
     __runtime__: [pool_name: :rlm_pool, session_id: session_id]

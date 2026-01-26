@@ -13,7 +13,7 @@
 #   mix run --no-start examples/introspect/dspy_api_introspect.exs \
 #     --prompt "Summarize RLM usage only" --signature "context, query -> output"
 
-alias Dspy.Predict.RLMClass
+alias Dspy.Predict.RLM
 alias SnakeBridge.ConfigHelper
 alias Snakepit.Bridge.SessionStore
 
@@ -69,7 +69,7 @@ defmodule DSPex.DspyApiIntrospect do
               Build a compact API cheat sheet from the Elixir wrapper sources.
 
               Requirements:
-              - List core modules and functions (configure, LM.new, PredictClass, RLMClass).
+              - List core modules and functions (configure, LM.new, PredictClass, RLM).
               - Explain how __runtime__ (pool_name/session_id) is passed.
               - Mention history inspection (Dspy.inspect_history or lm.history).
               - Output 8-12 short bullets.
@@ -312,7 +312,6 @@ defmodule DSPex.DspyApiIntrospect do
       {"LM module", ~r/^\s*defmodule\s+Dspy\.LM\b/},
       {"PredictClass module", ~r/^\s*defmodule\s+Dspy\.PredictClass\b/},
       {"Predict.PredictClass3 module", ~r/^\s*defmodule\s+Dspy\.Predict\.PredictClass3\b/},
-      {"Predict.RLMClass module", ~r/^\s*defmodule\s+Dspy\.Predict\.RLMClass\b/},
       {"Predict.RLM module", ~r/^\s*defmodule\s+Dspy\.Predict\.RLM\b/},
       {"Signature module", ~r/^\s*defmodule\s+Dspy\.Signature\b/},
       {"Signatures.Signature module", ~r/^\s*defmodule\s+Dspy\.Signatures\.Signature\b/},
@@ -325,11 +324,6 @@ defmodule DSPex.DspyApiIntrospect do
       |> Enum.flat_map(fn {label, regex} ->
         format_hits(sources, label, regex, 3)
       end)
-
-    rlm_class_defs =
-      if basics_query?(query),
-        do: extract_module_defs(sources, "Dspy.Predict.RLMClass", :all),
-        else: []
 
     rlm_defs =
       if basics_query?(query),
@@ -353,7 +347,6 @@ defmodule DSPex.DspyApiIntrospect do
 
     facts =
       base_hits ++
-        format_block("RLMClass defs", rlm_class_defs) ++
         format_block("RLM defs", rlm_defs) ++
         format_block("Signature defs", sig_defs) ++
         format_block("Signature (class) defs", signature_defs) ++
@@ -684,7 +677,7 @@ defmodule DSPex.DspyApiIntrospect do
           ~r/^\s+def\s+configure\b/,
           ~r/^\s+def\s+inspect_history\b/,
           ~r/^\s*defmodule\s+Dspy\.LM\b/,
-          ~r/^\s*defmodule\s+Dspy\.Predict\.RLMClass\b/,
+          ~r/^\s*defmodule\s+Dspy\.Predict\.RLM\b/,
           ~r/^\s*defmodule\s+Dspy\.PredictClass\b/,
           ~r/## Runtime Options/,
           ~r/__runtime__/
@@ -774,7 +767,7 @@ defmodule DSPex.DspyApiIntrospect do
     {:ok, _} = Dspy.configure(with_runtime([lm: lm], pool, session_id))
 
     {:ok, rlm} =
-      RLMClass.new(
+      RLM.new(
         opts.signature,
         opts.max_iterations,
         opts.max_llm_calls,
@@ -801,7 +794,7 @@ defmodule DSPex.DspyApiIntrospect do
     input_opts = build_input_opts(session.input_fields, context, query)
     opts = with_runtime(input_opts, session.pool, session.session_id)
 
-    case RLMClass.forward(session.rlm, opts) do
+    case RLM.forward(session.rlm, opts) do
       {:ok, result} ->
         runtime_opts = runtime(session.pool, session.session_id)
         {:ok, answer} = SnakeBridge.attr(result, session.output_field, __runtime__: runtime_opts)

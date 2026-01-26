@@ -5,7 +5,7 @@
 # Requires: GEMINI_API_KEY environment variable
 # Requires: Deno for PythonInterpreter (install via asdf or https://deno.land/install)
 
-alias Dspy.Predict.RLMClass
+alias Dspy.Predict.RLM
 alias SnakeBridge.ConfigHelper
 alias SnakeBridge.Runtime
 alias Snakepit.Bridge.SessionStore
@@ -156,7 +156,7 @@ defmodule DSPex.FlagshipMultiPoolRlm do
     {:ok, _} = Dspy.configure(with_runtime([lm: lm], :rlm_pool, session_id))
 
     {:ok, rlm} =
-      RLMClass.new(
+      RLM.new(
         @rlm_signature,
         @rlm_max_iterations,
         @rlm_max_llm_calls,
@@ -286,7 +286,7 @@ defmodule DSPex.FlagshipMultiPoolRlm do
   defp call_rlm(session, context, query) do
     opts = with_runtime([context: context, query: query], session.pool, session.session_id)
 
-    case RLMClass.forward(session.rlm, opts) do
+    case RLM.forward(session.rlm, opts) do
       {:ok, result} ->
         runtime_opts = runtime(session.pool, session.session_id)
         {:ok, answer} = SnakeBridge.attr(result, "output", __runtime__: runtime_opts)
