@@ -45,7 +45,7 @@ Add DSPex to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:dspex, "~> 0.8.0"}
+    {:dspex, "~> 0.9.0"}
   ]
 end
 ```
@@ -66,8 +66,17 @@ mix snakebridge.setup  # Creates managed venv + installs dspy-ai automatically
 
 SnakeBridge manages an isolated venv under `priv/snakepit/python/venv`; no manual venv creation or pip installs needed.
 
-For local development against a checkout of SnakeBridge, set `SNAKEBRIDGE_PATH` to
-the SnakeBridge repo path before running Mix tasks.
+For local development against a checkout of SnakeBridge, this repo uses a path dependency
+(`../snakebridge`). If you want to use the Hex release instead, update `mix.exs` to depend on a
+versioned `{:snakebridge, "~> ..."}`
+
+When SnakeBridge changes or you need to refresh generated wrappers, run:
+
+```bash
+mix snakebridge.regen
+```
+
+Add `--clean` to remove generated artifacts and metadata before regenerating.
 
 The RLM flagship example uses DSPy’s default PythonInterpreter (Pyodide/WASM), which requires Deno on your PATH.
 
@@ -239,7 +248,7 @@ config :snakebridge,
 ## API Reference
 
 DSPex provides a thin wrapper over SnakeBridge's Universal FFI, and the generated
-`Dspy.*` modules expose the full DSPy API surface:
+`Dspy.*` modules expose DSPy’s public API surface (generated via SnakeBridge `module_mode: :explicit`):
 
 ### Lifecycle
 

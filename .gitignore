@@ -169,6 +169,9 @@ snakepit_grpc_bridge/
 # SnakeBridge development project
 snakebridge/
 
+# SnakeBridge generated manifest (large, regenerated on build)
+.snakebridge/manifest.json
+
 # Cloned gemini_ex repository
 gemini_ex/
 

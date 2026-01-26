@@ -4,12 +4,20 @@ All notable changes to DSPex will be documented in this file.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-01-25
+
+### Changed
+- Updated SnakeBridge dependency to a local path (`../snakebridge`) for development in this workspace.
+- Switched DSPy generation to `module_mode: :explicit` to avoid broad/nuclear submodule discovery and keep the generated surface focused on explicit `__all__` exports.
+- Added `max_class_methods` guardrail to keep generated wrappers small for inheritance-heavy classes.
+
 ## [0.8.0] - 2026-01-23
 
 ### Added
 - New generated modules: `Dspy.Metadata`, `Dspy.Dsp`, `Dspy.Predict.Retry`, `Dspy.Retrievers.DatabricksRm`, `Dspy.Retrievers.WeaviateRm`.
 - Docstring fallback for methods without docstrings now inherit their class-level docstring (e.g., RLM methods display the RLM module description).
 - Config hash tracking in `snakebridge.lock` for library configuration changes.
+- README documentation for `mix snakebridge.regen` command (with `--clean` option) to refresh generated wrappers.
 
 ### Changed
 - Upgraded to SnakeBridge 0.14.0 and Snakepit 0.11.1; regenerated all DSPy bindings.
@@ -37,7 +45,7 @@ All notable changes to DSPex will be documented in this file.
 
 ### Changed
 - Examples now use generated native bindings (`Dspy.*` modules) and `Snakepit.run_as_script/2` instead of the DSPex wrapper layer.
-- Flagship demos now use native `Dspy.GEPA`, `Dspy.BootstrapFewShot`, and `Dspy.Predict.RLMClass` modules.
+- Flagship demos now use native `Dspy.GEPA`, `Dspy.BootstrapFewShot`, and `Dspy.Predict.RLM` modules.
 - RLM data extraction experiment consolidated into one script, switched pandas to stdlib CSV, and improved evaluation + extraction logic.
 - RLM data extraction experiment now includes trace controls and LM history inspection settings via environment variables.
 - Examples index/run-all scripts updated to include the NYC 311 experiment and introspection guide.
@@ -50,7 +58,7 @@ All notable changes to DSPex will be documented in this file.
 ### Changed
 - Regenerated DSPy wrappers/manifest with SnakeBridge 0.11.0 and DSPy 3.1.2 (full API surface, updated graceful serialization helpers).
 - Examples now lean on generated wrappers for signature creation, examples, GEPA optimization, and RLM, with tuple return handling.
-- RLM flagship uses `Dspy.Predict.RLMClass` to match DSPy 3.1.2’s export path.
+- RLM flagship uses `Dspy.Predict.RLM` to match DSPy 3.1.2’s export path.
 - RLM flagship init now matches DSPy 3.1.2 RLM parameters (removed unsupported `max_depth`).
 - Flagship GEPA/RLM demos now inspect LM history via `builtins.eval` with graceful serialization safeguards.
 - Examples index, run-all script, and docs now include the RLM flagship demo and guide.
@@ -153,3 +161,16 @@ Initial experimental release with direct Snakepit integration.
 - Session management
 - Pool-based Python process management
 - Initial examples and test infrastructure
+
+[Unreleased]: https://github.com/nshkrdotcom/DSPex/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/nshkrdotcom/DSPex/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/nshkrdotcom/DSPex/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/nshkrdotcom/DSPex/releases/tag/v0.1.0
