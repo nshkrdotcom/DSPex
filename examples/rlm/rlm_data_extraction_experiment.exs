@@ -13,7 +13,7 @@
 #   - Deno for PythonInterpreter (install via `asdf install` or deno.land/install)
 #   - Internet connection (first run downloads ~15MB CSV, then cached)
 
-alias Dspy.Predict.RLMClass
+alias Dspy.Predict.RLM
 alias SnakeBridge.ConfigHelper
 alias Snakepit.Bridge.SessionStore
 
@@ -483,7 +483,7 @@ defmodule RLMExperiment.DataExtraction do
     {:ok, _} = Dspy.configure(with_runtime([lm: lm], :rlm_pool, session_id))
 
     {:ok, rlm} =
-      RLMClass.new(
+      RLM.new(
         @rlm_signature,
         @rlm_max_iterations,
         @rlm_max_llm_calls,
@@ -550,7 +550,7 @@ defmodule RLMExperiment.DataExtraction do
         session.session_id
       )
 
-    case RLMClass.forward(session.rlm, opts) do
+    case RLM.forward(session.rlm, opts) do
       {:ok, result} ->
         runtime_opts = runtime(session.pool, session.session_id)
         {:ok, answer} = SnakeBridge.attr(result, "output", __runtime__: runtime_opts)
