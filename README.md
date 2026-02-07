@@ -45,7 +45,7 @@ Add DSPex to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:dspex, "~> 0.9.0"}
+    {:dspex, "~> 0.10.0"}
   ]
 end
 ```

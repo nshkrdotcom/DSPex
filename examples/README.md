@@ -452,6 +452,7 @@ The `run_all.sh` script runs all examples sequentially with:
 - Per-example timing
 - Pass/fail summary
 - Automatic timeout handling (configurable via `DSPEX_RUN_TIMEOUT_SECONDS`)
+- Per-example timeout override for long RLM extraction run (`DSPEX_RUN_TIMEOUT_SECONDS_RLM_DATA_EXTRACTION`, default `300`)
 
 ```bash
 # Run with default 120s timeout per example
@@ -459,6 +460,11 @@ The `run_all.sh` script runs all examples sequentially with:
 
 # Run with custom timeout (300s per example)
 DSPEX_RUN_TIMEOUT_SECONDS=300 ./examples/run_all.sh
+
+# Keep a short global timeout but allow longer RLM extraction timeout
+DSPEX_RUN_TIMEOUT_SECONDS=120 \
+DSPEX_RUN_TIMEOUT_SECONDS_RLM_DATA_EXTRACTION=300 \
+./examples/run_all.sh
 
 # Disable timeout
 DSPEX_RUN_TIMEOUT_SECONDS=0 ./examples/run_all.sh

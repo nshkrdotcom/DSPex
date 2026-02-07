@@ -26,24 +26,40 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$ROOT_DIR"
 
-# Timeout wrapper (seconds). Set DSPEX_RUN_TIMEOUT_SECONDS=0 to disable.
+# Timeout wrapper (seconds). Set DSPEX_RUN_TIMEOUT_SECONDS=0 to disable globally.
+# Heavy examples can override this timeout via dedicated env vars.
 RUN_TIMEOUT_SECONDS="${DSPEX_RUN_TIMEOUT_SECONDS:-120}"
-TIMEOUT_CMD=()
+RLM_DATA_EXTRACTION_TIMEOUT_SECONDS="${DSPEX_RUN_TIMEOUT_SECONDS_RLM_DATA_EXTRACTION:-300}"
+TIMEOUT_BIN=""
 
-if [[ "$RUN_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] && [[ "$RUN_TIMEOUT_SECONDS" -gt 0 ]]; then
-    if command -v timeout >/dev/null 2>&1; then
-        TIMEOUT_CMD=(timeout --foreground --preserve-status "$RUN_TIMEOUT_SECONDS")
-    elif command -v gtimeout >/dev/null 2>&1; then
-        TIMEOUT_CMD=(gtimeout --foreground --preserve-status "$RUN_TIMEOUT_SECONDS")
-    fi
+if command -v timeout >/dev/null 2>&1; then
+    TIMEOUT_BIN="timeout"
+elif command -v gtimeout >/dev/null 2>&1; then
+    TIMEOUT_BIN="gtimeout"
 fi
 
 run_cmd() {
-    if ((${#TIMEOUT_CMD[@]})); then
-        "${TIMEOUT_CMD[@]}" "$@"
+    local timeout_seconds=$1
+    shift
+
+    if [[ -n "$TIMEOUT_BIN" ]] && [[ "$timeout_seconds" =~ ^[0-9]+$ ]] && [[ "$timeout_seconds" -gt 0 ]]; then
+        "$TIMEOUT_BIN" --foreground --preserve-status "$timeout_seconds" "$@"
     else
         "$@"
     fi
+}
+
+timeout_for_example() {
+    local file=$1
+
+    case "$file" in
+        "examples/rlm/rlm_data_extraction_experiment.exs")
+            echo "$RLM_DATA_EXTRACTION_TIMEOUT_SECONDS"
+            ;;
+        *)
+            echo "$RUN_TIMEOUT_SECONDS"
+            ;;
+    esac
 }
 
 # Track results
@@ -69,13 +85,20 @@ run_example() {
     local file=$1
     local name=$(basename "$file" .exs)
     local start=$(date +%s)
+    local timeout_seconds
+    timeout_seconds=$(timeout_for_example "$file")
 
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${YELLOW}Running: ${NC}${name}"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    if [[ "$timeout_seconds" =~ ^[0-9]+$ ]] && [[ "$timeout_seconds" -gt 0 ]]; then
+        echo -e "${BLUE}Timeout:${NC} ${timeout_seconds}s"
+    else
+        echo -e "${BLUE}Timeout:${NC} disabled"
+    fi
     echo ""
 
-    if run_cmd mix run --no-start "$file" 2>&1; then
+    if run_cmd "$timeout_seconds" mix run --no-start "$file" 2>&1; then
         local end=$(date +%s)
         local duration=$((end - start))
         RESULTS+=("0")

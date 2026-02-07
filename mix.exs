@@ -1,7 +1,7 @@
 defmodule DSPex.MixProject do
   use Mix.Project
 
-  @version "0.9.0"
+  @version "0.10.0"
   @source_url "https://github.com/nshkrdotcom/dspex"
 
   def project do
@@ -41,13 +41,13 @@ defmodule DSPex.MixProject do
   defp deps do
     [
       # SnakeBridge - Python bridge
-      {:snakebridge, "~> 0.15.0"},
+      {:snakebridge, "~> 0.16.0"},
 
       # JSON encoding
       {:jason, "~> 1.4"},
 
       # Dev/test tools
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]

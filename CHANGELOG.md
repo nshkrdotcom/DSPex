@@ -4,6 +4,17 @@ All notable changes to DSPex will be documented in this file.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-02-06
+
+### Changed
+- Upgraded SnakeBridge dependency from 0.15.0 to 0.16.0; regenerated all DSPy bindings.
+- Upgraded ex_doc dependency from ~> 0.31 to ~> 0.40.
+- Trimmed redundant docstrings in `Dspy.__init__` and `Dspy.SignatureMeta` generated modules.
+
+### Added
+- Per-example timeout override in `run_all.sh` for long-running RLM data extraction (`DSPEX_RUN_TIMEOUT_SECONDS_RLM_DATA_EXTRACTION`).
+- Examples README documents the new per-example timeout configuration.
+
 ## [0.9.0] - 2026-01-25
 
 ### Changed
@@ -162,7 +173,8 @@ Initial experimental release with direct Snakepit integration.
 - Pool-based Python process management
 - Initial examples and test infrastructure
 
-[Unreleased]: https://github.com/nshkrdotcom/DSPex/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/nshkrdotcom/DSPex/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.6.0...v0.7.0
