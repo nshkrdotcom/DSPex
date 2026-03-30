@@ -26,9 +26,9 @@
       "arch": "x86_64",
       "os": "linux"
     },
-    "python_packages_hash": "sha256:9c3a452db43d30d0f3b2a489ed870b18ac04a848047629e4c52872100098de8c",
+    "python_packages_hash": "sha256:978123efc8aae8ec1209dc817311a4aefdc7c39c53fe261ccbd06fc6f9377fab",
     "python_platform": "x86_64-pc-linux-gnu",
-    "python_runtime_hash": "c2c20b4745d447551221ec3d4e70f92c270c4609fe3df34fc52ea6dd46e92273",
+    "python_runtime_hash": "8295ee25cfdb239f3e165afceda7f46de73e2b606ff0e2e3d8623e3facd30acc",
     "python_version": "3.12.3",
     "snakebridge_version": "0.16.0"
   },
@@ -36,13 +36,13 @@
     "dspy": {
       "config_hash": "dea3e2c620dffcea9d5436682ab63c09d2ec6d4416d8264f5e2708019e39354a",
       "hash": null,
-      "requested": "3.1.2",
-      "resolved": "3.1.2"
+      "requested": "3.1.3",
+      "resolved": "3.1.3"
     }
   },
   "python_packages": {
     "dspy": {
-      "version": "3.1.2",
+      "version": "3.1.3",
       "hash": null
     }
   },
