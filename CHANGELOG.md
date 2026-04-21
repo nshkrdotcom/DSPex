@@ -4,6 +4,13 @@ All notable changes to DSPex will be documented in this file.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-04-21
+
+### Changed
+- Upgraded DSPy from 3.1.3 to 3.2.0.
+- Regenerated the `Dspy.*` wrapper surface under `lib/snakebridge_generated/dspy` with SnakeBridge.
+- Refreshed Mix dependency lockfile: Credo 1.7.18, telemetry 1.4.1, and tls_certificate_check 1.32.1.
+
 ## [0.11.0] - 2026-03-30
 
 ### Changed
@@ -180,7 +187,8 @@ Initial experimental release with direct Snakepit integration.
 - Pool-based Python process management
 - Initial examples and test infrastructure
 
-[Unreleased]: https://github.com/nshkrdotcom/DSPex/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/nshkrdotcom/DSPex/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.8.0...v0.9.0

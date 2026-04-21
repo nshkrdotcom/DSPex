@@ -1,7 +1,7 @@
 defmodule DSPex.MixProject do
   use Mix.Project
 
-  @version "0.11.0"
+  @version "0.12.0"
   @source_url "https://github.com/nshkrdotcom/dspex"
 
   def project do
@@ -56,7 +56,7 @@ defmodule DSPex.MixProject do
   defp python_deps do
     [
       # generate: :all enables full API surface generation
-      {:dspy, "3.1.3", generate: :all, module_mode: :explicit, max_class_methods: 500}
+      {:dspy, "3.2.0", generate: :all, module_mode: :explicit, max_class_methods: 500}
     ]
   end
 

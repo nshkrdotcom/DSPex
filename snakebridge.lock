@@ -1,13 +1,13 @@
 {
   "compatibility": {
     "compute_capability_min": null,
-    "cuda_min": null
+    "cuda_min": "13.2"
   },
   "environment": {
     "elixir_version": "1.18.4",
     "generator_hash": "b42fe11f5e562e661535f7df00ee90c76624920d03cf35f9fbca687ac22b0c0f",
     "hardware": {
-      "accelerator": "cpu",
+      "accelerator": "cuda",
       "cpu_features": [
         "pclmul",
         "ssse3",
@@ -19,14 +19,16 @@
         "f16c",
         "avx2"
       ],
-      "gpu_count": 0
+      "cuda_version": "13.2",
+      "cudnn_version": null,
+      "gpu_count": 1
     },
     "otp_version": "28",
     "platform": {
       "arch": "x86_64",
       "os": "linux"
     },
-    "python_packages_hash": "sha256:978123efc8aae8ec1209dc817311a4aefdc7c39c53fe261ccbd06fc6f9377fab",
+    "python_packages_hash": "sha256:ac6d733345f6cc05d5bd045d53b06b7328ea60e3ad2602d777c748e19b06af94",
     "python_platform": "x86_64-pc-linux-gnu",
     "python_runtime_hash": "8295ee25cfdb239f3e165afceda7f46de73e2b606ff0e2e3d8623e3facd30acc",
     "python_version": "3.12.3",
@@ -36,13 +38,13 @@
     "dspy": {
       "config_hash": "dea3e2c620dffcea9d5436682ab63c09d2ec6d4416d8264f5e2708019e39354a",
       "hash": null,
-      "requested": "3.1.3",
-      "resolved": "3.1.3"
+      "requested": "3.2.0",
+      "resolved": "3.2.0"
     }
   },
   "python_packages": {
     "dspy": {
-      "version": "3.1.3",
+      "version": "3.2.0",
       "hash": null
     }
   },

@@ -2,32 +2,24 @@
 # Regenerate with: mix compile
 # Library: dspy 3.2.0
 # Python module: dspy
-# Python class: CodeInterpreterError
+# Python class: ContextWindowExceededError
 
-defmodule Dspy.CodeInterpreterError do
+defmodule Dspy.ContextWindowExceededError do
   @moduledoc """
-  Error raised during code interpretation.
+  Raised when the prompt exceeds the model's context window.
 
-  This exception covers two distinct failure modes:
+  Any `BaseLM` subclass should raise this error (or a subclass of it) when the
+  request fails because the input is too long for the model. Adapters and some
+  modules rely on catching this specific type to decide whether a fallback
+  retry is appropriate.
 
-  1. **Execution errors**: The sandbox ran user code that failed.
-     - NameError, TypeError, ValueError, etc.
-     - Tool call failures (unknown tool, tool raised exception)
-     - These are normal user code errors.
+  ## Parameters
 
-  2. **Protocol errors**: Communication between host and sandbox failed.
-     - Malformed JSON from sandbox
-     - Sandbox process crashed or became unresponsive
-     - Invalid JSON-RPC message structure
-     - These may indicate a corrupted sandbox needing restart.
-
-  The error message typically includes the original error type (e.g., "NameError: ...")
-  which can help distinguish the failure mode.
-
-  Note: SyntaxError is raised separately (not wrapped) for invalid Python syntax.
+  - `model` - The model identifier that rejected the request.
+  - `message` - Description of the error. Defaults to `"Context window exceeded"`.
   """
   def __snakebridge_python_name__, do: "dspy"
-  def __snakebridge_python_class__, do: "CodeInterpreterError"
+  def __snakebridge_python_class__, do: "ContextWindowExceededError"
   def __snakebridge_library__, do: "dspy"
   @opaque t :: SnakeBridge.Ref.t()
 
@@ -36,13 +28,12 @@ defmodule Dspy.CodeInterpreterError do
 
   ## Parameters
 
-  - `args` (term())
-  - `kwargs` (term())
+  - `model` (term() keyword-only default: None)
+  - `message` (String.t() keyword-only default: 'Context window exceeded')
   """
-  @spec new(list(term()), keyword()) :: {:ok, SnakeBridge.Ref.t()} | {:error, Snakepit.Error.t()}
-  def new(args, opts \\ []) do
-    {args, opts} = SnakeBridge.Runtime.normalize_args_opts(args, opts)
-    SnakeBridge.Runtime.call_class(__MODULE__, :__init__, [] ++ List.wrap(args), opts)
+  @spec new(keyword()) :: {:ok, SnakeBridge.Ref.t()} | {:error, Snakepit.Error.t()}
+  def new(opts \\ []) do
+    SnakeBridge.Runtime.call_class(__MODULE__, :__init__, [], opts)
   end
 
   @doc """
