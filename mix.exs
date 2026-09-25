@@ -1,7 +1,7 @@
 defmodule DSPex.MixProject do
   use Mix.Project
 
-  @version "0.12.0"
+  @version "0.13.0"
   @source_url "https://github.com/nshkrdotcom/dspex"
 
   def project do
@@ -40,8 +40,8 @@ defmodule DSPex.MixProject do
 
   defp deps do
     [
-      # SnakeBridge - Python bridge
-      {:snakebridge, "~> 0.16.0"},
+      # SnakeBridge & Snakepit - Python bridge (local development paths)
+      {:snakebridge, "~> 0.17.1"},
 
       # JSON encoding
       {:jason, "~> 1.4"},
@@ -56,7 +56,8 @@ defmodule DSPex.MixProject do
   defp python_deps do
     [
       # generate: :all enables full API surface generation
-      {:dspy, "3.2.0", generate: :all, module_mode: :explicit, max_class_methods: 500}
+      {:dspy, "3.4.0",
+       extras: ["typesafe"], generate: :all, module_mode: :explicit, max_class_methods: 500}
     ]
   end
 

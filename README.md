@@ -20,7 +20,7 @@
 
 DSPex brings [DSPy](https://github.com/stanfordnlp/dspy) — Stanford NLP's framework for programming language models — to Elixir. It ships with SnakeBridge-generated `Dspy.*` bindings that mirror DSPy's package layout (great for HexDocs + IDE navigation), plus a minimal `DSPex` convenience layer over [SnakeBridge](https://github.com/nshkrdotcom/snakebridge)'s Universal FFI. Use the generated modules for the full API surface or the thin FFI wrapper for direct calls.
 
-DSPex 0.12.0 pins and generates bindings for DSPy 3.2.0.
+DSPex 0.13.0 pins and generates bindings for DSPy 3.4.0.
 
 **Why DSPex?**
 
@@ -47,7 +47,7 @@ Add DSPex to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:dspex, "~> 0.12.0"}
+    {:dspex, "~> 0.13.0"}
   ]
 end
 ```

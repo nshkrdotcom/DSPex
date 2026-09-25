@@ -195,6 +195,33 @@ sentiment = DSPex.attr!(result, "sentiment")
 
 ---
 
+### Jev Decision Classification (`jev_classification.exs`)
+
+Structured decision-making with TypeSafe's System One model (**Jev**):
+- Non-generative decision model designed for typed answers (`bool`, `Literal[...]`, `Choice`, `Score`)
+- Fast, deterministic classification without hallucination risks
+- Uses `Dspy.Experimental.TypeSafe` client and `TYPESAFE_API_KEY`
+
+```elixir
+{:ok, lm} = Dspy.Experimental.TypeSafe.new("jev-latest", [])
+{:ok, _} = Dspy.configure(lm: lm)
+
+{:ok, classifier} =
+  Dspy.PredictClass.new("ticket -> urgent: bool, category: Literal['billing', 'technical', 'account']", [])
+
+{:ok, _} =
+  DSPex.set_attr(classifier, "fields", %{
+    "urgent" => %{"instructions" => "Is service blocked or severely degraded?"},
+    "category" => %{"instructions" => "Classify the ticket into billing, technical, or account."}
+  })
+
+{:ok, result} = Dspy.PredictClass.forward(classifier, ticket: "Checkout is down with 500 errors.")
+```
+
+**Run:** `mix run --no-start examples/jev_classification.exs`
+
+---
+
 ### Entity Extraction (`entity_extraction.exs`)
 
 Extract named entities from text:
@@ -482,6 +509,7 @@ DSPEX_RUN_TIMEOUT_SECONDS=0 ./examples/run_all.sh
 | `multi_field.exs` | Predict | Multiple inputs/outputs |
 | `custom_signature.exs` | Predict | Signatures with instructions |
 | `classification.exs` | Predict | Sentiment analysis |
+| `jev_classification.exs` | TypeSafe / Predict | Jev System One ticket triage & classification |
 | `entity_extraction.exs` | Predict | Extract people, orgs, locations |
 | `summarization.exs` | Predict | Text summarization |
 | `translation.exs` | Predict | Multi-language translation |

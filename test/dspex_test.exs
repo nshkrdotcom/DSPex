@@ -103,8 +103,10 @@ defmodule DSPexTest do
     end
 
     test "timeout_profile/1 only accepts valid profiles" do
+      invalid_profile = String.to_atom("invalid")
+
       assert_raise FunctionClauseError, fn ->
-        DSPex.timeout_profile(:invalid)
+        DSPex.timeout_profile(invalid_profile)
       end
     end
   end

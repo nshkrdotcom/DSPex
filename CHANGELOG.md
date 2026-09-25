@@ -4,6 +4,20 @@ All notable changes to DSPex will be documented in this file.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-25
+
+### Changed
+- Upgraded DSPy from 3.2.0 to 3.4.0 with `typesafe` extras support.
+- Upgraded SnakeBridge dependency to ~> 0.17.0 and Snakepit to ~> 0.14.0.
+- Refreshed Mix dependencies: Credo 1.7.19, Dialyxir 1.4.8, and ExDoc 0.40.4.
+- Fixed test suite type check compatibility under Elixir 1.18+ with zero warnings.
+- Regenerated the `Dspy.*` wrapper surface under `lib/snakebridge_generated/dspy` with SnakeBridge.
+- Bumped DSPex package version to 0.13.0 in project metadata and installation docs.
+
+### Added
+- Support for TypeSafe System One (Jev) decision models (`Dspy.Experimental.TypeSafe`).
+- Example demonstrating structured ticket classification using Jev (`examples/jev_classification.exs`).
+
 ## [0.12.0] - 2026-04-21
 
 ### Changed
@@ -187,7 +201,8 @@ Initial experimental release with direct Snakepit integration.
 - Pool-based Python process management
 - Initial examples and test infrastructure
 
-[Unreleased]: https://github.com/nshkrdotcom/DSPex/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/nshkrdotcom/DSPex/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.9.0...v0.10.0
