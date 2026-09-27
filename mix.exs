@@ -41,7 +41,7 @@ defmodule DSPex.MixProject do
   defp deps do
     [
       # SnakeBridge & Snakepit - Python bridge (local development paths)
-      {:snakebridge, "~> 0.18.0"},
+      {:snakebridge, "~> 0.18.1"},
 
       # JSON encoding
       {:jason, "~> 1.4"},
