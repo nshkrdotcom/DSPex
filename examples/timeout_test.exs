@@ -11,9 +11,9 @@ SnakeBridge.script do
   IO.puts("=====================================\n")
 
   # Setup using native bindings
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
-  {:ok, predict} = Dspy.PredictClass.new("question -> answer", [])
+  {:ok, predict} = Dspy.PredictClass.new("question -> answer")
 
   # -------------------------------------------------------------------------
   # Example 1: Default timeout (10 min via ml_inference profile)

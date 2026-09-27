@@ -8,7 +8,7 @@ SnakeBridge.script do
   IO.puts("DSPex Custom Signature Example")
   IO.puts("================================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
 
   # Create a signature with custom instructions via generated wrappers
@@ -19,7 +19,7 @@ SnakeBridge.script do
     )
 
   # Create predictor with custom signature
-  {:ok, predict} = Dspy.PredictClass.new(sig, [])
+  {:ok, predict} = Dspy.PredictClass.new(sig)
 
   questions = [
     "What is photosynthesis?",

@@ -8,10 +8,10 @@ SnakeBridge.script do
   IO.puts("DSPex Code Generation Example")
   IO.puts("===============================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
 
-  {:ok, coder} = Dspy.ChainOfThought.new("task, language -> code", [])
+  {:ok, coder} = Dspy.ChainOfThought.new("task, language -> code")
 
   tasks = [
     {"Write a function to check if a number is prime", "Python"},

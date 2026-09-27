@@ -8,10 +8,10 @@ SnakeBridge.script do
   IO.puts("DSPex Entity Extraction Example")
   IO.puts("=================================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
 
-  {:ok, extractor} = Dspy.PredictClass.new("text -> people, organizations, locations", [])
+  {:ok, extractor} = Dspy.PredictClass.new("text -> people, organizations, locations")
 
   text = """
   Apple CEO Tim Cook announced a new partnership with Microsoft at their

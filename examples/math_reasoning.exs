@@ -8,11 +8,11 @@ SnakeBridge.script do
   IO.puts("DSPex Math Reasoning Example")
   IO.puts("==============================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
 
   # Chain of thought for math problems
-  {:ok, solver} = Dspy.ChainOfThought.new("problem -> answer", [])
+  {:ok, solver} = Dspy.ChainOfThought.new("problem -> answer")
 
   problems = [
     "A train travels 120 miles in 2 hours. What is its average speed?",

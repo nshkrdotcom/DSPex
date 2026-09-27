@@ -52,7 +52,7 @@ SnakeBridge.script do
 
   # 1. Initialize TypeSafe LM with Jev
   IO.puts("1. Initializing TypeSafe System One client...")
-  {:ok, lm} = Dspy.Experimental.TypeSafe.new("jev-latest", [])
+  {:ok, lm} = Dspy.Experimental.TypeSafe.new("jev-latest")
   {:ok, _} = Dspy.configure(lm: lm)
   IO.puts("   ✓ Bound to TypeSafe System One engine (jev-latest)\n")
 
@@ -71,7 +71,7 @@ SnakeBridge.script do
       custom_types
     )
 
-  {:ok, classifier} = Dspy.PredictClass.new(sig, [])
+  {:ok, classifier} = Dspy.PredictClass.new(sig)
 
   # Configure question instructions for Jev's decision model
   {:ok, _} =

@@ -8,11 +8,11 @@ SnakeBridge.script do
   IO.puts("DSPex Classification Example")
   IO.puts("=============================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
 
   # Sentiment classification
-  {:ok, classifier} = Dspy.PredictClass.new("text -> sentiment", [])
+  {:ok, classifier} = Dspy.PredictClass.new("text -> sentiment")
 
   texts = [
     "I love this product! It's amazing!",

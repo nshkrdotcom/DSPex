@@ -203,11 +203,11 @@ Structured decision-making with TypeSafe's System One model (**Jev**):
 - Uses `Dspy.Experimental.TypeSafe` client and `TYPESAFE_API_KEY`
 
 ```elixir
-{:ok, lm} = Dspy.Experimental.TypeSafe.new("jev-latest", [])
+{:ok, lm} = Dspy.Experimental.TypeSafe.new("jev-latest")
 {:ok, _} = Dspy.configure(lm: lm)
 
 {:ok, classifier} =
-  Dspy.PredictClass.new("ticket -> urgent: bool, category: Literal['billing', 'technical', 'account']", [])
+  Dspy.PredictClass.new("ticket -> urgent: bool, category: Literal['billing', 'technical', 'account']")
 
 {:ok, _} =
   DSPex.set_attr(classifier, "fields", %{
@@ -340,7 +340,7 @@ Optimize a student module with `BootstrapFewShot`:
 - Demonstrates the optimizer workflow
 
 ```elixir
-{:ok, optimizer} = Dspy.BootstrapFewShot.new([])
+{:ok, optimizer} = Dspy.BootstrapFewShot.new()
 {:ok, optimized} = Dspy.BootstrapFewShot.compile(optimizer, student, trainset: trainset)
 ```
 
@@ -425,9 +425,9 @@ Bypass DSPy modules and call the LM directly:
 - Returns a provider response payload
 
 ```elixir
-{:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [], temperature: 0.9)
+{:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", temperature: 0.9)
 messages = [%{"role" => "user", "content" => "Tell me a joke about programming."}]
-{:ok, response} = Dspy.LM.forward(lm, [], messages: messages)
+{:ok, response} = Dspy.LM.forward(lm, messages: messages)
 ```
 
 **Run:** `mix run --no-start examples/direct_lm_call.exs`

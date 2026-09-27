@@ -478,7 +478,7 @@ defmodule RLMExperiment.DataExtraction do
     session_id = unique_session("rlm_main")
     ensure_session(session_id)
 
-    {:ok, lm} = Dspy.LM.new(@model, [], with_runtime([temperature: 0.1], :rlm_pool, session_id))
+    {:ok, lm} = Dspy.LM.new(@model, with_runtime([temperature: 0.1], :rlm_pool, session_id))
 
     {:ok, _} = Dspy.configure(with_runtime([lm: lm], :rlm_pool, session_id))
 
@@ -572,16 +572,12 @@ defmodule RLMExperiment.DataExtraction do
     ensure_session(session_id)
 
     {:ok, lm} =
-      Dspy.LM.new(@model, [], with_runtime([temperature: 0.1], :direct_pool, session_id))
+      Dspy.LM.new(@model, with_runtime([temperature: 0.1], :direct_pool, session_id))
 
     {:ok, _} = Dspy.configure(with_runtime([lm: lm], :direct_pool, session_id))
 
     {:ok, predictor} =
-      Dspy.PredictClass.new(
-        "context, question -> answer",
-        [],
-        with_runtime([], :direct_pool, session_id)
-      )
+      Dspy.PredictClass.new("context, question -> answer", with_runtime([], :direct_pool, session_id))
 
     %{
       label: "direct",

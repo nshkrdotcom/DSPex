@@ -4,6 +4,11 @@ All notable changes to DSPex will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- Upgraded the generated DSPy binding surface to SnakeBridge 0.18.0 and regenerated the checked-in `Dspy.*` modules for DSPy 3.4.0.
+- Migrated examples and documentation from the legacy synthetic positional-argument list convention to SnakeBridge 0.18's generated positional-prefix and guarded keyword-option call forms.
+
+
 ## [0.13.0] - 2026-09-25
 
 ### Changed

@@ -12,7 +12,7 @@ SnakeBridge.script do
 
   # Create and configure LM using native bindings
   IO.puts("1. Creating language model...")
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [], temperature: 0.7)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", temperature: 0.7)
   IO.puts("   Created: gemini/gemini-flash-lite-latest")
 
   IO.puts("\n2. Configuring DSPy...")
@@ -21,7 +21,7 @@ SnakeBridge.script do
 
   # Create predictor using native bindings
   IO.puts("\n3. Creating Predict module...")
-  {:ok, predict} = Dspy.PredictClass.new("question -> answer", [])
+  {:ok, predict} = Dspy.PredictClass.new("question -> answer")
   IO.puts("   Created!")
 
   # Run prediction using native method call

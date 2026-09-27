@@ -8,8 +8,8 @@ require SnakeBridge
 
 defmodule CustomQA do
   def new do
-    {:ok, extract} = Dspy.PredictClass.new("question -> keywords", [])
-    {:ok, answer} = Dspy.PredictClass.new("question, keywords -> answer", [])
+    {:ok, extract} = Dspy.PredictClass.new("question -> keywords")
+    {:ok, answer} = Dspy.PredictClass.new("question, keywords -> answer")
     %{extract: extract, answer: answer}
   end
 
@@ -30,7 +30,7 @@ SnakeBridge.script do
   IO.puts("DSPex Custom Module Example")
   IO.puts("===========================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
 
   qa = CustomQA.new()

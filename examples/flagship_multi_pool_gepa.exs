@@ -181,9 +181,9 @@ defmodule DSPex.FlagshipMultiPoolGepa do
     }
 
     with_session_runtime(session, fn ->
-      {:ok, lm} = Dspy.LM.new(@model, [], temperature: temperature)
+      {:ok, lm} = Dspy.LM.new(@model, temperature: temperature)
       {:ok, _} = Dspy.configure(lm: lm)
-      {:ok, predictor} = Dspy.PredictClass.new(signature, [])
+      {:ok, predictor} = Dspy.PredictClass.new(signature)
 
       Map.merge(session, %{
         predictor: predictor,
@@ -204,9 +204,9 @@ defmodule DSPex.FlagshipMultiPoolGepa do
     }
 
     with_session_runtime(session, fn ->
-      {:ok, lm} = Dspy.LM.new(@model, [], temperature: temperature)
+      {:ok, lm} = Dspy.LM.new(@model, temperature: temperature)
       {:ok, _} = Dspy.configure(lm: lm)
-      {:ok, module} = Dspy.ChainOfThought.new(signature, [])
+      {:ok, module} = Dspy.ChainOfThought.new(signature)
 
       Map.merge(session, %{
         module: module,
@@ -363,7 +363,7 @@ defmodule DSPex.FlagshipMultiPoolGepa do
     metric = build_gepa_metric(session)
 
     with_session_runtime(session, fn ->
-      {:ok, reflection_lm} = Dspy.LM.new(@model, [], temperature: 0.9)
+      {:ok, reflection_lm} = Dspy.LM.new(@model, temperature: 0.9)
 
       {:ok, gepa} =
         GEPA.new(
@@ -392,12 +392,7 @@ defmodule DSPex.FlagshipMultiPoolGepa do
     Enum.map(tickets, fn ticket ->
       with_session_runtime(session, fn ->
         {:ok, example} =
-          Example.new(
-            [],
-            ticket: ticket.text,
-            category: ticket.category,
-            urgency: ticket.urgency
-          )
+          Example.new(ticket: ticket.text, category: ticket.category, urgency: ticket.urgency)
 
         {:ok, example} = Example.with_inputs(example, ["ticket"])
         example

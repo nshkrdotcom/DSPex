@@ -8,11 +8,11 @@ SnakeBridge.script do
   IO.puts("DSPex Multi-Field Signature Example")
   IO.puts("=====================================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
 
   # Multiple inputs and outputs
-  {:ok, analyzer} = Dspy.PredictClass.new("title, content -> category, keywords, tone", [])
+  {:ok, analyzer} = Dspy.PredictClass.new("title, content -> category, keywords, tone")
 
   title = "Breaking: Major Tech Company Announces Layoffs"
   content = "The company cited economic headwinds and a need to focus on AI initiatives."

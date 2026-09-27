@@ -156,11 +156,11 @@ lm = DSPex.lm!("ollama/llama2")
 Bypass modules and call the LM directly:
 
 ```elixir
-{:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [], temperature: 0.9)
+{:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", temperature: 0.9)
 
 # Direct call with messages
 messages = [%{"role" => "user", "content" => "Say hello in French"}]
-{:ok, response} = Dspy.LM.forward(lm, [], messages: messages)
+{:ok, response} = Dspy.LM.forward(lm, messages: messages)
 ```
 
 ## Examples
@@ -250,7 +250,7 @@ config :snakebridge,
 ## API Reference
 
 DSPex provides a thin wrapper over SnakeBridge's Universal FFI, and the generated
-`Dspy.*` modules expose DSPy 3.2.0's public API surface (generated via SnakeBridge `module_mode: :explicit`):
+`Dspy.*` modules expose DSPy 3.4.0's public API surface (generated via SnakeBridge `module_mode: :explicit`):
 
 ### Lifecycle
 

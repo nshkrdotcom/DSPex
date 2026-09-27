@@ -8,10 +8,10 @@ SnakeBridge.script do
   IO.puts("DSPex Summarization Example")
   IO.puts("============================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
 
-  {:ok, summarizer} = Dspy.PredictClass.new("text -> summary", [])
+  {:ok, summarizer} = Dspy.PredictClass.new("text -> summary")
 
   text = """
   Elixir is a dynamic, functional language for building scalable and maintainable

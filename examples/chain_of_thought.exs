@@ -11,11 +11,11 @@ SnakeBridge.script do
   IO.puts("===============================\n")
 
   # Setup using native bindings
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [], temperature: 0.7)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", temperature: 0.7)
   {:ok, _} = Dspy.configure(lm: lm)
 
   # Create ChainOfThought predictor using native bindings
-  {:ok, cot} = Dspy.ChainOfThought.new("question -> answer", [])
+  {:ok, cot} = Dspy.ChainOfThought.new("question -> answer")
 
   questions = [
     "If I have 5 apples and give 2 to my friend, then buy 3 more, how many do I have?",

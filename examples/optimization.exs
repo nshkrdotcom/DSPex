@@ -10,13 +10,13 @@ SnakeBridge.script do
   IO.puts("DSPex Optimization Example")
   IO.puts("==========================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
 
-  {:ok, student} = Dspy.PredictClass.new("question -> answer", [])
+  {:ok, student} = Dspy.PredictClass.new("question -> answer")
 
   build_example = fn question, answer ->
-    {:ok, example} = Dspy.Example.new([], question: question, answer: answer)
+    {:ok, example} = Dspy.Example.new(question: question, answer: answer)
     {:ok, example} = Dspy.Example.with_inputs(example, ["question"])
     example
   end
@@ -27,7 +27,7 @@ SnakeBridge.script do
     build_example.("What color do you get by mixing blue and yellow?", "Green")
   ]
 
-  {:ok, optimizer} = Dspy.BootstrapFewShot.new([])
+  {:ok, optimizer} = Dspy.BootstrapFewShot.new()
 
   # Some DSPy optimizers accept a metric argument. If needed, pass `metric:` here.
   {:ok, optimized} = Dspy.BootstrapFewShot.compile(optimizer, student, trainset: trainset)

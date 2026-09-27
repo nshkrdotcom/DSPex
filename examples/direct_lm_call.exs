@@ -8,7 +8,7 @@ SnakeBridge.script do
   IO.puts("DSPex Direct LM Call Example")
   IO.puts("==============================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [], temperature: 0.9)
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", temperature: 0.9)
 
   # Call LM directly (not through a module)
   messages = [
@@ -17,7 +17,7 @@ SnakeBridge.script do
 
   IO.puts("Calling LM directly with messages...\n")
 
-  {:ok, response} = Dspy.LM.forward(lm, [], messages: messages)
+  {:ok, response} = Dspy.LM.forward(lm, messages: messages)
 
   extract_text = fn payload ->
     cond do
@@ -61,7 +61,7 @@ SnakeBridge.script do
     %{"role" => "user", "content" => "What's 2+2? Reply with just the number."}
   ]
 
-  {:ok, response2} = Dspy.LM.forward(lm, [], messages: messages2)
+  {:ok, response2} = Dspy.LM.forward(lm, messages: messages2)
   IO.puts("2+2 = #{extract_text.(response2)}")
 
   IO.puts("\nDone!")

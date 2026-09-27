@@ -10,11 +10,11 @@ SnakeBridge.script do
   IO.puts("DSPex Multi-hop QA Example")
   IO.puts("=============================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
 
-  {:ok, hop1} = Dspy.PredictClass.new("question -> answer", [])
-  {:ok, hop2} = Dspy.PredictClass.new("context, question -> answer", [])
+  {:ok, hop1} = Dspy.PredictClass.new("question -> answer")
+  {:ok, hop2} = Dspy.PredictClass.new("context, question -> answer")
 
   question = "What is the capital of the state where the University of Michigan is located?"
   IO.puts("Question: #{question}\n")

@@ -152,7 +152,7 @@ defmodule DSPex.FlagshipMultiPoolRlm do
     session_id = unique_session("rlm")
     ensure_session(session_id)
 
-    {:ok, lm} = Dspy.LM.new(@model, [], with_runtime([temperature: 0.3], :rlm_pool, session_id))
+    {:ok, lm} = Dspy.LM.new(@model, with_runtime([temperature: 0.3], :rlm_pool, session_id))
     {:ok, _} = Dspy.configure(with_runtime([lm: lm], :rlm_pool, session_id))
 
     {:ok, rlm} =
@@ -193,10 +193,10 @@ defmodule DSPex.FlagshipMultiPoolRlm do
     ensure_session(session_id)
 
     {:ok, lm} =
-      Dspy.LM.new(@model, [], with_runtime([temperature: temperature], pool, session_id))
+      Dspy.LM.new(@model, with_runtime([temperature: temperature], pool, session_id))
 
     {:ok, _} = Dspy.configure(with_runtime([lm: lm], pool, session_id))
-    {:ok, predictor} = Dspy.PredictClass.new(signature, [], with_runtime([], pool, session_id))
+    {:ok, predictor} = Dspy.PredictClass.new(signature, with_runtime([], pool, session_id))
 
     %{
       label: label,

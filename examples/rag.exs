@@ -30,7 +30,7 @@ SnakeBridge.script do
   IO.puts("DSPex RAG Example")
   IO.puts("=================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
 
   docs = [
@@ -57,7 +57,7 @@ SnakeBridge.script do
   context =
     Enum.map_join(top_docs, "\n\n", &"[#{&1.title}] #{&1.text}")
 
-  {:ok, rag} = Dspy.PredictClass.new("context, question -> answer", [])
+  {:ok, rag} = Dspy.PredictClass.new("context, question -> answer")
   {:ok, result} = Dspy.PredictClass.forward(rag, context: context, question: question)
   {:ok, answer} = SnakeBridge.attr(result, "answer")
 

@@ -8,10 +8,10 @@ SnakeBridge.script do
   IO.puts("DSPex Translation Example")
   IO.puts("==========================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
 
-  {:ok, translator} = Dspy.PredictClass.new("text, target_language -> translation", [])
+  {:ok, translator} = Dspy.PredictClass.new("text, target_language -> translation")
 
   phrases = [
     {"Hello, how are you?", "Spanish"},

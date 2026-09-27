@@ -8,10 +8,10 @@ SnakeBridge.script do
   IO.puts("DSPex Q&A with Context Example")
   IO.puts("================================\n")
 
-  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest", [])
+  {:ok, lm} = Dspy.LM.new("gemini/gemini-flash-lite-latest")
   {:ok, _} = Dspy.configure(lm: lm)
 
-  {:ok, qa} = Dspy.PredictClass.new("context, question -> answer", [])
+  {:ok, qa} = Dspy.PredictClass.new("context, question -> answer")
 
   context = """
   The Erlang programming language was created by Joe Armstrong, Robert Virding,

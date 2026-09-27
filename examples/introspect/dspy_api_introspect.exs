@@ -758,11 +758,7 @@ defmodule DSPex.DspyApiIntrospect do
     output_field = List.first(outputs) || "output"
 
     {:ok, lm} =
-      Dspy.LM.new(
-        opts.model,
-        [],
-        with_runtime([temperature: opts.temperature], pool, session_id)
-      )
+      Dspy.LM.new(opts.model, with_runtime([temperature: opts.temperature], pool, session_id))
 
     {:ok, _} = Dspy.configure(with_runtime([lm: lm], pool, session_id))
 
