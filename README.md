@@ -20,7 +20,7 @@
 
 DSPex brings [DSPy](https://github.com/stanfordnlp/dspy) — Stanford NLP's framework for programming language models — to Elixir. It ships with SnakeBridge-generated `Dspy.*` bindings that mirror DSPy's package layout (great for HexDocs + IDE navigation), plus a minimal `DSPex` convenience layer over [SnakeBridge](https://github.com/nshkrdotcom/snakebridge)'s Universal FFI. Use the generated modules for the full API surface or the thin FFI wrapper for direct calls.
 
-DSPex 0.13.0 pins and generates bindings for DSPy 3.4.0.
+DSPex 0.13.1 pins and generates bindings for DSPy 3.4.0.
 
 **Why DSPex?**
 
@@ -47,7 +47,7 @@ Add DSPex to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:dspex, "~> 0.13.0"}
+    {:dspex, "~> 0.13.1"}
   ]
 end
 ```
@@ -66,11 +66,7 @@ mix deps.get
 mix snakebridge.setup  # Creates managed venv + installs dspy-ai automatically
 ```
 
-SnakeBridge manages an isolated venv under `priv/snakepit/python/venv`; no manual venv creation or pip installs needed. This release installs DSPy 3.2.0.
-
-For local development against a checkout of SnakeBridge, this repo uses a path dependency
-(`../snakebridge`). If you want to use the Hex release instead, update `mix.exs` to depend on a
-versioned `{:snakebridge, "~> ..."}`
+SnakeBridge manages an isolated venv under `priv/snakepit/python/venv`; no manual venv creation or pip installs needed. This release installs DSPy 3.4.0 and depends on SnakeBridge `~> 0.18.1` from Hex.
 
 When SnakeBridge changes or you need to refresh generated wrappers, run:
 

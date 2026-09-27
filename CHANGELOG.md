@@ -4,10 +4,13 @@ All notable changes to DSPex will be documented in this file.
 
 ## [Unreleased]
 
-### Changed
-- Upgraded the generated DSPy binding surface to SnakeBridge 0.18.0 and regenerated the checked-in `Dspy.*` modules for DSPy 3.4.0.
-- Migrated examples and documentation from the legacy synthetic positional-argument list convention to SnakeBridge 0.18's generated positional-prefix and guarded keyword-option call forms.
+## [0.13.1] - 2026-09-27
 
+### Changed
+- Regenerated the checked-in DSPy 3.4.0 `Dspy.*` binding surface against SnakeBridge 0.18.1.
+- Corrected Python classmethod and staticmethod descriptor binding while preserving instance property access.
+- Preserved positional-default constructor signatures, including `Dspy.Predict.RLM.new/1..9`.
+- Migrated examples and documentation from the legacy synthetic positional-argument list convention to SnakeBridge 0.18's generated positional-prefix and guarded keyword-option call forms.
 
 ## [0.13.0] - 2026-09-25
 
@@ -206,7 +209,8 @@ Initial experimental release with direct Snakepit integration.
 - Pool-based Python process management
 - Initial examples and test infrastructure
 
-[Unreleased]: https://github.com/nshkrdotcom/DSPex/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/nshkrdotcom/DSPex/compare/0.13.1...HEAD
+[0.13.1]: https://github.com/nshkrdotcom/DSPex/compare/v0.13.0...0.13.1
 [0.13.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/nshkrdotcom/DSPex/compare/v0.10.0...v0.11.0
